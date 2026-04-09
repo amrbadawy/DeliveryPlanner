@@ -1,12 +1,30 @@
 .vs/
 .opencode/
+.vscode/
+.idea/
+
+# OS files
+Thumbs.db
+.DS_Store
 
 # .NET build artifacts
 **/bin/
 **/obj/
+artifacts/
+TestResults/
+**/TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+**/coverage/
 
 # Node dependencies
 **/node_modules/
+
+# Playwright outputs
+**/playwright-report/
+**/test-results/
 
 # User-specific files
 *.user
