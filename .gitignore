@@ -1,0 +1,17 @@
+.vs/
+.opencode/
+
+# .NET build artifacts
+**/bin/
+**/obj/
+
+# Node dependencies
+**/node_modules/
+
+# User-specific files
+*.user
+*.suo
+
+# Logs and temporary files
+*.log
+*.tmp

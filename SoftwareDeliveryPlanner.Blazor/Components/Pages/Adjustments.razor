@@ -1,0 +1,213 @@
+@page "/adjustments"
+@using SoftwareDeliveryPlanner.Data
+@using SoftwareDeliveryPlanner.Models
+@using SoftwareDeliveryPlanner.Services
+@inject IDbContextFactory<PlannerDbContext> DbFactory
+
+<PageTitle>Adjustments</PageTitle>
+
+<h3 style="margin-bottom: 20px;">🏖️ Adjustments (Vacations - Training)</h3>
+
+<div class="mb-3">
+    <button class="btn btn-primary" @onclick="ShowAddModal" data-testid="adjustments-add">➕ Add Adjustment</button>
+    <button class="btn btn-secondary" @onclick="RefreshData" data-testid="adjustments-refresh">🔄 Refresh</button>
+</div>
+
+@if (showModal)
+{
+    <div class="modal d-block" style="background: rgba(0,0,0,0.5);" data-testid="adjustments-modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Adjustment</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label>Employee:</label>
+                        <select class="form-control" @bind="adjustmentForm.ResourceId" data-testid="adjustments-resource-id">
+                            @foreach (var r in resources)
+                            {
+                                <option value="@r.ResourceId">@r.ResourceName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <label>Adjustment Type:</label>
+                            <select class="form-control" @bind="adjustmentForm.AdjType" data-testid="adjustments-type">
+                                <option>Vacation</option>
+                                <option>Training</option>
+                                <option>Sick Leave</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label>Availability (%):</label>
+                            <input class="form-control" type="number" @bind="adjustmentForm.AvailabilityPct" data-testid="adjustments-availability" />
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <label>Start Date:</label>
+                            <input class="form-control" type="date" @bind="startDateValue" data-testid="adjustments-start-date" />
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label>End Date:</label>
+                            <input class="form-control" type="date" @bind="endDateValue" data-testid="adjustments-end-date" />
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label>Notes:</label>
+                        <textarea class="form-control" @bind="adjustmentForm.Notes" data-testid="adjustments-notes"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" @onclick="SaveAdjustment" data-testid="adjustments-save">Save</button>
+                    <button class="btn btn-secondary" @onclick="CloseModal" data-testid="adjustments-cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showDeleteConfirm)
+{
+    <div class="modal d-block" style="background: rgba(0,0,0,0.5);" data-testid="adjustments-delete-modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete this adjustment?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-danger" @onclick="ConfirmDelete" data-testid="adjustments-delete-confirm">Delete</button>
+                    <button class="btn btn-secondary" @onclick="() => showDeleteConfirm = false" data-testid="adjustments-delete-cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<table class="table table-striped table-hover" data-testid="adjustments-table">
+    <thead class="table-dark">
+        <tr>
+            <th>Employee</th>
+            <th>Type</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Availability %</th>
+            <th>Notes</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var a in adjustments)
+        {
+            <tr>
+                <td>@a.ResourceId</td>
+                <td>@a.AdjType</td>
+                <td>@a.AdjStart.ToString("yyyy-MM-dd")</td>
+                <td>@a.AdjEnd.ToString("yyyy-MM-dd")</td>
+                <td>@a.AvailabilityPct%</td>
+                <td>@a.Notes</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteAdjustment(a)" data-testid="adjustments-delete-@a.Id">🗑️</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<Adjustment> adjustments = new();
+    private List<TeamMember> resources = new();
+    private bool showModal = false;
+    private bool showDeleteConfirm = false;
+    private Adjustment? editingAdjustment;
+    private Adjustment adjustmentForm = new();
+    private DateTime startDateValue;
+    private DateTime endDateValue;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        adjustments = await db.Adjustments.ToListAsync();
+        resources = await db.Resources.ToListAsync();
+    }
+
+    private void ShowAddModal()
+    {
+        adjustmentForm = new Adjustment
+        {
+            AdjType = "Vacation",
+            AvailabilityPct = 0,
+            ResourceId = resources.FirstOrDefault()?.ResourceId ?? string.Empty
+        };
+        startDateValue = DateTime.Today;
+        endDateValue = DateTime.Today.AddDays(7);
+        showModal = true;
+    }
+
+    private void DeleteAdjustment(Adjustment a)
+    {
+        editingAdjustment = a;
+        showDeleteConfirm = true;
+    }
+
+    private async Task SaveAdjustment()
+    {
+        if (string.IsNullOrWhiteSpace(adjustmentForm.ResourceId)) return;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        adjustmentForm.AdjStart = startDateValue;
+        adjustmentForm.AdjEnd = endDateValue;
+        
+        db.Adjustments.Add(adjustmentForm);
+        await db.SaveChangesAsync();
+        var scheduler = new SchedulingEngine(db);
+        scheduler.RunScheduler();
+        await LoadData();
+        CloseModal();
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (editingAdjustment != null)
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var a = await db.Adjustments.FirstOrDefaultAsync(x => x.Id == editingAdjustment.Id);
+            if (a != null)
+            {
+                db.Adjustments.Remove(a);
+                await db.SaveChangesAsync();
+                var scheduler = new SchedulingEngine(db);
+                scheduler.RunScheduler();
+            }
+        }
+        showDeleteConfirm = false;
+        editingAdjustment = null;
+        await LoadData();
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+    }
+
+    private async Task RefreshData()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var scheduler = new SchedulingEngine(db);
+        scheduler.RunScheduler();
+        await LoadData();
+    }
+}

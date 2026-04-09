@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/SoftwareDeliveryPlannerCS/">
+    <Project Path="SoftwareDeliveryPlannerCS/SoftwareDeliveryPlanner.csproj" />
+  </Folder>
+  <Project Path="SoftwareDeliveryPlanner.Blazor/SoftwareDeliveryPlanner.Blazor.csproj" />
+  <Project Path="SoftwareDeliveryPlanner.Tests/SoftwareDeliveryPlanner.Tests.csproj" />
+</Solution>

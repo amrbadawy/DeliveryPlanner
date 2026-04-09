@@ -1,0 +1,131 @@
+@page "/"
+@using SoftwareDeliveryPlanner.Data
+@using SoftwareDeliveryPlanner.Services
+@inject IDbContextFactory<PlannerDbContext> DbFactory
+
+<PageTitle>Dashboard</PageTitle>
+
+<h3 style="margin-bottom: 20px;">📊 Dashboard</h3>
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary mb-3">
+            <div class="card-header">Total Services</div>
+            <div class="card-body">
+                <h4 class="card-title">@totalServices</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success mb-3">
+            <div class="card-header">Total Estimation (days)</div>
+            <div class="card-body">
+                <h4 class="card-title">@totalEstimation</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info mb-3">
+            <div class="card-header">Active Resources</div>
+            <div class="card-body">
+                <h4 class="card-title">@activeResources</h4>
+                <small>Capacity: @totalCapacity.ToString("F1")</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning mb-3">
+            <div class="card-header">Projected Finish</div>
+            <div class="card-body">
+                <h4 class="card-title">@overallFinish</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header bg-success text-white">✅ On Track</div>
+            <div class="card-body">
+                <h2 style="color: green;">@onTrack</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header bg-warning text-white">⚠️ At Risk</div>
+            <div class="card-body">
+                <h2 style="color: orange;">@atRisk</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header bg-danger text-white">🔴 Late</div>
+            <div class="card-body">
+                <h2 style="color: red;">@late</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">📈 Statistics</div>
+            <div class="card-body">
+                <p>Avg Assigned Developers: <strong>@avgAssigned</strong></p>
+                <button class="btn btn-primary" @onclick="RunScheduler" data-testid="btn-run-scheduler">
+                    🔄 Run Scheduler
+                </button>
+                <span style="margin-left: 10px;" data-testid="scheduler-result">@schedulerResult</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private int totalServices = 0;
+    private double totalEstimation = 0;
+    private int activeResources = 0;
+    private double totalCapacity = 0;
+    private string overallFinish = "N/A";
+    private int onTrack = 0;
+    private int atRisk = 0;
+    private int late = 0;
+    private double avgAssigned = 0;
+    private string schedulerResult = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadKPIs();
+    }
+
+    private async Task LoadKPIs()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.InitializeDefaultData();
+
+        var scheduler = new SchedulingEngine(db);
+        var kpis = scheduler.GetDashboardKPIs();
+        totalServices = (int)kpis["total_services"];
+        totalEstimation = (double)kpis["total_estimation"];
+        activeResources = (int)kpis["active_resources"];
+        totalCapacity = (double)kpis["total_capacity"];
+        overallFinish = kpis["overall_finish"]?.ToString() ?? "N/A";
+        onTrack = (int)kpis["on_track"];
+        atRisk = (int)kpis["at_risk"];
+        late = (int)kpis["late"];
+        avgAssigned = (double)kpis["avg_assigned"];
+    }
+
+    private async Task RunScheduler()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var scheduler = new SchedulingEngine(db);
+        var result = scheduler.RunScheduler();
+        schedulerResult = result;
+        await LoadKPIs();
+    }
+}

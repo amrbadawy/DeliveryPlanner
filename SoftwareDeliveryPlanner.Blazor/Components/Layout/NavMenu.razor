@@ -1,0 +1,59 @@
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <span class="navbar-brand">Main Menu</span>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All" data-testid="nav-dashboard">
+                <span style="margin-left: 8px;">📊</span> Dashboard
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="tasks" data-testid="nav-tasks">
+                <span style="margin-left: 8px;">📋</span> Task Register
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="resources" data-testid="nav-resources">
+                <span style="margin-left: 8px;">👥</span> Resources
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="adjustments" data-testid="nav-adjustments">
+                <span style="margin-left: 8px;">🏖️</span> Adjustments
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="holidays" data-testid="nav-holidays">
+                <span style="margin-left: 8px;">🎉</span> Holidays
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="calendar" data-testid="nav-calendar">
+                <span style="margin-left: 8px;">📅</span> Calendar
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="timeline" data-testid="nav-timeline">
+                <span style="margin-left: 8px;">🗓️</span> Timeline
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="output" data-testid="nav-output">
+                <span style="margin-left: 8px;">📤</span> Delivery Plan
+            </NavLink>
+        </div>
+    </nav>
+</div>
