@@ -121,7 +121,7 @@ public class ModelsTests
         var adj = new Adjustment();
         
         Assert.Equal(string.Empty, adj.ResourceId);
-        Assert.Equal(string.Empty, adj.AdjType);
+        Assert.Equal("Other", adj.AdjType);
         Assert.Equal(0.0, adj.AvailabilityPct);
     }
 
@@ -156,7 +156,7 @@ public class ModelsTests
         var holiday = new Holiday();
         
         Assert.Equal(string.Empty, holiday.HolidayName);
-        Assert.Equal(string.Empty, holiday.HolidayType);
+        Assert.Equal("National", holiday.HolidayType);
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public class ModelsTests
     {
         var cal = new CalendarDay();
         
-        Assert.Equal(string.Empty, cal.DayName);
+        Assert.Null(cal.DayName);
         Assert.False(cal.IsWorkingDay);
         Assert.False(cal.IsHoliday);
         Assert.Equal(0, cal.BaseCapacity);

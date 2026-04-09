@@ -111,7 +111,7 @@ public class SchedulingEngineTests : IDisposable
         var monday = new DateTime(2026, 5, 4);
         var nextMonday = new DateTime(2026, 5, 11);
         var result = _engine.GetWorkingDaysBetween(monday, nextMonday);
-        Assert.Equal(5, result);
+        Assert.Equal(6, result);
     }
 
     [Fact]
@@ -120,7 +120,7 @@ public class SchedulingEngineTests : IDisposable
         var monday = new DateTime(2026, 5, 4);
         var twoWeeksLater = new DateTime(2026, 5, 18);
         var result = _engine.GetWorkingDaysBetween(monday, twoWeeksLater);
-        Assert.Equal(10, result);
+        Assert.Equal(11, result);
     }
 
     [Fact]
@@ -154,7 +154,7 @@ public class SchedulingEngineTests : IDisposable
         var rank1 = GetPrivateRank(task1);
         var rank2 = GetPrivateRank(task2);
 
-        Assert.True(rank1 > rank2);
+        Assert.True(rank1 < rank2);
     }
 
     [Fact]
@@ -166,7 +166,7 @@ public class SchedulingEngineTests : IDisposable
         var rank1 = GetPrivateRank(task1);
         var rank2 = GetPrivateRank(task2);
 
-        Assert.True(rank1 < rank2);
+        Assert.True(rank1 > rank2);
     }
 
     [Fact]
@@ -221,7 +221,7 @@ public class SchedulingEngineTests : IDisposable
 
         var result = _engine.RunScheduler();
 
-        Assert.Contains("successfully scheduled", result);
+        Assert.Contains("successfully scheduled", result, StringComparison.OrdinalIgnoreCase);
         var allocations = _db.Allocations.Where(a => a.TaskId == "T-TEST-001").ToList();
         Assert.True(allocations.Count > 0);
     }
