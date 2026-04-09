@@ -1,18 +1,17 @@
 # Software Delivery Planner
 
-This repository contains two .NET applications and a shared test project for software delivery planning and scheduling.
+This repository contains a Blazor application and a shared test project for software delivery planning and scheduling.
 
 ## Projects
 
 - `SoftwareDeliveryPlanner.Blazor/` - Blazor web application.
-- `SoftwareDeliveryPlannerCS/` - Windows Forms desktop application.
 - `SoftwareDeliveryPlanner.Tests/` - xUnit tests.
 - `SoftwareDeliveryPlanner.slnx` - Solution file.
 
 ## Prerequisites
 
 - .NET SDK 10.0+
-- Windows (required for WinForms project and current test target framework)
+- Windows (required for current test target framework)
 - Optional: Node.js (only needed for Playwright e2e tests under the Blazor project)
 
 ## Bootstrap Assets
@@ -36,20 +35,6 @@ dotnet test SoftwareDeliveryPlanner.Tests/SoftwareDeliveryPlanner.Tests.csproj
 ```bash
 dotnet run --project SoftwareDeliveryPlanner.Blazor/SoftwareDeliveryPlanner.Blazor.csproj
 ```
-
-### WinForms App
-
-```bash
-dotnet run --project SoftwareDeliveryPlannerCS/SoftwareDeliveryPlanner.csproj
-```
-
-## Publish Desktop App
-
-```bash
-dotnet publish SoftwareDeliveryPlannerCS/SoftwareDeliveryPlanner.csproj -c Release
-```
-
-The project is configured for self-contained single-file publish on `win-x64`.
 
 ## CI
 
