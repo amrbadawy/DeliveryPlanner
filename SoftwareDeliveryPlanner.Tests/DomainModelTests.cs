@@ -243,21 +243,36 @@ public class AdjustmentDomainTests
 }
 
 // ============================================================
-// Holiday.Create — domain factory
+// Holiday.Create — domain factory (date range)
 // ============================================================
 
 public class HolidayDomainTests
 {
     [Fact]
-    public void Create_ValidInputs_ReturnsPopulatedHoliday()
+    public void Create_ValidRange_ReturnsPopulatedHoliday()
+    {
+        var start = new DateTime(2026, 3, 30);
+        var end = new DateTime(2026, 4, 2);
+        var holiday = Holiday.Create("Eid Al-Fitr", start, end, "Religious", "Festival");
+
+        Assert.Equal("Eid Al-Fitr", holiday.HolidayName);
+        Assert.Equal(start.Date, holiday.StartDate);
+        Assert.Equal(end.Date, holiday.EndDate);
+        Assert.Equal("Religious", holiday.HolidayType);
+        Assert.Equal("Festival", holiday.Notes);
+        Assert.Equal(4, holiday.DurationDays);
+    }
+
+    [Fact]
+    public void Create_SingleDay_OverloadSetsStartAndEndEqual()
     {
         var date = new DateTime(2026, 9, 23);
         var holiday = Holiday.Create("National Day", date, "National", "Key date");
 
         Assert.Equal("National Day", holiday.HolidayName);
-        Assert.Equal(date.Date, holiday.HolidayDate);
-        Assert.Equal("National", holiday.HolidayType);
-        Assert.Equal("Key date", holiday.Notes);
+        Assert.Equal(date.Date, holiday.StartDate);
+        Assert.Equal(date.Date, holiday.EndDate);
+        Assert.Equal(1, holiday.DurationDays);
     }
 
     [Theory]
@@ -266,29 +281,51 @@ public class HolidayDomainTests
     public void Create_EmptyName_ThrowsDomainException(string name)
     {
         Assert.Throws<DomainException>(() =>
-            Holiday.Create(name, DateTime.Today));
+            Holiday.Create(name, DateTime.Today, DateTime.Today));
     }
 
     [Fact]
-    public void Create_StripsTimeComponent()
+    public void Create_StartAfterEnd_ThrowsDomainException()
     {
-        var dateWithTime = new DateTime(2026, 9, 23, 14, 30, 0);
-        var holiday = Holiday.Create("National Day", dateWithTime);
-        Assert.Equal(new DateTime(2026, 9, 23), holiday.HolidayDate);
+        Assert.Throws<DomainException>(() =>
+            Holiday.Create("Bad Holiday",
+                new DateTime(2026, 9, 25),
+                new DateTime(2026, 9, 23)));
+    }
+
+    [Fact]
+    public void Create_StripsTimeComponent_BothDates()
+    {
+        var startWithTime = new DateTime(2026, 9, 23, 14, 30, 0);
+        var endWithTime = new DateTime(2026, 9, 25, 8, 0, 0);
+        var holiday = Holiday.Create("National Day", startWithTime, endWithTime);
+
+        Assert.Equal(new DateTime(2026, 9, 23), holiday.StartDate);
+        Assert.Equal(new DateTime(2026, 9, 25), holiday.EndDate);
     }
 
     [Fact]
     public void Create_DefaultsToNationalType()
     {
-        var holiday = Holiday.Create("Some Holiday", DateTime.Today);
+        var holiday = Holiday.Create("Some Holiday", DateTime.Today, DateTime.Today);
         Assert.Equal("National", holiday.HolidayType);
     }
 
     [Fact]
     public void Create_TrimsHolidayName()
     {
-        var holiday = Holiday.Create("  Eid  ", DateTime.Today);
+        var holiday = Holiday.Create("  Eid  ", DateTime.Today, DateTime.Today);
         Assert.Equal("Eid", holiday.HolidayName);
+    }
+
+    [Fact]
+    public void Create_StartEqualsEnd_DoesNotThrow()
+    {
+        var date = new DateTime(2026, 1, 1);
+        var holiday = Holiday.Create("New Year", date, date);
+        Assert.Equal(date, holiday.StartDate);
+        Assert.Equal(date, holiday.EndDate);
+        Assert.Equal(1, holiday.DurationDays);
     }
 }
 

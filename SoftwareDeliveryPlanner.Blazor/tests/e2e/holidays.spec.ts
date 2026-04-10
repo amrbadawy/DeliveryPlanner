@@ -22,7 +22,8 @@ test.describe('Holidays CRUD + edge cases', () => {
     await expectModalVisible(page, 'holidays-modal');
 
     await fillInputByTestId(page, 'holidays-name', holidayName);
-    await fillInputByTestId(page, 'holidays-date', '2026-11-20');
+    await fillInputByTestId(page, 'holidays-start-date', '2026-11-20');
+    await fillInputByTestId(page, 'holidays-end-date', '2026-11-22');
     await fillInputByTestId(page, 'holidays-type', 'Company');
     await fillInputByTestId(page, 'holidays-notes', 'e2e holiday');
     await page.getByTestId('holidays-save').click();
@@ -95,10 +96,39 @@ test.describe('Holidays CRUD + edge cases', () => {
     await fillInputByTestId(page, 'holidays-name', '');
     await page.getByTestId('holidays-save').click();
 
-    // If app currently allows empty names, this will fail and expose the gap.
-    // Desired behavior for edge validation: not persisted.
+    // Validation should prevent saving - modal should still be open or error shown
     await page.getByTestId('holidays-cancel').click();
     const after = await table.locator('tbody tr').count();
     expect(after).toBe(before);
+  });
+
+  test('holiday shows duration for multi-day range', async ({ page }) => {
+    await gotoPage(page, '/holidays');
+    const table = page.getByTestId('holidays-table');
+    await waitForTableRows(table);
+
+    // Eid Al-Fitr is seeded as a 4-day holiday (Mar 30 - Apr 2)
+    const eidRow = table.locator('tbody tr', { hasText: 'الفطر' }).first();
+    await expect(eidRow).toBeVisible();
+    // Should show "4 days" duration
+    await expect(eidRow.locator('text=4 days')).toBeVisible();
+  });
+
+  test('overlap validation prevents saving', async ({ page }) => {
+    await gotoPage(page, '/holidays');
+    const table = page.getByTestId('holidays-table');
+    await waitForTableRows(table);
+
+    // Try to add a holiday that overlaps with National Day (Sep 23)
+    await page.getByTestId('holidays-add').click();
+    await expectModalVisible(page, 'holidays-modal');
+    await fillInputByTestId(page, 'holidays-name', 'Overlap Test');
+    await fillInputByTestId(page, 'holidays-start-date', '2026-09-22');
+    await fillInputByTestId(page, 'holidays-end-date', '2026-09-24');
+    await page.getByTestId('holidays-save').click();
+
+    // Should show error about overlap
+    await expect(page.getByTestId('holidays-error')).toBeVisible();
+    await page.getByTestId('holidays-cancel').click();
   });
 });

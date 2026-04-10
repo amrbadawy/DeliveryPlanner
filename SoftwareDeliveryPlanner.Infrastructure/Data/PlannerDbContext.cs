@@ -80,8 +80,11 @@ public class PlannerDbContext : DbContext
             .HasPrincipalKey(t => t.TaskId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<Holiday>()
-            .HasIndex(h => h.HolidayDate);
+        modelBuilder.Entity<Holiday>(entity =>
+        {
+            entity.HasIndex(h => h.StartDate);
+            entity.HasIndex(h => h.EndDate);
+        });
 
         modelBuilder.Entity<CalendarDay>()
             .HasIndex(c => c.DateKey)
@@ -112,19 +115,15 @@ public class PlannerDbContext : DbContext
             new TeamMember { ResourceId = "DEV-005", ResourceName = "Developer 5", Role = "Developer", Team = "Delivery", StartDate = new DateTime(2026, 6, 1), Notes = "Phase 2" }
         );
 
+        // Consolidated holiday records — multi-day holidays use date ranges (12 → 7)
         Holidays.AddRange(
-            new Holiday { HolidayName = "عيد رأس السنة الميلادية", HolidayDate = new DateTime(2026, 1, 1), HolidayType = "National" },
-            new Holiday { HolidayName = "يوم التأسيس السعودي", HolidayDate = new DateTime(2026, 2, 22), HolidayType = "National" },
-            new Holiday { HolidayName = "عيد الفطر المبارك - يوم 1", HolidayDate = new DateTime(2026, 3, 30), HolidayType = "Religious" },
-            new Holiday { HolidayName = "عيد الفطر المبارك - يوم 2", HolidayDate = new DateTime(2026, 3, 31), HolidayType = "Religious" },
-            new Holiday { HolidayName = "عيد الفطر المبارك - يوم 3", HolidayDate = new DateTime(2026, 4, 1), HolidayType = "Religious" },
-            new Holiday { HolidayName = "عيد الفطر المبارك - يوم 4", HolidayDate = new DateTime(2026, 4, 2), HolidayType = "Religious" },
-            new Holiday { HolidayName = "يوم عرفات", HolidayDate = new DateTime(2026, 5, 27), HolidayType = "Religious" },
-            new Holiday { HolidayName = "عيد الأضحى المبارك - يوم 1", HolidayDate = new DateTime(2026, 5, 28), HolidayType = "Religious" },
-            new Holiday { HolidayName = "عيد الأضحى المبارك - يوم 2", HolidayDate = new DateTime(2026, 5, 29), HolidayType = "Religious" },
-            new Holiday { HolidayName = "عيد الأضحى المبارك - يوم 3", HolidayDate = new DateTime(2026, 5, 30), HolidayType = "Religious" },
-            new Holiday { HolidayName = "يوم عاشوراء", HolidayDate = new DateTime(2026, 9, 17), HolidayType = "Religious" },
-            new Holiday { HolidayName = "اليوم الوطني", HolidayDate = new DateTime(2026, 9, 23), HolidayType = "National" }
+            new Holiday { HolidayName = "عيد رأس السنة الميلادية", StartDate = new DateTime(2026, 1, 1), EndDate = new DateTime(2026, 1, 1), HolidayType = "National" },
+            new Holiday { HolidayName = "يوم التأسيس السعودي", StartDate = new DateTime(2026, 2, 22), EndDate = new DateTime(2026, 2, 22), HolidayType = "National" },
+            new Holiday { HolidayName = "عيد الفطر المبارك", StartDate = new DateTime(2026, 3, 30), EndDate = new DateTime(2026, 4, 2), HolidayType = "Religious" },
+            new Holiday { HolidayName = "يوم عرفات وعيد الأضحى المبارك", StartDate = new DateTime(2026, 5, 27), EndDate = new DateTime(2026, 5, 30), HolidayType = "Religious" },
+            new Holiday { HolidayName = "يوم عاشوراء", StartDate = new DateTime(2026, 9, 17), EndDate = new DateTime(2026, 9, 17), HolidayType = "Religious" },
+            new Holiday { HolidayName = "اليوم الوطني", StartDate = new DateTime(2026, 9, 23), EndDate = new DateTime(2026, 9, 23), HolidayType = "National" },
+            new Holiday { HolidayName = "يوم العلم", StartDate = new DateTime(2026, 3, 11), EndDate = new DateTime(2026, 3, 11), HolidayType = "National" }
         );
 
         Tasks.AddRange(

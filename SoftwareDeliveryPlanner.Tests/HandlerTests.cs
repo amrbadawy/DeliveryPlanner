@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using MediatR;
+using SoftwareDeliveryPlanner.Application.Abstractions;
 using SoftwareDeliveryPlanner.Application.Adjustments.Commands;
 using SoftwareDeliveryPlanner.Application.Adjustments.Queries;
 using SoftwareDeliveryPlanner.Application.Calendar.Queries;
@@ -634,7 +635,7 @@ public class GetHolidaysQueryHandlerTests : OrchestratorFixture
         var handler = new GetHolidaysQueryHandler(Orchestrator);
         var result = await handler.Handle(new GetHolidaysQuery(), CancellationToken.None);
         Assert.NotNull(result);
-        Assert.Equal(12, result.Count); // 12 seeded
+        Assert.Equal(7, result.Count); // 7 seeded (consolidated)
     }
 
     [Fact]
@@ -644,7 +645,7 @@ public class GetHolidaysQueryHandlerTests : OrchestratorFixture
         var result = await handler.Handle(new GetHolidaysQuery(), CancellationToken.None);
         for (int i = 1; i < result.Count; i++)
         {
-            Assert.True(result[i].HolidayDate >= result[i - 1].HolidayDate);
+            Assert.True(result[i].StartDate >= result[i - 1].StartDate);
         }
     }
 }
@@ -664,7 +665,8 @@ public class UpsertHolidayCommandHandlerTests : OrchestratorFixture
         await handler.Handle(new UpsertHolidayCommand(
             Id: 0,
             HolidayName: "Christmas",
-            HolidayDate: date,
+            StartDate: date,
+            EndDate: date,
             HolidayType: "Company",
             Notes: null,
             IsNew: true), CancellationToken.None);
@@ -683,7 +685,8 @@ public class UpsertHolidayCommandHandlerTests : OrchestratorFixture
         await handler.Handle(new UpsertHolidayCommand(
             Id: existing.Id,
             HolidayName: "Updated Holiday",
-            HolidayDate: existing.HolidayDate,
+            StartDate: existing.StartDate,
+            EndDate: existing.EndDate,
             HolidayType: "Company",
             Notes: "updated",
             IsNew: false), CancellationToken.None);
@@ -723,32 +726,141 @@ public class DeleteHolidayCommandHandlerTests : OrchestratorFixture
 // Holidays — Validators
 // ============================================================
 
-public class UpsertHolidayCommandValidatorTests
+public class UpsertHolidayCommandValidatorTests : OrchestratorFixture
 {
-    private readonly UpsertHolidayCommandValidator _validator = new();
-
     private static UpsertHolidayCommand Valid() => new(
         Id: 0,
-        HolidayName: "Eid",
-        HolidayDate: DateTime.Today,
+        HolidayName: "Test Holiday",
+        StartDate: new DateTime(2026, 11, 15),
+        EndDate: new DateTime(2026, 11, 15),
         HolidayType: "National",
         Notes: null,
         IsNew: true);
 
     [Fact]
-    public void Valid_Command_PassesValidation()
+    public async Task Valid_Command_PassesValidation()
     {
-        Assert.True(_validator.Validate(Valid()).IsValid);
+        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var result = await validator.ValidateAsync(Valid());
+        Assert.True(result.IsValid);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("  ")]
-    public void EmptyHolidayName_FailsValidation(string name)
+    public async Task EmptyHolidayName_FailsValidation(string name)
     {
-        var result = _validator.Validate(Valid() with { HolidayName = name });
+        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var result = await validator.ValidateAsync(Valid() with { HolidayName = name });
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertHolidayCommand.HolidayName));
+    }
+
+    [Fact]
+    public async Task StartDateAfterEndDate_FailsValidation()
+    {
+        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var result = await validator.ValidateAsync(Valid() with
+        {
+            StartDate = new DateTime(2026, 11, 20),
+            EndDate = new DateTime(2026, 11, 15)
+        });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertHolidayCommand.StartDate));
+    }
+
+    [Fact]
+    public async Task OverlappingHoliday_FailsValidation()
+    {
+        // Seed an existing holiday: Dec 1–5
+        await using var db = await Factory.CreateDbContextAsync();
+        db.Holidays.Add(Holiday.Create("Existing Holiday", new DateTime(2026, 12, 1), new DateTime(2026, 12, 5)));
+        await db.SaveChangesAsync();
+
+        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        // Try to add a holiday that overlaps: Dec 3–7
+        var result = await validator.ValidateAsync(Valid() with
+        {
+            StartDate = new DateTime(2026, 12, 3),
+            EndDate = new DateTime(2026, 12, 7)
+        });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "StartDate");
+    }
+
+    [Fact]
+    public async Task AdjacentNonOverlappingDates_PassesValidation()
+    {
+        // Seed an existing holiday: Dec 1–5
+        await using var db = await Factory.CreateDbContextAsync();
+        db.Holidays.Add(Holiday.Create("Existing Holiday", new DateTime(2026, 12, 1), new DateTime(2026, 12, 5)));
+        await db.SaveChangesAsync();
+
+        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        // Adjacent: Dec 6–8 (no overlap)
+        var result = await validator.ValidateAsync(Valid() with
+        {
+            StartDate = new DateTime(2026, 12, 6),
+            EndDate = new DateTime(2026, 12, 8)
+        });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task PartialOverlap_FailsValidation()
+    {
+        // Seed an existing holiday: Dec 1–5
+        await using var db = await Factory.CreateDbContextAsync();
+        db.Holidays.Add(Holiday.Create("Existing Holiday", new DateTime(2026, 12, 1), new DateTime(2026, 12, 5)));
+        await db.SaveChangesAsync();
+
+        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        // Partial overlap: Nov 28–Dec 2
+        var result = await validator.ValidateAsync(Valid() with
+        {
+            StartDate = new DateTime(2026, 11, 28),
+            EndDate = new DateTime(2026, 12, 2)
+        });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "StartDate");
+    }
+
+    [Fact]
+    public async Task ExactSameDates_FailsValidation()
+    {
+        // Seed an existing holiday: Dec 1–5
+        await using var db = await Factory.CreateDbContextAsync();
+        db.Holidays.Add(Holiday.Create("Existing Holiday", new DateTime(2026, 12, 1), new DateTime(2026, 12, 5)));
+        await db.SaveChangesAsync();
+
+        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        // Exact same dates
+        var result = await validator.ValidateAsync(Valid() with
+        {
+            StartDate = new DateTime(2026, 12, 1),
+            EndDate = new DateTime(2026, 12, 5)
+        });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "StartDate");
+    }
+
+    [Fact]
+    public async Task ContainedRange_FailsValidation()
+    {
+        // Seed an existing holiday: Dec 1–5
+        await using var db = await Factory.CreateDbContextAsync();
+        db.Holidays.Add(Holiday.Create("Existing Holiday", new DateTime(2026, 12, 1), new DateTime(2026, 12, 5)));
+        await db.SaveChangesAsync();
+
+        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        // Contained within existing: Dec 2–4
+        var result = await validator.ValidateAsync(Valid() with
+        {
+            StartDate = new DateTime(2026, 12, 2),
+            EndDate = new DateTime(2026, 12, 4)
+        });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "StartDate");
     }
 }
 

@@ -6,9 +6,13 @@ public class Holiday
 {
     public int Id { get; set; }
     public string HolidayName { get; set; } = string.Empty;
-    public DateTime HolidayDate { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
     public string HolidayType { get; set; } = "National";
     public string? Notes { get; set; }
+
+    /// <summary>Number of calendar days spanned (inclusive).</summary>
+    public int DurationDays => (EndDate.Date - StartDate.Date).Days + 1;
 
     // ── Domain factory ────────────────────────────────────────────────────────
     /// <summary>
@@ -17,19 +21,32 @@ public class Holiday
     /// </summary>
     public static Holiday Create(
         string holidayName,
-        DateTime holidayDate,
+        DateTime startDate,
+        DateTime endDate,
         string holidayType = "National",
         string? notes = null)
     {
         if (string.IsNullOrWhiteSpace(holidayName))
             throw new DomainException("Holiday name must not be empty.");
 
+        if (startDate.Date > endDate.Date)
+            throw new DomainException("Start date must be on or before end date.");
+
         return new Holiday
         {
             HolidayName = holidayName.Trim(),
-            HolidayDate = holidayDate.Date,
+            StartDate = startDate.Date,
+            EndDate = endDate.Date,
             HolidayType = holidayType,
             Notes = notes
         };
     }
+
+    /// <summary>Single-day convenience overload.</summary>
+    public static Holiday Create(
+        string holidayName,
+        DateTime date,
+        string holidayType = "National",
+        string? notes = null)
+        => Create(holidayName, date, date, holidayType, notes);
 }

@@ -71,12 +71,12 @@ export function countHolidaysByName(name: string): number {
   });
 }
 
-export function getHolidayByName(name: string): { holidayName: string; holidayType: string; notes: string | null } | null {
+export function getHolidayByName(name: string): { holidayName: string; startDate: string; endDate: string; holidayType: string; notes: string | null } | null {
   return withDb((db) => {
     if (!tableExists(db, 'Holidays')) return null;
     const row = db
-      .prepare('SELECT HolidayName AS holidayName, HolidayType AS holidayType, Notes AS notes FROM Holidays WHERE HolidayName = ?')
-      .get(name) as { holidayName: string; holidayType: string; notes: string | null } | undefined;
+      .prepare('SELECT HolidayName AS holidayName, StartDate AS startDate, EndDate AS endDate, HolidayType AS holidayType, Notes AS notes FROM Holidays WHERE HolidayName = ?')
+      .get(name) as { holidayName: string; startDate: string; endDate: string; holidayType: string; notes: string | null } | undefined;
     return row ?? null;
   });
 }

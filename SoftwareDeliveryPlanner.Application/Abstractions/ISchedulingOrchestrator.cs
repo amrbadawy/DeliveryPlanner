@@ -29,6 +29,25 @@ public interface ISchedulingOrchestrator
     Task UpsertHolidayAsync(Holiday holiday, bool isNew, CancellationToken cancellationToken = default);
     Task DeleteHolidayAsync(int id, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Returns true if any existing holiday overlaps the given date range.
+    /// Optionally excludes one holiday by ID (for edits).
+    /// Overlap formula: A.StartDate &lt;= B.EndDate AND A.EndDate &gt;= B.StartDate
+    /// </summary>
+    Task<bool> HasHolidayOverlapAsync(DateTime startDate, DateTime endDate, int? excludeId = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Copies all holidays from the source year to the target year, shifting dates by the year delta.
+    /// Returns the number of holidays copied.
+    /// </summary>
+    Task<int> CopyHolidaysToYearAsync(int sourceYear, int targetYear, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Computes the number of working days lost in a date range
+    /// (i.e. days in range that are working days — Sun-Thu and not weekend).
+    /// </summary>
+    Task<int> GetHolidayWorkingDaysLostAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
+
     // Calendar
     Task<List<CalendarDay>> GetCalendarAsync(CancellationToken cancellationToken = default);
 

@@ -1,0 +1,35 @@
+/* Holidays page scoped styles */
+
+::deep .table-secondary.opacity-75 {
+    opacity: 0.7 !important;
+}
+
+::deep .card {
+    transition: box-shadow 0.2s ease;
+}
+
+::deep .card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+::deep .badge {
+    font-weight: 500;
+}
+
+::deep .btn-outline-warning:hover i,
+::deep .btn-outline-danger:hover i {
+    transform: scale(1.1);
+}
+
+::deep .modal-lg .card.bg-light {
+    border-radius: 8px;
+}
+
+::deep .alert-success {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}

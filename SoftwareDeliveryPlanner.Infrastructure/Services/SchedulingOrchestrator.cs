@@ -213,7 +213,7 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
     public async Task<List<Holiday>> GetHolidaysAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        return await db.Holidays.OrderBy(h => h.HolidayDate).ToListAsync(cancellationToken);
+        return await db.Holidays.OrderBy(h => h.StartDate).ToListAsync(cancellationToken);
     }
 
     public async Task UpsertHolidayAsync(Holiday holiday, bool isNew, CancellationToken cancellationToken = default)
@@ -230,7 +230,8 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
             if (existing != null)
             {
                 existing.HolidayName = holiday.HolidayName;
-                existing.HolidayDate = holiday.HolidayDate;
+                existing.StartDate = holiday.StartDate;
+                existing.EndDate = holiday.EndDate;
                 existing.HolidayType = holiday.HolidayType;
                 existing.Notes = holiday.Notes;
             }
@@ -254,6 +255,86 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
 
         await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
         new SchedulingEngine(schedulerDb).RunScheduler();
+    }
+
+    public async Task<bool> HasHolidayOverlapAsync(
+        DateTime startDate, DateTime endDate, int? excludeId = null,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        // Overlap formula: A.StartDate <= B.EndDate AND A.EndDate >= B.StartDate
+        var query = db.Holidays
+            .Where(h => h.StartDate.Date <= endDate.Date && h.EndDate.Date >= startDate.Date);
+
+        if (excludeId.HasValue)
+            query = query.Where(h => h.Id != excludeId.Value);
+
+        return await query.AnyAsync(cancellationToken);
+    }
+
+    public async Task<int> CopyHolidaysToYearAsync(
+        int sourceYear, int targetYear,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        var sourceHolidays = await db.Holidays
+            .Where(h => h.StartDate.Year == sourceYear)
+            .ToListAsync(cancellationToken);
+
+        var yearDelta = targetYear - sourceYear;
+        var copied = 0;
+
+        foreach (var src in sourceHolidays)
+        {
+            var newStart = src.StartDate.AddYears(yearDelta);
+            var newEnd = src.EndDate.AddYears(yearDelta);
+
+            // Check no overlap in target year
+            var overlaps = await db.Holidays
+                .AnyAsync(h => h.StartDate.Date <= newEnd.Date && h.EndDate.Date >= newStart.Date, cancellationToken);
+
+            if (!overlaps)
+            {
+                db.Holidays.Add(new Holiday
+                {
+                    HolidayName = src.HolidayName,
+                    StartDate = newStart,
+                    EndDate = newEnd,
+                    HolidayType = src.HolidayType,
+                    Notes = src.Notes
+                });
+                copied++;
+            }
+        }
+
+        if (copied > 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+
+            await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
+            new SchedulingEngine(schedulerDb).RunScheduler();
+        }
+
+        return copied;
+    }
+
+    public async Task<int> GetHolidayWorkingDaysLostAsync(
+        DateTime startDate, DateTime endDate,
+        CancellationToken cancellationToken = default)
+    {
+        // Count working days in the date range (Sun-Thu, excluding Fri/Sat)
+        int count = 0;
+        var current = startDate.Date;
+        while (current <= endDate.Date)
+        {
+            var dayOfWeek = (int)current.DayOfWeek;
+            if (dayOfWeek != 5 && dayOfWeek != 6) // Not Friday, Not Saturday
+                count++;
+            current = current.AddDays(1);
+        }
+        return count;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -299,7 +380,8 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         {
             var dayOfWeek = (int)current.DayOfWeek;
             var isWeekend = dayOfWeek == 5 || dayOfWeek == 6;
-            var isHoliday = holidays.Any(h => h.HolidayDate.Date == current.Date);
+            // Date range holiday check: any holiday whose range covers this date
+            var isHoliday = holidays.Any(h => h.StartDate.Date <= current.Date && h.EndDate.Date >= current.Date);
             var adjustment = adjustments.FirstOrDefault(
                 a => a.AdjStart.Date <= current.Date && a.AdjEnd.Date >= current.Date);
 
@@ -331,7 +413,7 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
             else if (isHoliday)
             {
                 bgColor = "#fff3cd";
-                var h = holidays.First(x => x.HolidayDate.Date == current.Date);
+                var h = holidays.First(x => x.StartDate.Date <= current.Date && x.EndDate.Date >= current.Date);
                 statusText = h.HolidayName.Length > 10
                     ? h.HolidayName.Substring(0, 10) + ".."
                     : h.HolidayName;

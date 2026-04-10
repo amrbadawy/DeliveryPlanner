@@ -81,8 +81,60 @@ public class SchedulingEngineTests : IDisposable
     [Fact]
     public void IsWorkingDay_Holiday_ReturnsFalse()
     {
-        var eidDate = new DateTime(2026, 6, 6);
-        Assert.False(_engine.IsWorkingDay(eidDate));
+        // 2026-09-23 is National Day (Wednesday) - a seeded single-day holiday on a working day
+        var nationalDay = new DateTime(2026, 9, 23);
+        Assert.False(_engine.IsWorkingDay(nationalDay));
+    }
+
+    [Fact]
+    public void IsWorkingDay_MultiDayHoliday_MiddleDate_ReturnsFalse()
+    {
+        // 2026-03-31 is in Eid Al-Fitr range (Mar 30 - Apr 2) and is a Tuesday (working day)
+        var eidMiddle = new DateTime(2026, 3, 31);
+        Assert.False(_engine.IsWorkingDay(eidMiddle));
+    }
+
+    [Fact]
+    public void IsWorkingDay_MultiDayHoliday_StartDate_ReturnsFalse()
+    {
+        // 2026-03-30 is the start of Eid Al-Fitr (Monday)
+        var eidStart = new DateTime(2026, 3, 30);
+        Assert.False(_engine.IsWorkingDay(eidStart));
+    }
+
+    [Fact]
+    public void IsWorkingDay_MultiDayHoliday_EndDate_ReturnsFalse()
+    {
+        // 2026-04-02 is the end of Eid Al-Fitr (Thursday)
+        var eidEnd = new DateTime(2026, 4, 2);
+        Assert.False(_engine.IsWorkingDay(eidEnd));
+    }
+
+    [Fact]
+    public void IsWorkingDay_DayAfterHolidayRange_ReturnsTrue()
+    {
+        // 2026-04-05 is the Sunday after Eid (Apr 2 was end), should be working
+        var dayAfter = new DateTime(2026, 4, 5);
+        Assert.True(_engine.IsWorkingDay(dayAfter));
+    }
+
+    #endregion
+
+    #region GetHolidayForDate Tests
+
+    [Fact]
+    public void GetHolidayForDate_WithinRange_ReturnsHoliday()
+    {
+        var holiday = _engine.GetHolidayForDate(new DateTime(2026, 3, 31));
+        Assert.NotNull(holiday);
+        Assert.Contains("الفطر", holiday.HolidayName);
+    }
+
+    [Fact]
+    public void GetHolidayForDate_OutsideRange_ReturnsNull()
+    {
+        var holiday = _engine.GetHolidayForDate(new DateTime(2026, 5, 4));
+        Assert.Null(holiday);
     }
 
     #endregion
@@ -364,8 +416,8 @@ public class SchedulingEngineTests : IDisposable
         var output = _engine.GetOutputPlan();
         for (int i = 1; i < output.Count; i++)
         {
-            var prev = (int)output[i - 1]["num"];
-            var curr = (int)output[i]["num"];
+            var prev = (int)output[i - 1]["num"]!;
+            var curr = (int)output[i]["num"]!;
             Assert.True(prev < curr);
         }
     }

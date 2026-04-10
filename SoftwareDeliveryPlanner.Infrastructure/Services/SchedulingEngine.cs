@@ -8,11 +8,21 @@ public class SchedulingEngine
     private readonly PlannerDbContext _db;
     private readonly int _atRiskThreshold;
 
+    // In-memory holiday cache — loaded once per RunScheduler call to avoid 1460+ DB queries.
+    private List<Holiday>? _holidayCache;
+
     public SchedulingEngine(PlannerDbContext db)
     {
         _db = db;
         var setting = _db.Settings.FirstOrDefault(s => s.Key == "at_risk_threshold");
         _atRiskThreshold = int.TryParse(setting?.Value, out var t) ? t : 5;
+    }
+
+    /// <summary>Loads holidays into an in-memory cache if not already loaded.</summary>
+    private List<Holiday> GetHolidayCache()
+    {
+        _holidayCache ??= _db.Holidays.ToList();
+        return _holidayCache;
     }
 
     public bool IsWorkingDay(DateTime date)
@@ -22,9 +32,17 @@ public class SchedulingEngine
         if ((int)date.DayOfWeek == 5 || (int)date.DayOfWeek == 6)
             return false;
 
-        // Check holidays
-        var isHoliday = _db.Holidays.Any(h => h.HolidayDate.Date == date.Date);
+        // Check holidays — date falls within any holiday range
+        var holidays = GetHolidayCache();
+        var isHoliday = holidays.Any(h => h.StartDate.Date <= date.Date && h.EndDate.Date >= date.Date);
         return !isHoliday;
+    }
+
+    /// <summary>Finds the first holiday whose range covers the given date, or null.</summary>
+    public Holiday? GetHolidayForDate(DateTime date)
+    {
+        var holidays = GetHolidayCache();
+        return holidays.FirstOrDefault(h => h.StartDate.Date <= date.Date && h.EndDate.Date >= date.Date);
     }
 
     public int GetWorkingDaysBetween(DateTime start, DateTime end)
@@ -90,6 +108,9 @@ public class SchedulingEngine
 
     public string RunScheduler()
     {
+        // Prime the holiday cache once at the start (eliminates 1460+ individual DB queries)
+        _holidayCache = _db.Holidays.ToList();
+
         var planStartSetting = _db.Settings.FirstOrDefault(s => s.Key == "plan_start_date");
         var planStart = DateTime.TryParse(planStartSetting?.Value, out var ps) ? ps : new DateTime(2026, 5, 1);
         var endDate = planStart.AddDays(730);
@@ -117,7 +138,7 @@ public class SchedulingEngine
         while (current <= endDate)
         {
             var isWorking = IsWorkingDay(current);
-            var holiday = _db.Holidays.FirstOrDefault(h => h.HolidayDate.Date == current.Date);
+            var holiday = GetHolidayForDate(current);  // Uses cache, no DB query
 
             var baseCap = isWorking ? CalculateEffectiveCapacity(current, resources, adjustments) : 0;
 

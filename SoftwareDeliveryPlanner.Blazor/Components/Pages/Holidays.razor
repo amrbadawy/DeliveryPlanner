@@ -4,57 +4,297 @@
 @using SoftwareDeliveryPlanner.Application.Holidays.Queries
 @using SoftwareDeliveryPlanner.Application.Holidays.Commands
 @using SoftwareDeliveryPlanner.Application.Planning.Commands
+@using SoftwareDeliveryPlanner.Application.Abstractions
 @using SoftwareDeliveryPlanner.Models
 @inject IMediator Mediator
+@inject ISchedulingOrchestrator Orchestrator
 
 <PageTitle>Holidays</PageTitle>
 
-<h3 style="margin-bottom: 20px;">🎉 Holidays (Saudi Arabia 2026)</h3>
-
-<div class="mb-3">
-    <button class="btn btn-primary" @onclick="ShowAddModal" data-testid="holidays-add">➕ Add Holiday</button>
-    <button class="btn btn-secondary" @onclick="RefreshData" data-testid="holidays-refresh">🔄 Refresh</button>
+<!-- ── Header ─────────────────────────────────────────────── -->
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h3 class="mb-1"><i class="bi bi-calendar2-heart"></i> Holidays</h3>
+        <p class="text-muted mb-0">Manage official holidays that affect the delivery schedule</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" @onclick="ShowAddModal" data-testid="holidays-add">
+            <i class="bi bi-plus-lg"></i> Add Holiday
+        </button>
+        <button class="btn btn-outline-secondary" @onclick="RefreshData" data-testid="holidays-refresh">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+        @if (holidays.Any())
+        {
+            <button class="btn btn-outline-info" @onclick="ShowCopyModal" data-testid="holidays-copy">
+                <i class="bi bi-copy"></i> Copy to Year
+            </button>
+        }
+    </div>
 </div>
 
+<!-- ── Toast ──────────────────────────────────────────────── -->
+@if (!string.IsNullOrWhiteSpace(toastMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert" data-testid="holidays-toast">
+        <i class="bi bi-check-circle"></i> @toastMessage
+        <button type="button" class="btn-close" @onclick="() => toastMessage = string.Empty"></button>
+    </div>
+}
+
+<!-- ── KPI Summary Bar ────────────────────────────────────── -->
+@if (!isLoading && holidays.Any())
+{
+    <div class="row g-3 mb-4" data-testid="holidays-kpi">
+        <div class="col-md-4">
+            <div class="card text-center border-0 shadow-sm">
+                <div class="card-body py-3">
+                    <div class="text-muted small">Total Holidays</div>
+                    <div class="fs-3 fw-bold text-primary">@holidays.Count</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center border-0 shadow-sm">
+                <div class="card-body py-3">
+                    <div class="text-muted small">Working Days Lost</div>
+                    <div class="fs-3 fw-bold text-danger">@totalWorkingDaysLost</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center border-0 shadow-sm">
+                <div class="card-body py-3">
+                    <div class="text-muted small">Next Holiday</div>
+                    <div class="fs-6 fw-bold text-success">
+                        @if (nextHoliday != null)
+                        {
+                            <span>@nextHoliday.HolidayName</span>
+                            <br /><small class="text-muted">@nextHoliday.StartDate.ToString("MMM dd, yyyy")</small>
+                        }
+                        else
+                        {
+                            <span class="text-muted">None upcoming</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ── Filters ─────────────────────────────────────────────── -->
+@if (!isLoading && holidays.Any())
+{
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body py-2">
+            <div class="row align-items-center g-2">
+                <div class="col-md-4">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input class="form-control" placeholder="Search holidays..." @bind="searchTerm" @bind:event="oninput" data-testid="holidays-search" />
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select form-select-sm" @bind="selectedYear" data-testid="holidays-year-filter">
+                        <option value="0">All Years</option>
+                        @foreach (var y in availableYears)
+                        {
+                            <option value="@y">@y</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select form-select-sm" @bind="selectedType">
+                        <option value="">All Types</option>
+                        <option value="National">National</option>
+                        <option value="Religious">Religious</option>
+                        <option value="Company">Company</option>
+                    </select>
+                </div>
+                <div class="col-md-2 text-muted small text-end">
+                    @filteredHolidays.Count() of @holidays.Count
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ── Loading State ───────────────────────────────────────── -->
+@if (isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="text-muted mt-2">Loading holidays...</p>
+    </div>
+}
+<!-- ── Empty State ─────────────────────────────────────────── -->
+else if (!holidays.Any())
+{
+    <div class="text-center py-5">
+        <i class="bi bi-calendar-x display-1 text-muted"></i>
+        <h5 class="mt-3 text-muted">No holidays configured</h5>
+        <p class="text-muted">Add holidays to accurately calculate delivery schedules.</p>
+        <button class="btn btn-primary" @onclick="ShowAddModal">
+            <i class="bi bi-plus-lg"></i> Add First Holiday
+        </button>
+    </div>
+}
+<!-- ── Table ───────────────────────────────────────────────── -->
+else
+{
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" data-testid="holidays-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Duration</th>
+                        <th>Type</th>
+                        <th>Notes</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var h in filteredHolidays)
+                    {
+                        var isPast = h.EndDate.Date < DateTime.Today;
+                        <tr class="@(isPast ? "table-secondary opacity-75" : "")" data-testid="holidays-row-@h.Id">
+                            <td>
+                                @if (isPast) { <i class="bi bi-clock-history text-muted me-1"></i> }
+                                @h.HolidayName
+                            </td>
+                            <td>@h.StartDate.ToString("yyyy-MM-dd")</td>
+                            <td>@h.EndDate.ToString("yyyy-MM-dd")</td>
+                            <td>
+                                <span class="badge bg-light text-dark">
+                                    @h.DurationDays day@(h.DurationDays > 1 ? "s" : "")
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-@(h.HolidayType == "National" ? "primary" : h.HolidayType == "Religious" ? "warning text-dark" : "info")">
+                                    @h.HolidayType
+                                </span>
+                            </td>
+                            <td class="text-muted">@h.Notes</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-warning" @onclick="() => EditHoliday(h)" data-testid="holidays-edit-@h.Id">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger ms-1" @onclick="() => DeleteHoliday(h)" data-testid="holidays-delete-@h.Id">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+<!-- ── Add/Edit Modal ──────────────────────────────────────── -->
 @if (showModal)
 {
     <div class="modal d-block" style="background: rgba(0,0,0,0.5);" data-testid="holidays-modal">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">@(editingHoliday == null ? "Add New Holiday" : "Edit Holiday")</h5>
+                    <h5 class="modal-title">
+                        <i class="bi bi-@(editingHoliday == null ? "plus-circle" : "pencil-square")"></i>
+                        @(editingHoliday == null ? "Add New Holiday" : "Edit Holiday")
+                    </h5>
                     <button type="button" class="btn-close" @onclick="CloseModal"></button>
                 </div>
                 <div class="modal-body">
                     @if (!string.IsNullOrWhiteSpace(modalError))
                     {
-                        <div class="alert alert-danger" data-testid="holidays-error">@modalError</div>
+                        <div class="alert alert-danger" data-testid="holidays-error">
+                            <i class="bi bi-exclamation-triangle"></i> @modalError
+                        </div>
                     }
-                    <div class="mb-2">
-                        <label>Holiday Name:</label>
-                        <input class="form-control" @bind="holidayForm.HolidayName" data-testid="holidays-name" />
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Holiday Name</label>
+                        <input class="form-control @(fieldErrors.ContainsKey("HolidayName") ? "is-invalid" : "")"
+                               @bind="formName" data-testid="holidays-name" />
+                        @if (fieldErrors.ContainsKey("HolidayName"))
+                        {
+                            <div class="invalid-feedback">@fieldErrors["HolidayName"]</div>
+                        }
                     </div>
                     <div class="row">
-                        <div class="col-md-6 mb-2">
-                            <label>Date:</label>
-                            <input class="form-control" type="date" @bind="holidayDateValue" data-testid="holidays-date" />
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">Start Date</label>
+                            <input class="form-control @(fieldErrors.ContainsKey("StartDate") ? "is-invalid" : "")"
+                                   type="date" @bind="formStartDate" @bind:event="onchange" data-testid="holidays-start-date" />
+                            @if (fieldErrors.ContainsKey("StartDate"))
+                            {
+                                <div class="invalid-feedback">@fieldErrors["StartDate"]</div>
+                            }
                         </div>
-                        <div class="col-md-6 mb-2">
-                            <label>Type:</label>
-                            <select class="form-control" @bind="holidayForm.HolidayType" data-testid="holidays-type">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">End Date</label>
+                            <input class="form-control @(fieldErrors.ContainsKey("EndDate") ? "is-invalid" : "")"
+                                   type="date" @bind="formEndDate" @bind:event="onchange" data-testid="holidays-end-date" />
+                            @if (fieldErrors.ContainsKey("EndDate"))
+                            {
+                                <div class="invalid-feedback">@fieldErrors["EndDate"]</div>
+                            }
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">Type</label>
+                            <select class="form-select" @bind="formType" data-testid="holidays-type">
                                 <option>National</option>
                                 <option>Religious</option>
                                 <option>Company</option>
                             </select>
                         </div>
                     </div>
-                    <div class="mb-2">
-                        <label>Description:</label>
-                        <textarea class="form-control" @bind="holidayForm.Notes" data-testid="holidays-notes"></textarea>
+
+                    <!-- ── Impact Preview ─────────────────────────── -->
+                    @if (formStartDate <= formEndDate)
+                    {
+                        var days = (formEndDate - formStartDate).Days + 1;
+                        var workingDays = CountWorkingDaysInRange(formStartDate, formEndDate);
+                        var allWeekend = workingDays == 0 && days > 0;
+
+                        <div class="card bg-light border-0 mb-3" data-testid="holidays-impact">
+                            <div class="card-body py-2">
+                                <div class="row text-center">
+                                    <div class="col">
+                                        <small class="text-muted">Calendar Days</small>
+                                        <div class="fw-bold">@days</div>
+                                    </div>
+                                    <div class="col">
+                                        <small class="text-muted">Working Days Affected</small>
+                                        <div class="fw-bold text-danger">@workingDays</div>
+                                    </div>
+                                </div>
+                                @if (allWeekend)
+                                {
+                                    <div class="text-center mt-2">
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="bi bi-exclamation-triangle"></i> All selected dates fall on weekends (Fri/Sat) - no working days affected
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Notes</label>
+                        <textarea class="form-control" rows="2" @bind="formNotes" data-testid="holidays-notes"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-primary" @onclick="SaveHoliday" data-testid="holidays-save">Save</button>
+                    <button class="btn btn-primary" @onclick="SaveHoliday" data-testid="holidays-save">
+                        <i class="bi bi-check-lg"></i> Save
+                    </button>
                     <button class="btn btn-secondary" @onclick="CloseModal" data-testid="holidays-cancel">Cancel</button>
                 </div>
             </div>
@@ -62,19 +302,22 @@
     </div>
 }
 
+<!-- ── Delete Confirm Modal ────────────────────────────────── -->
 @if (showDeleteConfirm)
 {
     <div class="modal d-block" style="background: rgba(0,0,0,0.5);" data-testid="holidays-delete-modal">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Confirm Delete</h5>
+                    <h5 class="modal-title"><i class="bi bi-trash"></i> Confirm Delete</h5>
                 </div>
                 <div class="modal-body">
-                    <p>Are you sure you want to delete this holiday?</p>
+                    <p>Are you sure you want to delete <strong>@editingHoliday?.HolidayName</strong>?</p>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-danger" @onclick="ConfirmDelete" data-testid="holidays-delete-confirm">Delete</button>
+                    <button class="btn btn-danger" @onclick="ConfirmDelete" data-testid="holidays-delete-confirm">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
                     <button class="btn btn-secondary" @onclick="CloseDeleteModal" data-testid="holidays-delete-cancel">Cancel</button>
                 </div>
             </div>
@@ -82,79 +325,194 @@
     </div>
 }
 
-<table class="table table-striped table-hover" data-testid="holidays-table">
-    <thead class="table-dark">
-        <tr>
-            <th>Name</th>
-            <th>Date</th>
-            <th>Type</th>
-            <th>Description</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var h in holidays)
-        {
-            <tr data-testid="holidays-row-@h.Id">
-                <td>@h.HolidayName</td>
-                <td>@h.HolidayDate.ToString("yyyy-MM-dd")</td>
-                <td>
-                    <span class="badge bg-@(h.HolidayType == "National" ? "primary" : "warning")">
-                        @h.HolidayType
-                    </span>
-                </td>
-                <td>@h.Notes</td>
-                <td>
-                    <button class="btn btn-sm btn-warning" @onclick="() => EditHoliday(h)" data-testid="holidays-edit-@h.Id">✏️</button>
-                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteHoliday(h)" data-testid="holidays-delete-@h.Id">🗑️</button>
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
+<!-- ── Copy to Year Modal ──────────────────────────────────── -->
+@if (showCopyModal)
+{
+    <div class="modal d-block" style="background: rgba(0,0,0,0.5);" data-testid="holidays-copy-modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-copy"></i> Copy Holidays to Year</h5>
+                    <button type="button" class="btn-close" @onclick="() => showCopyModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">From Year</label>
+                            <select class="form-select" @bind="copyFromYear">
+                                @foreach (var y in availableYears)
+                                {
+                                    <option value="@y">@y</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">To Year</label>
+                            <input class="form-control" type="number" @bind="copyToYear" min="2020" max="2050" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" @onclick="DoCopyToYear" data-testid="holidays-copy-confirm">
+                        <i class="bi bi-copy"></i> Copy
+                    </button>
+                    <button class="btn btn-secondary" @onclick="() => showCopyModal = false">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
+    // ── State ────────────────────────────────────────────────
     private List<Holiday> holidays = new();
-    private bool showModal = false;
-    private bool showDeleteConfirm = false;
+    private bool isLoading = true;
+    private bool showModal;
+    private bool showDeleteConfirm;
+    private bool showCopyModal;
     private Holiday? editingHoliday;
-    private Holiday holidayForm = new();
-    private DateTime holidayDateValue;
     private string modalError = string.Empty;
+    private string toastMessage = string.Empty;
+    private Dictionary<string, string> fieldErrors = new();
+
+    // Form fields
+    private string formName = string.Empty;
+    private DateTime formStartDate;
+    private DateTime formEndDate;
+    private string formType = "National";
+    private string? formNotes;
+
+    // Filters
+    private string searchTerm = string.Empty;
+    private int selectedYear;
+    private string selectedType = string.Empty;
+
+    // Copy
+    private int copyFromYear;
+    private int copyToYear;
+
+    // KPI computed
+    private int totalWorkingDaysLost;
+    private Holiday? nextHoliday;
+
+    // ── Computed ──────────────────────────────────────────────
+
+    private IEnumerable<int> availableYears =>
+        holidays.Select(h => h.StartDate.Year).Distinct().OrderBy(y => y);
+
+    private IEnumerable<Holiday> filteredHolidays
+    {
+        get
+        {
+            var q = holidays.AsEnumerable();
+            if (selectedYear > 0)
+                q = q.Where(h => h.StartDate.Year == selectedYear);
+            if (!string.IsNullOrEmpty(selectedType))
+                q = q.Where(h => h.HolidayType == selectedType);
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+                q = q.Where(h => h.HolidayName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+                    || (h.Notes ?? "").Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+            return q;
+        }
+    }
+
+    // ── Lifecycle ────────────────────────────────────────────
 
     protected override async Task OnInitializedAsync()
     {
         await LoadHolidays();
+        isLoading = false;
     }
 
     private async Task LoadHolidays()
     {
         holidays = await Mediator.Send(new GetHolidaysQuery());
+        ComputeKpis();
     }
+
+    private void ComputeKpis()
+    {
+        totalWorkingDaysLost = holidays.Sum(h => CountWorkingDaysInRange(h.StartDate, h.EndDate));
+        nextHoliday = holidays.Where(h => h.EndDate.Date >= DateTime.Today).OrderBy(h => h.StartDate).FirstOrDefault();
+        if (availableYears.Any())
+            copyFromYear = availableYears.Max();
+        copyToYear = (availableYears.Any() ? availableYears.Max() : DateTime.Today.Year) + 1;
+    }
+
+    /// <summary>Client-side working-day counter (Sun-Thu). Used for impact preview and KPI.</summary>
+    private int CountWorkingDaysInRange(DateTime start, DateTime end)
+    {
+        int count = 0;
+        var current = start.Date;
+        while (current <= end.Date)
+        {
+            var dow = (int)current.DayOfWeek;
+            if (dow != 5 && dow != 6) count++;
+            current = current.AddDays(1);
+        }
+        return count;
+    }
+
+    // ── Add / Edit ───────────────────────────────────────────
 
     private void ShowAddModal()
     {
-        holidayForm = new Holiday { HolidayType = "National" };
-        holidayDateValue = DateTime.Today;
         editingHoliday = null;
+        formName = string.Empty;
+        formStartDate = DateTime.Today;
+        formEndDate = DateTime.Today;
+        formType = "National";
+        formNotes = null;
         modalError = string.Empty;
+        fieldErrors.Clear();
         showModal = true;
     }
 
     private void EditHoliday(Holiday h)
     {
         editingHoliday = h;
-        holidayForm = new Holiday
-        {
-            Id = h.Id,
-            HolidayName = h.HolidayName,
-            HolidayType = h.HolidayType,
-            Notes = h.Notes
-        };
-        holidayDateValue = h.HolidayDate;
+        formName = h.HolidayName;
+        formStartDate = h.StartDate;
+        formEndDate = h.EndDate;
+        formType = h.HolidayType;
+        formNotes = h.Notes;
         modalError = string.Empty;
+        fieldErrors.Clear();
         showModal = true;
     }
+
+    private async Task SaveHoliday()
+    {
+        modalError = string.Empty;
+        fieldErrors.Clear();
+        try
+        {
+            var command = new UpsertHolidayCommand(
+                Id: editingHoliday?.Id ?? 0,
+                HolidayName: formName,
+                StartDate: formStartDate,
+                EndDate: formEndDate,
+                HolidayType: formType,
+                Notes: formNotes,
+                IsNew: editingHoliday == null);
+
+            await Mediator.Send(command);
+            await LoadHolidays();
+            CloseModal();
+            toastMessage = editingHoliday == null ? "Holiday added successfully." : "Holiday updated successfully.";
+        }
+        catch (ValidationException ex)
+        {
+            foreach (var err in ex.Errors)
+            {
+                if (!string.IsNullOrWhiteSpace(err.PropertyName) && !fieldErrors.ContainsKey(err.PropertyName))
+                    fieldErrors[err.PropertyName] = err.ErrorMessage;
+            }
+            modalError = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+    }
+
+    // ── Delete ───────────────────────────────────────────────
 
     private void DeleteHoliday(Holiday h)
     {
@@ -162,34 +520,12 @@
         showDeleteConfirm = true;
     }
 
-    private async Task SaveHoliday()
-    {
-        modalError = string.Empty;
-        try
-        {
-            var command = new UpsertHolidayCommand(
-                Id: holidayForm.Id,
-                HolidayName: holidayForm.HolidayName,
-                HolidayDate: holidayDateValue,
-                HolidayType: holidayForm.HolidayType,
-                Notes: holidayForm.Notes,
-                IsNew: editingHoliday == null);
-
-            await Mediator.Send(command);
-            await LoadHolidays();
-            CloseModal();
-        }
-        catch (ValidationException ex)
-        {
-            modalError = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
-        }
-    }
-
     private async Task ConfirmDelete()
     {
         if (editingHoliday != null)
         {
             await Mediator.Send(new DeleteHolidayCommand(editingHoliday.Id));
+            toastMessage = $"Holiday \"{editingHoliday.HolidayName}\" deleted.";
         }
         showDeleteConfirm = false;
         editingHoliday = null;
@@ -201,6 +537,7 @@
         showModal = false;
         editingHoliday = null;
         modalError = string.Empty;
+        fieldErrors.Clear();
     }
 
     private void CloseDeleteModal()
@@ -209,9 +546,29 @@
         editingHoliday = null;
     }
 
+    // ── Copy to Year ─────────────────────────────────────────
+
+    private void ShowCopyModal()
+    {
+        showCopyModal = true;
+    }
+
+    private async Task DoCopyToYear()
+    {
+        var copied = await Orchestrator.CopyHolidaysToYearAsync(copyFromYear, copyToYear);
+        showCopyModal = false;
+        await LoadHolidays();
+        toastMessage = copied > 0
+            ? $"Copied {copied} holiday(s) from {copyFromYear} to {copyToYear}."
+            : $"No holidays copied (target year may already have overlapping dates).";
+    }
+
+    // ── Refresh ──────────────────────────────────────────────
+
     private async Task RefreshData()
     {
         await Mediator.Send(new RunSchedulerCommand());
         await LoadHolidays();
+        toastMessage = "Schedule refreshed.";
     }
 }

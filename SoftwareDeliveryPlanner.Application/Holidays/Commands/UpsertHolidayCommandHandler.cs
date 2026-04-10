@@ -13,14 +13,14 @@ public sealed class UpsertHolidayCommandHandler : IRequestHandler<UpsertHolidayC
 
     public async Task<Unit> Handle(UpsertHolidayCommand request, CancellationToken cancellationToken)
     {
-        var holiday = new Holiday
-        {
-            Id = request.Id,
-            HolidayName = request.HolidayName,
-            HolidayDate = request.HolidayDate,
-            HolidayType = request.HolidayType,
-            Notes = request.Notes
-        };
+        var holiday = Holiday.Create(
+            request.HolidayName,
+            request.StartDate,
+            request.EndDate,
+            request.HolidayType,
+            request.Notes);
+
+        holiday.Id = request.Id;
 
         await _orchestrator.UpsertHolidayAsync(holiday, request.IsNew, cancellationToken);
         return Unit.Value;

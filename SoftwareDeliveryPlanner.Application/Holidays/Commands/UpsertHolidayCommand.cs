@@ -5,7 +5,8 @@ namespace SoftwareDeliveryPlanner.Application.Holidays.Commands;
 public sealed record UpsertHolidayCommand(
     int Id,
     string HolidayName,
-    DateTime HolidayDate,
+    DateTime StartDate,
+    DateTime EndDate,
     string HolidayType,
     string? Notes,
     bool IsNew) : IRequest<Unit>;

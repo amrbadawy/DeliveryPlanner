@@ -160,20 +160,44 @@ public class ModelsTests
     }
 
     [Fact]
-    public void Holiday_CanSetProperties()
+    public void Holiday_CanSetProperties_DateRange()
     {
         var holiday = new Holiday
         {
             HolidayName = "Eid Al-Fitr",
-            HolidayDate = new DateTime(2026, 6, 6),
-            HolidayType = "National",
+            StartDate = new DateTime(2026, 3, 30),
+            EndDate = new DateTime(2026, 4, 2),
+            HolidayType = "Religious",
             Notes = "Festival of Breaking Fast"
         };
 
         Assert.Equal("Eid Al-Fitr", holiday.HolidayName);
-        Assert.Equal(new DateTime(2026, 6, 6), holiday.HolidayDate);
-        Assert.Equal("National", holiday.HolidayType);
+        Assert.Equal(new DateTime(2026, 3, 30), holiday.StartDate);
+        Assert.Equal(new DateTime(2026, 4, 2), holiday.EndDate);
+        Assert.Equal("Religious", holiday.HolidayType);
         Assert.Equal("Festival of Breaking Fast", holiday.Notes);
+    }
+
+    [Fact]
+    public void Holiday_DurationDays_SingleDay()
+    {
+        var holiday = new Holiday
+        {
+            StartDate = new DateTime(2026, 1, 1),
+            EndDate = new DateTime(2026, 1, 1)
+        };
+        Assert.Equal(1, holiday.DurationDays);
+    }
+
+    [Fact]
+    public void Holiday_DurationDays_MultiDay()
+    {
+        var holiday = new Holiday
+        {
+            StartDate = new DateTime(2026, 3, 30),
+            EndDate = new DateTime(2026, 4, 2)
+        };
+        Assert.Equal(4, holiday.DurationDays);
     }
 
     #endregion
