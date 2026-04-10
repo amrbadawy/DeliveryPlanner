@@ -1,8 +1,11 @@
 @page "/tasks"
-@using SoftwareDeliveryPlanner.Data
+@using MediatR
+@using FluentValidation
+@using SoftwareDeliveryPlanner.Application.Tasks.Queries
+@using SoftwareDeliveryPlanner.Application.Tasks.Commands
+@using SoftwareDeliveryPlanner.Application.Planning.Commands
 @using SoftwareDeliveryPlanner.Models
-@using SoftwareDeliveryPlanner.Services
-@inject IDbContextFactory<PlannerDbContext> DbFactory
+@inject IMediator Mediator
 
 <PageTitle>Task Register</PageTitle>
 
@@ -148,24 +151,22 @@
 
     private async Task LoadTasks()
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        tasks = await db.Tasks.OrderBy(t => t.SchedulingRank ?? 999).ToListAsync();
+        tasks = await Mediator.Send(new GetTasksQuery());
     }
 
-    private void ShowAddModal()
+    private async Task ShowAddModal()
     {
-        taskForm = new TaskItem { TaskId = GenerateTaskId(), Priority = 5, MaxDev = 1 };
+        var count = await Mediator.Send(new GetTaskCountQuery());
+        taskForm = new TaskItem
+        {
+            TaskId = $"SVC-{(count + 1):D3}",
+            Priority = 5,
+            MaxDev = 1
+        };
         strictDateValue = null;
         editingTask = null;
         modalError = string.Empty;
         showModal = true;
-    }
-
-    private string GenerateTaskId()
-    {
-        using var db = DbFactory.CreateDbContext();
-        var count = db.Tasks.Count() + 1;
-        return $"SVC-{count:D3}";
     }
 
     private void EditTask(TaskItem task)
@@ -195,80 +196,33 @@
     private async Task SaveTask()
     {
         modalError = string.Empty;
-        if (string.IsNullOrWhiteSpace(taskForm.TaskId))
+        try
         {
-            modalError = "Service ID is required.";
-            return;
-        }
+            var command = new UpsertTaskCommand(
+                Id: taskForm.Id,
+                TaskId: taskForm.TaskId,
+                ServiceName: taskForm.ServiceName,
+                DevEstimation: taskForm.DevEstimation,
+                MaxDev: taskForm.MaxDev,
+                Priority: taskForm.Priority,
+                StrictDate: strictDateValue,
+                IsNew: editingTask == null);
 
-        if (string.IsNullOrWhiteSpace(taskForm.ServiceName))
+            await Mediator.Send(command);
+            await LoadTasks();
+            CloseModal();
+        }
+        catch (ValidationException ex)
         {
-            modalError = "Service Name is required.";
-            return;
+            modalError = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
         }
-
-        if (taskForm.DevEstimation <= 0)
-        {
-            modalError = "Estimation must be greater than zero.";
-            return;
-        }
-
-        if (taskForm.MaxDev <= 0)
-        {
-            modalError = "Max Developers must be greater than zero.";
-            return;
-        }
-
-        if (taskForm.Priority < 1 || taskForm.Priority > 10)
-        {
-            modalError = "Priority must be between 1 and 10.";
-            return;
-        }
-
-        await using var db = await DbFactory.CreateDbContextAsync();
-
-        taskForm.StrictDate = strictDateValue;
-        
-        if (editingTask == null)
-        {
-            taskForm.CreatedAt = DateTime.Now;
-            taskForm.UpdatedAt = DateTime.Now;
-            db.Tasks.Add(taskForm);
-        }
-        else
-        {
-            var existing = await db.Tasks.FirstOrDefaultAsync(t => t.Id == editingTask.Id);
-            if (existing != null)
-            {
-                existing.ServiceName = taskForm.ServiceName;
-                existing.DevEstimation = taskForm.DevEstimation;
-                existing.MaxDev = taskForm.MaxDev;
-                existing.Priority = taskForm.Priority;
-                existing.StrictDate = taskForm.StrictDate;
-                existing.UpdatedAt = DateTime.Now;
-            }
-        }
-
-        await db.SaveChangesAsync();
-        var scheduler = new SchedulingEngine(db);
-        scheduler.RunScheduler();
-        await LoadTasks();
-        CloseModal();
     }
 
     private async Task ConfirmDelete()
     {
         if (editingTask != null)
         {
-            await using var db = await DbFactory.CreateDbContextAsync();
-            var task = await db.Tasks.FirstOrDefaultAsync(t => t.Id == editingTask.Id);
-            if (task != null)
-            {
-                db.Tasks.Remove(task);
-                await db.SaveChangesAsync();
-                var scheduler = new SchedulingEngine(db);
-                scheduler.RunScheduler();
-            }
+            await Mediator.Send(new DeleteTaskCommand(editingTask.Id));
         }
         showDeleteConfirm = false;
         editingTask = null;
@@ -290,9 +244,7 @@
 
     private async Task RefreshData()
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var scheduler = new SchedulingEngine(db);
-        scheduler.RunScheduler();
+        await Mediator.Send(new RunSchedulerCommand());
         await LoadTasks();
     }
 }

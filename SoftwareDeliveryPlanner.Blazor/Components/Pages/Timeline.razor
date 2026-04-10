@@ -1,8 +1,10 @@
 @page "/timeline"
-@using SoftwareDeliveryPlanner.Data
+@using MediatR
+@using SoftwareDeliveryPlanner.Application.Timeline.Queries
+@using SoftwareDeliveryPlanner.Application.Resources.Queries
+@using SoftwareDeliveryPlanner.Application.Abstractions
 @using SoftwareDeliveryPlanner.Models
-@using SoftwareDeliveryPlanner.Services
-@inject IDbContextFactory<PlannerDbContext> DbFactory
+@inject IMediator Mediator
 
 <PageTitle>Employee Timeline</PageTitle>
 
@@ -64,25 +66,19 @@
 
 @code {
     private List<TeamMember> resources = new();
-    private List<TimelineDay> timelineDays = new();
+    private List<TimelineDayDto> timelineDays = new();
     private string selectedResourceId = "";
     private DateTime startDate = DateTime.Today.AddDays(-7);
     private DateTime endDate = DateTime.Today.AddMonths(2);
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadResources();
+        resources = await Mediator.Send(new GetResourcesQuery());
         if (resources.Any())
         {
             selectedResourceId = resources.First().ResourceId;
             await LoadTimeline();
         }
-    }
-
-    private async Task LoadResources()
-    {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        resources = await db.Resources.Where(r => r.Active == "Yes").OrderBy(r => r.ResourceName).ToListAsync();
     }
 
     private async Task OnResourceChanged(ChangeEventArgs e)
@@ -93,88 +89,9 @@
 
     private async Task LoadTimeline()
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
+        if (string.IsNullOrEmpty(selectedResourceId)) return;
 
-        var adjustments = await db.Adjustments.Where(a => a.ResourceId == selectedResourceId).ToListAsync();
-        var tasks = await db.Tasks.ToListAsync();
-        var holidays = await db.Holidays.ToListAsync();
-
-        var resourcesList = await db.Resources.Where(r => r.Active == "Yes").OrderBy(r => r.ResourceName).ToListAsync();
-        var devIndex = resourcesList.FindIndex(r => r.ResourceId == selectedResourceId) + 1;
-
-        timelineDays.Clear();
-        var current = startDate;
-
-        while (current <= endDate)
-        {
-            var dayOfWeek = (int)current.DayOfWeek;
-            var isWeekend = dayOfWeek == 5 || dayOfWeek == 6;
-            var isHoliday = holidays.Any(h => h.HolidayDate.Date == current.Date);
-            var adjustment = adjustments.FirstOrDefault(a => a.AdjStart.Date <= current.Date && a.AdjEnd.Date >= current.Date);
-
-            TaskItem? workingTask = null;
-            if (devIndex > 0)
-            {
-                foreach (var task in tasks)
-                {
-                    if (task.AssignedDev.HasValue &&
-                        Math.Floor(task.AssignedDev.Value) >= devIndex &&
-                        task.PlannedStart.HasValue && task.PlannedFinish.HasValue &&
-                        current.Date >= task.PlannedStart.Value.Date && current.Date <= task.PlannedFinish.Value.Date)
-                    {
-                        workingTask = task;
-                        break;
-                    }
-                }
-            }
-
-            string bgColor;
-            string statusText;
-
-            if (isWeekend)
-            {
-                bgColor = "#f8f9fa";
-                statusText = dayOfWeek == 5 ? "Friday" : "Saturday";
-            }
-            else if (isHoliday)
-            {
-                bgColor = "#fff3cd";
-                var h = holidays.First(x => x.HolidayDate.Date == current.Date);
-                statusText = h.HolidayName.Length > 10 ? h.HolidayName.Substring(0, 10) + ".." : h.HolidayName;
-            }
-            else if (adjustment != null)
-            {
-                bgColor = "#cce5ff";
-                statusText = adjustment.AdjType;
-            }
-            else if (workingTask != null)
-            {
-                bgColor = "#d1ecf1";
-                statusText = workingTask.ServiceName.Length > 12 ? workingTask.ServiceName.Substring(0, 12) + ".." : workingTask.ServiceName;
-            }
-            else
-            {
-                bgColor = "#d4edda";
-                statusText = "Free";
-            }
-
-            timelineDays.Add(new TimelineDay
-            {
-                Date = current,
-                DateDisplay = $"{current.Day} {current.ToString("ddd")}",
-                BackgroundColor = bgColor,
-                StatusText = statusText
-            });
-
-            current = current.AddDays(1);
-        }
-    }
-
-    private class TimelineDay
-    {
-        public DateTime Date { get; set; }
-        public string DateDisplay { get; set; } = "";
-        public string BackgroundColor { get; set; } = "";
-        public string StatusText { get; set; } = "";
+        var data = await Mediator.Send(new GetTimelineQuery(selectedResourceId, startDate, endDate));
+        timelineDays = data.Days;
     }
 }

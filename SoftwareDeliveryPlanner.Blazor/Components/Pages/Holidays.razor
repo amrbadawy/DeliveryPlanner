@@ -1,8 +1,11 @@
 @page "/holidays"
-@using SoftwareDeliveryPlanner.Data
+@using MediatR
+@using FluentValidation
+@using SoftwareDeliveryPlanner.Application.Holidays.Queries
+@using SoftwareDeliveryPlanner.Application.Holidays.Commands
+@using SoftwareDeliveryPlanner.Application.Planning.Commands
 @using SoftwareDeliveryPlanner.Models
-@using SoftwareDeliveryPlanner.Services
-@inject IDbContextFactory<PlannerDbContext> DbFactory
+@inject IMediator Mediator
 
 <PageTitle>Holidays</PageTitle>
 
@@ -126,8 +129,7 @@
 
     private async Task LoadHolidays()
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        holidays = await db.Holidays.OrderBy(h => h.HolidayDate).ToListAsync();
+        holidays = await Mediator.Send(new GetHolidaysQuery());
     }
 
     private void ShowAddModal()
@@ -163,52 +165,31 @@
     private async Task SaveHoliday()
     {
         modalError = string.Empty;
-        if (string.IsNullOrWhiteSpace(holidayForm.HolidayName))
+        try
         {
-            modalError = "Holiday Name is required.";
-            return;
+            var command = new UpsertHolidayCommand(
+                Id: holidayForm.Id,
+                HolidayName: holidayForm.HolidayName,
+                HolidayDate: holidayDateValue,
+                HolidayType: holidayForm.HolidayType,
+                Notes: holidayForm.Notes,
+                IsNew: editingHoliday == null);
+
+            await Mediator.Send(command);
+            await LoadHolidays();
+            CloseModal();
         }
-
-        await using var db = await DbFactory.CreateDbContextAsync();
-
-        holidayForm.HolidayDate = holidayDateValue;
-        
-        if (editingHoliday == null)
+        catch (ValidationException ex)
         {
-            db.Holidays.Add(holidayForm);
+            modalError = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
         }
-        else
-        {
-            var existing = await db.Holidays.FirstOrDefaultAsync(h => h.Id == editingHoliday.Id);
-            if (existing != null)
-            {
-                existing.HolidayName = holidayForm.HolidayName;
-                existing.HolidayDate = holidayForm.HolidayDate;
-                existing.HolidayType = holidayForm.HolidayType;
-                existing.Notes = holidayForm.Notes;
-            }
-        }
-
-        await db.SaveChangesAsync();
-        var scheduler = new SchedulingEngine(db);
-        scheduler.RunScheduler();
-        await LoadHolidays();
-        CloseModal();
     }
 
     private async Task ConfirmDelete()
     {
         if (editingHoliday != null)
         {
-            await using var db = await DbFactory.CreateDbContextAsync();
-            var h = await db.Holidays.FirstOrDefaultAsync(x => x.Id == editingHoliday.Id);
-            if (h != null)
-            {
-                db.Holidays.Remove(h);
-                await db.SaveChangesAsync();
-                var scheduler = new SchedulingEngine(db);
-                scheduler.RunScheduler();
-            }
+            await Mediator.Send(new DeleteHolidayCommand(editingHoliday.Id));
         }
         showDeleteConfirm = false;
         editingHoliday = null;
@@ -230,9 +211,7 @@
 
     private async Task RefreshData()
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var scheduler = new SchedulingEngine(db);
-        scheduler.RunScheduler();
+        await Mediator.Send(new RunSchedulerCommand());
         await LoadHolidays();
     }
 }

@@ -1,7 +1,8 @@
 @page "/calendar"
-@using SoftwareDeliveryPlanner.Data
+@using MediatR
+@using SoftwareDeliveryPlanner.Application.Calendar.Queries
 @using SoftwareDeliveryPlanner.Models
-@inject IDbContextFactory<PlannerDbContext> DbFactory
+@inject IMediator Mediator
 
 <PageTitle>Calendar</PageTitle>
 
@@ -59,8 +60,7 @@
 
     private async Task LoadCalendar()
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        calendar = await db.Calendar.OrderBy(c => c.CalendarDate).ToListAsync();
+        calendar = await Mediator.Send(new GetCalendarQuery());
     }
 
     private async Task RefreshData()

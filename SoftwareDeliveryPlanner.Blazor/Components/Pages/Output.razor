@@ -1,8 +1,8 @@
 @page "/output"
-@using SoftwareDeliveryPlanner.Data
-@using SoftwareDeliveryPlanner.Models
-@using SoftwareDeliveryPlanner.Services
-@inject IDbContextFactory<PlannerDbContext> DbFactory
+@using MediatR
+@using SoftwareDeliveryPlanner.Application.Output.Queries
+@using SoftwareDeliveryPlanner.Application.Planning.Commands
+@inject IMediator Mediator
 @inject IJSRuntime JS
 
 <PageTitle>Delivery Plan</PageTitle>
@@ -70,9 +70,7 @@
 
     private async Task LoadOutput()
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var scheduler = new SchedulingEngine(db);
-        output = scheduler.GetOutputPlan();
+        output = await Mediator.Send(new GetOutputPlanQuery());
     }
 
     private string GetStatusColor(string? status)
@@ -143,9 +141,7 @@
 
     private async Task RefreshData()
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var scheduler = new SchedulingEngine(db);
-        scheduler.RunScheduler();
+        await Mediator.Send(new RunSchedulerCommand());
         await LoadOutput();
     }
 }

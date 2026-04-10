@@ -1,8 +1,12 @@
 @page "/adjustments"
-@using SoftwareDeliveryPlanner.Data
+@using MediatR
+@using FluentValidation
+@using SoftwareDeliveryPlanner.Application.Adjustments.Queries
+@using SoftwareDeliveryPlanner.Application.Adjustments.Commands
+@using SoftwareDeliveryPlanner.Application.Resources.Queries
+@using SoftwareDeliveryPlanner.Application.Planning.Commands
 @using SoftwareDeliveryPlanner.Models
-@using SoftwareDeliveryPlanner.Services
-@inject IDbContextFactory<PlannerDbContext> DbFactory
+@inject IMediator Mediator
 
 <PageTitle>Adjustments</PageTitle>
 
@@ -143,9 +147,8 @@
 
     private async Task LoadData()
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        adjustments = await db.Adjustments.ToListAsync();
-        resources = await db.Resources.ToListAsync();
+        adjustments = await Mediator.Send(new GetAdjustmentsQuery());
+        resources = await Mediator.Send(new GetResourcesQuery());
     }
 
     private void ShowAddModal()
@@ -171,67 +174,31 @@
     private async Task SaveAdjustment()
     {
         modalError = string.Empty;
-        if (string.IsNullOrWhiteSpace(adjustmentForm.ResourceId))
-        {
-            modalError = "Employee is required.";
-            return;
-        }
-
-        if (adjustmentForm.AvailabilityPct < 0 || adjustmentForm.AvailabilityPct > 100)
-        {
-            modalError = "Availability must be between 0 and 100.";
-            return;
-        }
-
-        if (startDateValue > endDateValue)
-        {
-            modalError = "Start Date must be before or equal to End Date.";
-            return;
-        }
-
-        await using var db = await DbFactory.CreateDbContextAsync();
-
-        adjustmentForm.AdjStart = startDateValue;
-        adjustmentForm.AdjEnd = endDateValue;
-        
-        db.Adjustments.Add(adjustmentForm);
-        await db.SaveChangesAsync();
         try
         {
-            await using var schedulerDb = await DbFactory.CreateDbContextAsync();
-            var scheduler = new SchedulingEngine(schedulerDb);
-            scheduler.RunScheduler();
+            var command = new AddAdjustmentCommand(
+                ResourceId: adjustmentForm.ResourceId,
+                AdjType: adjustmentForm.AdjType,
+                AvailabilityPct: adjustmentForm.AvailabilityPct,
+                AdjStart: startDateValue,
+                AdjEnd: endDateValue,
+                Notes: adjustmentForm.Notes);
+
+            await Mediator.Send(command);
+            await LoadData();
+            CloseModal();
         }
-        catch
+        catch (ValidationException ex)
         {
-            modalError = "Adjustment saved, but scheduling refresh failed.";
-            return;
+            modalError = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
         }
-        await LoadData();
-        CloseModal();
     }
 
     private async Task ConfirmDelete()
     {
         if (editingAdjustment != null)
         {
-            await using var db = await DbFactory.CreateDbContextAsync();
-            var a = await db.Adjustments.FirstOrDefaultAsync(x => x.Id == editingAdjustment.Id);
-            if (a != null)
-            {
-                db.Adjustments.Remove(a);
-                await db.SaveChangesAsync();
-                try
-                {
-                    await using var schedulerDb = await DbFactory.CreateDbContextAsync();
-                    var scheduler = new SchedulingEngine(schedulerDb);
-                    scheduler.RunScheduler();
-                }
-                catch
-                {
-                    // Keep delete successful even if scheduling refresh fails.
-                }
-            }
+            await Mediator.Send(new DeleteAdjustmentCommand(editingAdjustment.Id));
         }
         showDeleteConfirm = false;
         editingAdjustment = null;
@@ -252,16 +219,7 @@
 
     private async Task RefreshData()
     {
-        try
-        {
-            await using var db = await DbFactory.CreateDbContextAsync();
-            var scheduler = new SchedulingEngine(db);
-            scheduler.RunScheduler();
-        }
-        catch
-        {
-            // UI remains usable even if scheduler fails.
-        }
+        await Mediator.Send(new RunSchedulerCommand());
         await LoadData();
     }
 }

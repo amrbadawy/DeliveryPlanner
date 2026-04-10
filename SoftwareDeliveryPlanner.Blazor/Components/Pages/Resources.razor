@@ -1,8 +1,11 @@
 @page "/resources"
-@using SoftwareDeliveryPlanner.Data
+@using MediatR
+@using FluentValidation
+@using SoftwareDeliveryPlanner.Application.Resources.Queries
+@using SoftwareDeliveryPlanner.Application.Resources.Commands
+@using SoftwareDeliveryPlanner.Application.Planning.Commands
 @using SoftwareDeliveryPlanner.Models
-@using SoftwareDeliveryPlanner.Services
-@inject IDbContextFactory<PlannerDbContext> DbFactory
+@inject IMediator Mediator
 
 <PageTitle>Resources</PageTitle>
 
@@ -162,24 +165,26 @@
 
     private async Task LoadResources()
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        resources = await db.Resources.ToListAsync();
+        resources = await Mediator.Send(new GetResourcesQuery());
     }
 
-    private void ShowAddModal()
+    private async Task ShowAddModal()
     {
-        resourceForm = new TeamMember { ResourceId = GenerateResourceId(), Role = "Developer", Team = "Delivery", StartDate = DateTime.Today, Active = "Yes", AvailabilityPct = 100, DailyCapacity = 1 };
+        var count = await Mediator.Send(new GetResourceCountQuery());
+        resourceForm = new TeamMember
+        {
+            ResourceId = $"DEV-{(count + 1):D3}",
+            Role = "Developer",
+            Team = "Delivery",
+            StartDate = DateTime.Today,
+            Active = "Yes",
+            AvailabilityPct = 100,
+            DailyCapacity = 1
+        };
         startDateValue = DateTime.Today;
         editingResource = null;
         modalError = string.Empty;
         showModal = true;
-    }
-
-    private string GenerateResourceId()
-    {
-        using var db = DbFactory.CreateDbContext();
-        var count = db.Resources.Count() + 1;
-        return $"DEV-{count:D3}";
     }
 
     private void EditResource(TeamMember r)
@@ -212,75 +217,36 @@
     private async Task SaveResource()
     {
         modalError = string.Empty;
-        if (string.IsNullOrWhiteSpace(resourceForm.ResourceId))
+        try
         {
-            modalError = "Resource ID is required.";
-            return;
-        }
+            var command = new UpsertResourceCommand(
+                Id: resourceForm.Id,
+                ResourceId: resourceForm.ResourceId,
+                ResourceName: resourceForm.ResourceName,
+                Role: resourceForm.Role,
+                Team: resourceForm.Team,
+                AvailabilityPct: resourceForm.AvailabilityPct,
+                DailyCapacity: resourceForm.DailyCapacity,
+                StartDate: startDateValue,
+                Active: resourceForm.Active,
+                Notes: resourceForm.Notes,
+                IsNew: editingResource == null);
 
-        if (string.IsNullOrWhiteSpace(resourceForm.ResourceName))
+            await Mediator.Send(command);
+            await LoadResources();
+            CloseModal();
+        }
+        catch (ValidationException ex)
         {
-            modalError = "Name is required.";
-            return;
+            modalError = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
         }
-
-        if (resourceForm.AvailabilityPct < 0 || resourceForm.AvailabilityPct > 100)
-        {
-            modalError = "Availability must be between 0 and 100.";
-            return;
-        }
-
-        if (resourceForm.DailyCapacity <= 0)
-        {
-            modalError = "Daily capacity must be greater than zero.";
-            return;
-        }
-
-        await using var db = await DbFactory.CreateDbContextAsync();
-
-        resourceForm.StartDate = startDateValue;
-        
-        if (editingResource == null)
-        {
-            resourceForm.CreatedAt = DateTime.Now;
-            db.Resources.Add(resourceForm);
-        }
-        else
-        {
-            var existing = await db.Resources.FirstOrDefaultAsync(r => r.Id == editingResource.Id);
-            if (existing != null)
-            {
-                existing.ResourceName = resourceForm.ResourceName;
-                existing.Role = resourceForm.Role;
-                existing.Team = resourceForm.Team;
-                existing.AvailabilityPct = resourceForm.AvailabilityPct;
-                existing.DailyCapacity = resourceForm.DailyCapacity;
-                existing.StartDate = resourceForm.StartDate;
-                existing.Active = resourceForm.Active;
-                existing.Notes = resourceForm.Notes;
-            }
-        }
-
-        await db.SaveChangesAsync();
-        var scheduler = new SchedulingEngine(db);
-        scheduler.RunScheduler();
-        await LoadResources();
-        CloseModal();
     }
 
     private async Task ConfirmDelete()
     {
         if (editingResource != null)
         {
-            await using var db = await DbFactory.CreateDbContextAsync();
-            var r = await db.Resources.FirstOrDefaultAsync(x => x.Id == editingResource.Id);
-            if (r != null)
-            {
-                db.Resources.Remove(r);
-                await db.SaveChangesAsync();
-                var scheduler = new SchedulingEngine(db);
-                scheduler.RunScheduler();
-            }
+            await Mediator.Send(new DeleteResourceCommand(editingResource.Id));
         }
         showDeleteConfirm = false;
         editingResource = null;
@@ -302,9 +268,7 @@
 
     private async Task RefreshData()
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var scheduler = new SchedulingEngine(db);
-        scheduler.RunScheduler();
+        await Mediator.Send(new RunSchedulerCommand());
         await LoadResources();
     }
 }
