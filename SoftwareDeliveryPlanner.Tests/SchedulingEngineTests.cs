@@ -120,6 +120,35 @@ public class SchedulingEngineTests : IDisposable
 
     #endregion
 
+    #region IsWorkingDay edge cases
+
+    [Fact]
+    public void IsWorkingDay_HolidayOnWeekend_ReturnsFalse()
+    {
+        // Labour Day 2026-05-01 is a Friday (weekend) — both weekend AND holiday
+        var labourDay = new DateTime(2026, 5, 1);
+        Assert.False(_engine.IsWorkingDay(labourDay));
+    }
+
+    [Fact]
+    public void IsWorkingDay_DateBeforeAllHolidays_ReturnsTrue()
+    {
+        // 2026-01-05 is a Monday (working day), and no seeded holiday falls on this date
+        // (New Year's Day Jan 1 is seeded; next holiday is Founding Day Feb 22)
+        var jan5 = new DateTime(2026, 1, 5);
+        Assert.True(_engine.IsWorkingDay(jan5));
+    }
+
+    [Fact]
+    public void IsWorkingDay_NewYearsDay2027_ReturnsTrue()
+    {
+        // 2027-01-04 is a Monday (working day) and not a seeded holiday
+        var date = new DateTime(2027, 1, 4);
+        Assert.True(_engine.IsWorkingDay(date));
+    }
+
+    #endregion
+
     #region GetHolidayForDate Tests
 
     [Fact]
@@ -135,6 +164,44 @@ public class SchedulingEngineTests : IDisposable
     {
         var holiday = _engine.GetHolidayForDate(new DateTime(2026, 5, 4));
         Assert.Null(holiday);
+    }
+
+    #endregion
+
+    #region GetHolidayForDate edge cases
+
+    [Fact]
+    public void GetHolidayForDate_StartDate_ReturnsHoliday()
+    {
+        // First day of Eid Al-Fitr: Mar 30, 2026
+        var holiday = _engine.GetHolidayForDate(new DateTime(2026, 3, 30));
+        Assert.NotNull(holiday);
+        Assert.Contains("الفطر", holiday.HolidayName);
+    }
+
+    [Fact]
+    public void GetHolidayForDate_EndDate_ReturnsHoliday()
+    {
+        // Last day of Eid Al-Fitr: Apr 2, 2026
+        var holiday = _engine.GetHolidayForDate(new DateTime(2026, 4, 2));
+        Assert.NotNull(holiday);
+        Assert.Contains("الفطر", holiday.HolidayName);
+    }
+
+    [Fact]
+    public void GetHolidayForDate_DayBefore_ReturnsNull()
+    {
+        // Day before Eid Al-Fitr start: Mar 29, 2026
+        var holiday = _engine.GetHolidayForDate(new DateTime(2026, 3, 29));
+        Assert.Null(holiday);
+    }
+
+    [Fact]
+    public void GetHolidayForDate_SingleDayHoliday_ReturnsHoliday()
+    {
+        // National Day: Sep 23, 2026 (single-day holiday)
+        var holiday = _engine.GetHolidayForDate(new DateTime(2026, 9, 23));
+        Assert.NotNull(holiday);
     }
 
     #endregion
@@ -191,6 +258,44 @@ public class SchedulingEngineTests : IDisposable
         var monday = new DateTime(2026, 5, 4);
         var result = _engine.GetWorkingDaysBetween(thursday, monday);
         Assert.True(result <= 0);
+    }
+
+    #endregion
+
+    #region GetWorkingDaysBetween with holidays
+
+    [Fact]
+    public void GetWorkingDaysBetween_SpanningHoliday_ExcludesHoliday()
+    {
+        // Sep 21 (Mon) to Sep 24 (Thu) 2026 — Sep 23 is National Day (holiday)
+        // Working days: Sep 21 (Mon), Sep 22 (Tue), Sep 24 (Thu) = 3
+        var start = new DateTime(2026, 9, 21);
+        var end = new DateTime(2026, 9, 24);
+        var result = _engine.GetWorkingDaysBetween(start, end);
+        Assert.Equal(3, result);
+    }
+
+    [Fact]
+    public void GetWorkingDaysBetween_SpanningMultiDayHoliday_ExcludesAll()
+    {
+        // Mar 29 (Sun) to Apr 5 (Sun) 2026
+        // Eid Al-Fitr: Mar 30 (Mon) - Apr 2 (Thu) — 4 holiday days on working days
+        // Working days in range: Mar 29 (Sun), Apr 5 (Sun) = 2 working days
+        // Apr 3 (Fri) and Apr 4 (Sat) are weekend
+        var start = new DateTime(2026, 3, 29);
+        var end = new DateTime(2026, 4, 5);
+        var result = _engine.GetWorkingDaysBetween(start, end);
+        Assert.Equal(2, result);
+    }
+
+    [Fact]
+    public void GetWorkingDaysBetween_EntirelyWithinHoliday_ReturnsZero()
+    {
+        // Mar 30 (Mon) to Apr 2 (Thu) 2026 — entirely within Eid Al-Fitr
+        var start = new DateTime(2026, 3, 30);
+        var end = new DateTime(2026, 4, 2);
+        var result = _engine.GetWorkingDaysBetween(start, end);
+        Assert.Equal(0, result);
     }
 
     #endregion
@@ -348,6 +453,40 @@ public class SchedulingEngineTests : IDisposable
 
     #endregion
 
+    #region RunScheduler result format
+
+    [Fact]
+    public void RunScheduler_WithDefaultData_ReturnsAllocationsCount()
+    {
+        var result = _engine.RunScheduler();
+        Assert.Contains("allocations", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RunScheduler_SingleTask_StatusIsCompleted()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.SaveChanges();
+
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "T-SMALL",
+            ServiceName = "Small Task",
+            DevEstimation = 1,
+            MaxDev = 1,
+            Priority = 5
+        });
+        _db.SaveChanges();
+
+        _engine.RunScheduler();
+
+        var task = _db.Tasks.First(t => t.TaskId == "T-SMALL");
+        Assert.Equal("Completed", task.Status);
+    }
+
+    #endregion
+
     #region GetDashboardKPIs Tests
 
     [Fact]
@@ -381,6 +520,31 @@ public class SchedulingEngineTests : IDisposable
         Assert.True(kpis.ContainsKey("on_track"));
         Assert.True(kpis.ContainsKey("at_risk"));
         Assert.True(kpis.ContainsKey("late"));
+    }
+
+    #endregion
+
+    #region GetDashboardKPIs edge cases
+
+    [Fact]
+    public void GetDashboardKPIs_ContainsTotalEstimation()
+    {
+        var kpis = _engine.GetDashboardKPIs();
+        Assert.True(kpis.ContainsKey("total_estimation"));
+    }
+
+    [Fact]
+    public void GetDashboardKPIs_ContainsAvgAssigned()
+    {
+        var kpis = _engine.GetDashboardKPIs();
+        Assert.True(kpis.ContainsKey("avg_assigned"));
+    }
+
+    [Fact]
+    public void GetDashboardKPIs_ContainsStrictCount()
+    {
+        var kpis = _engine.GetDashboardKPIs();
+        Assert.True(kpis.ContainsKey("strict_count"));
     }
 
     #endregion

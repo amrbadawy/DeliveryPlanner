@@ -349,4 +349,184 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
             Assert.True(p1.PlannedStart.Value <= p9.PlannedStart.Value);
         }
     }
+
+    // ------------------------------------------------------------------
+    // Same-priority tasks — both get scheduled
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void RunScheduler_MultipleTasksSamePriority_BothGetScheduled()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.SaveChanges();
+
+        _db.Tasks.Add(new TaskItem { TaskId = "SV-SP1", ServiceName = "Same Priority A", DevEstimation = 3, Priority = 5 });
+        _db.Tasks.Add(new TaskItem { TaskId = "SV-SP2", ServiceName = "Same Priority B", DevEstimation = 3, Priority = 5 });
+        _db.SaveChanges();
+
+        _engine.RunScheduler();
+
+        var t1 = _db.Tasks.First(t => t.TaskId == "SV-SP1");
+        var t2 = _db.Tasks.First(t => t.TaskId == "SV-SP2");
+
+        Assert.NotNull(t1.PlannedStart);
+        Assert.NotNull(t2.PlannedStart);
+    }
+
+    // ------------------------------------------------------------------
+    // MaxDev exceeding capacity — capped at available capacity
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void RunScheduler_TaskWithMaxDevGreaterThanCapacity_CapsAtCapacity()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.SaveChanges();
+
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "SV-MAXD",
+            ServiceName = "Max Dev Overflow",
+            DevEstimation = 10,
+            MaxDev = 100,   // far exceeds any realistic daily capacity
+            Priority = 5
+        });
+        _db.SaveChanges();
+
+        _engine.RunScheduler();
+
+        var allocations = _db.Allocations.Where(a => a.TaskId == "SV-MAXD").ToList();
+        // Each allocation's AssignedDev should not exceed the day's available capacity
+        Assert.All(allocations, a =>
+            Assert.True(a.AssignedDev <= a.AvailableCapacity,
+                $"AssignedDev {a.AssignedDev} exceeds AvailableCapacity {a.AvailableCapacity}"));
+    }
+
+    // ------------------------------------------------------------------
+    // All resources inactive — task remains unscheduled
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void RunScheduler_AllResourcesInactive_TaskNotScheduled()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.Resources.RemoveRange(_db.Resources);
+        _db.SaveChanges();
+
+        // Add a single inactive resource
+        _db.Resources.Add(new TeamMember
+        {
+            ResourceId = "RES-OFF",
+            ResourceName = "Inactive Dev",
+            Role = "Developer",
+            Active = "No",
+            StartDate = new DateTime(2026, 1, 1),
+            DailyCapacity = 8,
+            AvailabilityPct = 100
+        });
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "SV-INAC",
+            ServiceName = "Inactive Resources Task",
+            DevEstimation = 5,
+            Priority = 5
+        });
+        _db.SaveChanges();
+
+        var engine = new SchedulingEngine(_db);
+        engine.RunScheduler();
+
+        var task = _db.Tasks.First(t => t.TaskId == "SV-INAC");
+        Assert.Equal("Not Started", task.Status);
+    }
+
+    // ------------------------------------------------------------------
+    // CalculateRisk — No strict date returns On Track
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void CalculateRisk_NoStrictDate_ReturnsOnTrack()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.SaveChanges();
+
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "SV-NOST",
+            ServiceName = "No Strict Date",
+            DevEstimation = 3,
+            Priority = 5,
+            StrictDate = null
+        });
+        _db.SaveChanges();
+
+        _engine.RunScheduler();
+
+        var task = _db.Tasks.First(t => t.TaskId == "SV-NOST");
+        Assert.Equal("On Track", task.DeliveryRisk);
+    }
+
+    // ------------------------------------------------------------------
+    // Multiple strict-date tasks — earlier deadline scheduled first
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void RunScheduler_MultipleStrictDateTasks_EarlierDeadlineFirst()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.SaveChanges();
+
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "SV-SD1",
+            ServiceName = "Later Deadline",
+            DevEstimation = 5,
+            Priority = 5,
+            StrictDate = new DateTime(2026, 12, 1)
+        });
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "SV-SD2",
+            ServiceName = "Earlier Deadline",
+            DevEstimation = 5,
+            Priority = 5,
+            StrictDate = new DateTime(2026, 8, 1)
+        });
+        _db.SaveChanges();
+
+        _engine.RunScheduler();
+
+        var later = _db.Tasks.First(t => t.TaskId == "SV-SD1");
+        var earlier = _db.Tasks.First(t => t.TaskId == "SV-SD2");
+
+        // Earlier strict date task should start on or before the later one
+        if (earlier.PlannedStart.HasValue && later.PlannedStart.HasValue)
+        {
+            Assert.True(earlier.PlannedStart.Value <= later.PlannedStart.Value,
+                $"Earlier deadline task started {earlier.PlannedStart:yyyy-MM-dd} but later deadline started {later.PlannedStart:yyyy-MM-dd}");
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // GetDashboardKPIs — overall_finish is a real date after scheduling
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void GetDashboardKPIs_WithScheduledTasks_OverallFinishIsMax()
+    {
+        // Run scheduler with default seeded data
+        _engine.RunScheduler();
+
+        var kpis = _engine.GetDashboardKPIs();
+        Assert.True(kpis.ContainsKey("overall_finish"));
+
+        var overallFinish = (DateTime)kpis["overall_finish"];
+        Assert.True(overallFinish > DateTime.MinValue,
+            $"Expected a real date but got {overallFinish}");
+    }
 }

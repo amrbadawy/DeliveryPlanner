@@ -97,6 +97,27 @@ public class TaskItemDomainTests
         var task = TaskItem.Create("SVC-001", "  My Service  ", 5, 1, 5);
         Assert.Equal("My Service", task.ServiceName);
     }
+
+    [Fact]
+    public void Create_BoundaryEstimation_SmallValue_DoesNotThrow()
+    {
+        var task = TaskItem.Create("SVC-001", "Service", 0.001, 1, 5);
+        Assert.Equal(0.001, task.DevEstimation);
+    }
+
+    [Fact]
+    public void Create_LargeEstimation_DoesNotThrow()
+    {
+        var task = TaskItem.Create("SVC-001", "Service", 10000, 1, 5);
+        Assert.Equal(10000, task.DevEstimation);
+    }
+
+    [Fact]
+    public void Create_NullServiceName_ThrowsDomainException()
+    {
+        Assert.Throws<DomainException>(() =>
+            TaskItem.Create("SVC-001", null!, 5, 1, 5));
+    }
 }
 
 // ============================================================
@@ -176,6 +197,36 @@ public class TeamMemberDomainTests
         var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, DateTime.Today, "Yes", "Note here");
         Assert.Equal("Note here", member.Notes);
     }
+
+    [Fact]
+    public void Create_BoundaryAvailability_ZeroPercent_DoesNotThrow()
+    {
+        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 0, 1, DateTime.Today);
+        Assert.Equal(0, member.AvailabilityPct);
+    }
+
+    [Fact]
+    public void Create_BoundaryAvailability_HundredPercent_DoesNotThrow()
+    {
+        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, DateTime.Today);
+        Assert.Equal(100, member.AvailabilityPct);
+    }
+
+    [Fact]
+    public void Create_WithNullNotes_SetsNull()
+    {
+        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, DateTime.Today);
+        Assert.Null(member.Notes);
+    }
+
+    [Fact]
+    public void Create_WithEndDate_SetsEndDate()
+    {
+        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, DateTime.Today);
+        var endDate = new DateTime(2026, 12, 31);
+        member.EndDate = endDate;
+        Assert.Equal(endDate, member.EndDate);
+    }
 }
 
 // ============================================================
@@ -239,6 +290,21 @@ public class AdjustmentDomainTests
     {
         var adj = Adjustment.Create("  DEV-001  ", "Vacation", 0, DateTime.Today, DateTime.Today.AddDays(3));
         Assert.Equal("DEV-001", adj.ResourceId);
+    }
+
+    [Fact]
+    public void Create_WithNullNotes_SetsNull()
+    {
+        var adj = Adjustment.Create("DEV-001", "Vacation", 0, DateTime.Today, DateTime.Today.AddDays(3));
+        Assert.Null(adj.Notes);
+    }
+
+    [Fact]
+    public void Create_PreservesResourceIdCase_ButTrims()
+    {
+        // Adjustment.Create trims but does NOT normalize to uppercase (unlike TeamMember.Create)
+        var adj = Adjustment.Create("  dev-001  ", "Vacation", 0, DateTime.Today, DateTime.Today.AddDays(3));
+        Assert.Equal("dev-001", adj.ResourceId);
     }
 }
 
@@ -326,6 +392,59 @@ public class HolidayDomainTests
         Assert.Equal(date, holiday.StartDate);
         Assert.Equal(date, holiday.EndDate);
         Assert.Equal(1, holiday.DurationDays);
+    }
+
+    [Fact]
+    public void Create_NullName_ThrowsDomainException()
+    {
+        Assert.Throws<DomainException>(() =>
+            Holiday.Create(null!, DateTime.Today, DateTime.Today));
+    }
+
+    [Fact]
+    public void Create_WithNotes_PersistsNotes()
+    {
+        var holiday = Holiday.Create("Test Holiday", DateTime.Today, DateTime.Today, "National", "Some notes");
+        Assert.Equal("Some notes", holiday.Notes);
+    }
+
+    [Fact]
+    public void Create_WithCustomType_PersistsType()
+    {
+        var holiday = Holiday.Create("Eid", DateTime.Today, DateTime.Today, "Religious");
+        Assert.Equal("Religious", holiday.HolidayType);
+    }
+
+    [Fact]
+    public void Create_LargeRange_CalculatesDurationCorrectly()
+    {
+        var start = new DateTime(2026, 1, 1);
+        var end = new DateTime(2026, 1, 30);
+        var holiday = Holiday.Create("Long Holiday", start, end);
+        Assert.Equal(30, holiday.DurationDays);
+    }
+
+    [Fact]
+    public void Create_SingleDayOverload_DefaultsToNationalType()
+    {
+        var holiday = Holiday.Create("Independence Day", new DateTime(2026, 7, 4));
+        Assert.Equal("National", holiday.HolidayType);
+    }
+
+    [Fact]
+    public void Create_SingleDayOverload_StripsTime()
+    {
+        var dateWithTime = new DateTime(2026, 7, 4, 15, 30, 45);
+        var holiday = Holiday.Create("Independence Day", dateWithTime);
+        Assert.Equal(new DateTime(2026, 7, 4), holiday.StartDate);
+        Assert.Equal(new DateTime(2026, 7, 4), holiday.EndDate);
+    }
+
+    [Fact]
+    public void Create_RangeOverload_NullNotes_SetsNull()
+    {
+        var holiday = Holiday.Create("Test Holiday", DateTime.Today, DateTime.Today, "National", null);
+        Assert.Null(holiday.Notes);
     }
 }
 
