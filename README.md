@@ -26,6 +26,12 @@ From the repository root:
 dotnet restore SoftwareDeliveryPlanner.slnx
 dotnet build SoftwareDeliveryPlanner.slnx
 dotnet test SoftwareDeliveryPlanner.Tests/SoftwareDeliveryPlanner.Tests.csproj
+dotnet test SoftwareDeliveryPlanner.ArchTests/SoftwareDeliveryPlanner.ArchTests.csproj
+
+# Optional but recommended quality gates
+pwsh .github/scripts/verify-licenses.ps1 -RootPath . -PolicyFile .github/license-policy.json
+npm --prefix SoftwareDeliveryPlanner.Blazor ci
+npm --prefix SoftwareDeliveryPlanner.Blazor run test:e2e:smoke
 ```
 
 ## Run Applications

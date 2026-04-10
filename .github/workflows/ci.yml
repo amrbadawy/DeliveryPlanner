@@ -31,3 +31,23 @@ jobs:
 
       - name: Test
         run: dotnet test SoftwareDeliveryPlanner.Tests/SoftwareDeliveryPlanner.Tests.csproj --configuration Release --no-build
+
+      - name: Architecture Tests
+        run: dotnet test SoftwareDeliveryPlanner.ArchTests/SoftwareDeliveryPlanner.ArchTests.csproj --configuration Release --no-build
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Playwright Dependencies
+        working-directory: SoftwareDeliveryPlanner.Blazor
+        run: npm ci
+
+      - name: Verify License Policy
+        shell: pwsh
+        run: .github/scripts/verify-licenses.ps1 -RootPath . -PolicyFile .github/license-policy.json
+
+      - name: Playwright Smoke
+        working-directory: SoftwareDeliveryPlanner.Blazor
+        run: npm run test:e2e:smoke

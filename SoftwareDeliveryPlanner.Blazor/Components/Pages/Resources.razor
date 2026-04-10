@@ -23,6 +23,10 @@
                     <button type="button" class="btn-close" @onclick="CloseModal"></button>
                 </div>
                 <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(modalError))
+                    {
+                        <div class="alert alert-danger" data-testid="resources-error">@modalError</div>
+                    }
                     <div class="mb-2">
                         <label>Resource ID:</label>
                         <input class="form-control" @bind="resourceForm.ResourceId" disabled="@(editingResource != null)" data-testid="resources-id" />
@@ -96,7 +100,7 @@
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-danger" @onclick="ConfirmDelete" data-testid="resources-delete-confirm">Delete</button>
-                    <button class="btn btn-secondary" @onclick="() => showDeleteConfirm = false" data-testid="resources-delete-cancel">Cancel</button>
+                    <button class="btn btn-secondary" @onclick="CloseDeleteModal" data-testid="resources-delete-cancel">Cancel</button>
                 </div>
             </div>
         </div>
@@ -120,7 +124,7 @@
     <tbody>
         @foreach (var r in resources)
         {
-            <tr>
+            <tr data-testid="resources-row-@r.ResourceId">
                 <td>@r.ResourceId</td>
                 <td>@r.ResourceName</td>
                 <td>@r.Role</td>
@@ -149,6 +153,7 @@
     private TeamMember? editingResource;
     private TeamMember resourceForm = new();
     private DateTime startDateValue;
+    private string modalError = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -166,6 +171,7 @@
         resourceForm = new TeamMember { ResourceId = GenerateResourceId(), Role = "Developer", Team = "Delivery", StartDate = DateTime.Today, Active = "Yes", AvailabilityPct = 100, DailyCapacity = 1 };
         startDateValue = DateTime.Today;
         editingResource = null;
+        modalError = string.Empty;
         showModal = true;
     }
 
@@ -193,6 +199,7 @@
             Notes = r.Notes
         };
         startDateValue = r.StartDate;
+        modalError = string.Empty;
         showModal = true;
     }
 
@@ -204,6 +211,31 @@
 
     private async Task SaveResource()
     {
+        modalError = string.Empty;
+        if (string.IsNullOrWhiteSpace(resourceForm.ResourceId))
+        {
+            modalError = "Resource ID is required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(resourceForm.ResourceName))
+        {
+            modalError = "Name is required.";
+            return;
+        }
+
+        if (resourceForm.AvailabilityPct < 0 || resourceForm.AvailabilityPct > 100)
+        {
+            modalError = "Availability must be between 0 and 100.";
+            return;
+        }
+
+        if (resourceForm.DailyCapacity <= 0)
+        {
+            modalError = "Daily capacity must be greater than zero.";
+            return;
+        }
+
         await using var db = await DbFactory.CreateDbContextAsync();
 
         resourceForm.StartDate = startDateValue;
@@ -258,6 +290,13 @@
     private void CloseModal()
     {
         showModal = false;
+        editingResource = null;
+        modalError = string.Empty;
+    }
+
+    private void CloseDeleteModal()
+    {
+        showDeleteConfirm = false;
         editingResource = null;
     }
 

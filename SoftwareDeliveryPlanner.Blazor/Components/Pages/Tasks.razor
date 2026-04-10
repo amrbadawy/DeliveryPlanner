@@ -23,6 +23,10 @@
                     <button type="button" class="btn-close" @onclick="CloseModal"></button>
                 </div>
                 <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(modalError))
+                    {
+                        <div class="alert alert-danger" data-testid="tasks-error">@modalError</div>
+                    }
                     <div class="mb-2">
                         <label>Service ID:</label>
                         <input class="form-control" @bind="taskForm.TaskId" disabled="@(editingTask != null)" data-testid="tasks-task-id" />
@@ -74,7 +78,7 @@
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-danger" @onclick="ConfirmDelete" data-testid="tasks-delete-confirm">Delete</button>
-                    <button class="btn btn-secondary" @onclick="() => showDeleteConfirm = false" data-testid="tasks-delete-cancel">Cancel</button>
+                    <button class="btn btn-secondary" @onclick="CloseDeleteModal" data-testid="tasks-delete-cancel">Cancel</button>
                 </div>
             </div>
         </div>
@@ -100,7 +104,7 @@
     <tbody>
         @foreach (var task in tasks)
         {
-            <tr>
+            <tr data-testid="tasks-row-@task.TaskId">
                 <td>@task.TaskId</td>
                 <td>@task.ServiceName</td>
                 <td>@task.DevEstimation</td>
@@ -135,6 +139,7 @@
     private TaskItem? editingTask;
     private TaskItem taskForm = new();
     private DateTime? strictDateValue;
+    private string modalError = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -152,6 +157,7 @@
         taskForm = new TaskItem { TaskId = GenerateTaskId(), Priority = 5, MaxDev = 1 };
         strictDateValue = null;
         editingTask = null;
+        modalError = string.Empty;
         showModal = true;
     }
 
@@ -176,6 +182,7 @@
             StrictDate = task.StrictDate
         };
         strictDateValue = task.StrictDate;
+        modalError = string.Empty;
         showModal = true;
     }
 
@@ -187,6 +194,37 @@
 
     private async Task SaveTask()
     {
+        modalError = string.Empty;
+        if (string.IsNullOrWhiteSpace(taskForm.TaskId))
+        {
+            modalError = "Service ID is required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(taskForm.ServiceName))
+        {
+            modalError = "Service Name is required.";
+            return;
+        }
+
+        if (taskForm.DevEstimation <= 0)
+        {
+            modalError = "Estimation must be greater than zero.";
+            return;
+        }
+
+        if (taskForm.MaxDev <= 0)
+        {
+            modalError = "Max Developers must be greater than zero.";
+            return;
+        }
+
+        if (taskForm.Priority < 1 || taskForm.Priority > 10)
+        {
+            modalError = "Priority must be between 1 and 10.";
+            return;
+        }
+
         await using var db = await DbFactory.CreateDbContextAsync();
 
         taskForm.StrictDate = strictDateValue;
@@ -240,6 +278,13 @@
     private void CloseModal()
     {
         showModal = false;
+        editingTask = null;
+        modalError = string.Empty;
+    }
+
+    private void CloseDeleteModal()
+    {
+        showDeleteConfirm = false;
         editingTask = null;
     }
 

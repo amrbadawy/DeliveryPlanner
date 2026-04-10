@@ -1,7 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using SoftwareDeliveryPlanner.Application;
 using SoftwareDeliveryPlanner.Blazor.Components;
 using SoftwareDeliveryPlanner.Data;
-using SoftwareDeliveryPlanner.Services;
+using SoftwareDeliveryPlanner.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,20 +10,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Add DbContext factory for Blazor components
-builder.Services.AddDbContextFactory<PlannerDbContext>(options =>
-{
-    var dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "planner.db");
-    Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
-    options.UseSqlite($"Data Source={dbPath}");
-});
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
 // Initialize database
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<PlannerDbContext>();
+    var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<PlannerDbContext>>();
+    using var db = dbFactory.CreateDbContext();
     db.InitializeDefaultData();
 }
 

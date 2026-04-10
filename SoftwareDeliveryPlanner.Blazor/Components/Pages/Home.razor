@@ -1,7 +1,8 @@
 @page "/"
-@using SoftwareDeliveryPlanner.Data
-@using SoftwareDeliveryPlanner.Services
-@inject IDbContextFactory<PlannerDbContext> DbFactory
+@using MediatR
+@using SoftwareDeliveryPlanner.Application.DeliveryInsights.Queries
+@using SoftwareDeliveryPlanner.Application.Planning.Commands
+@inject IMediator Mediator
 
 <PageTitle>Dashboard</PageTitle>
 
@@ -104,28 +105,21 @@
 
     private async Task LoadKPIs()
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        db.InitializeDefaultData();
-
-        var scheduler = new SchedulingEngine(db);
-        var kpis = scheduler.GetDashboardKPIs();
-        totalServices = (int)kpis["total_services"];
-        totalEstimation = (double)kpis["total_estimation"];
-        activeResources = (int)kpis["active_resources"];
-        totalCapacity = (double)kpis["total_capacity"];
-        overallFinish = kpis["overall_finish"]?.ToString() ?? "N/A";
-        onTrack = (int)kpis["on_track"];
-        atRisk = (int)kpis["at_risk"];
-        late = (int)kpis["late"];
-        avgAssigned = (double)kpis["avg_assigned"];
+        var kpis = await Mediator.Send(new GetDashboardKpisQuery());
+        totalServices = kpis.TotalServices;
+        totalEstimation = kpis.TotalEstimation;
+        activeResources = kpis.ActiveResources;
+        totalCapacity = kpis.TotalCapacity;
+        overallFinish = kpis.OverallFinish?.ToString() ?? "N/A";
+        onTrack = kpis.OnTrack;
+        atRisk = kpis.AtRisk;
+        late = kpis.Late;
+        avgAssigned = kpis.AvgAssigned;
     }
 
     private async Task RunScheduler()
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var scheduler = new SchedulingEngine(db);
-        var result = scheduler.RunScheduler();
-        schedulerResult = result;
+        schedulerResult = await Mediator.Send(new RunSchedulerCommand());
         await LoadKPIs();
     }
 }

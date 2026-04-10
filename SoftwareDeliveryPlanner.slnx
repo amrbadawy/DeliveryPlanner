@@ -1,4 +1,8 @@
 <Solution>
+  <Project Path="SoftwareDeliveryPlanner.Domain/SoftwareDeliveryPlanner.Domain.csproj" />
+  <Project Path="SoftwareDeliveryPlanner.Application/SoftwareDeliveryPlanner.Application.csproj" />
+  <Project Path="SoftwareDeliveryPlanner.Infrastructure/SoftwareDeliveryPlanner.Infrastructure.csproj" />
+  <Project Path="SoftwareDeliveryPlanner.ArchTests/SoftwareDeliveryPlanner.ArchTests.csproj" />
   <Project Path="SoftwareDeliveryPlanner.Blazor/SoftwareDeliveryPlanner.Blazor.csproj" />
   <Project Path="SoftwareDeliveryPlanner.Tests/SoftwareDeliveryPlanner.Tests.csproj" />
 </Solution>

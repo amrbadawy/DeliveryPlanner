@@ -23,6 +23,10 @@
                     <button type="button" class="btn-close" @onclick="CloseModal"></button>
                 </div>
                 <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(modalError))
+                    {
+                        <div class="alert alert-danger" data-testid="adjustments-error">@modalError</div>
+                    }
                     <div class="mb-2">
                         <label>Employee:</label>
                         <select class="form-control" @bind="adjustmentForm.ResourceId" data-testid="adjustments-resource-id">
@@ -84,7 +88,7 @@
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-danger" @onclick="ConfirmDelete" data-testid="adjustments-delete-confirm">Delete</button>
-                    <button class="btn btn-secondary" @onclick="() => showDeleteConfirm = false" data-testid="adjustments-delete-cancel">Cancel</button>
+                    <button class="btn btn-secondary" @onclick="CloseDeleteModal" data-testid="adjustments-delete-cancel">Cancel</button>
                 </div>
             </div>
         </div>
@@ -106,7 +110,7 @@
     <tbody>
         @foreach (var a in adjustments)
         {
-            <tr>
+            <tr data-testid="adjustments-row-@a.Id">
                 <td>@a.ResourceId</td>
                 <td>@a.AdjType</td>
                 <td>@a.AdjStart.ToString("yyyy-MM-dd")</td>
@@ -130,6 +134,7 @@
     private Adjustment adjustmentForm = new();
     private DateTime startDateValue;
     private DateTime endDateValue;
+    private string modalError = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -153,6 +158,7 @@
         };
         startDateValue = DateTime.Today;
         endDateValue = DateTime.Today.AddDays(7);
+        modalError = string.Empty;
         showModal = true;
     }
 
@@ -164,7 +170,24 @@
 
     private async Task SaveAdjustment()
     {
-        if (string.IsNullOrWhiteSpace(adjustmentForm.ResourceId)) return;
+        modalError = string.Empty;
+        if (string.IsNullOrWhiteSpace(adjustmentForm.ResourceId))
+        {
+            modalError = "Employee is required.";
+            return;
+        }
+
+        if (adjustmentForm.AvailabilityPct < 0 || adjustmentForm.AvailabilityPct > 100)
+        {
+            modalError = "Availability must be between 0 and 100.";
+            return;
+        }
+
+        if (startDateValue > endDateValue)
+        {
+            modalError = "Start Date must be before or equal to End Date.";
+            return;
+        }
 
         await using var db = await DbFactory.CreateDbContextAsync();
 
@@ -173,8 +196,17 @@
         
         db.Adjustments.Add(adjustmentForm);
         await db.SaveChangesAsync();
-        var scheduler = new SchedulingEngine(db);
-        scheduler.RunScheduler();
+        try
+        {
+            await using var schedulerDb = await DbFactory.CreateDbContextAsync();
+            var scheduler = new SchedulingEngine(schedulerDb);
+            scheduler.RunScheduler();
+        }
+        catch
+        {
+            modalError = "Adjustment saved, but scheduling refresh failed.";
+            return;
+        }
         await LoadData();
         CloseModal();
     }
@@ -189,8 +221,16 @@
             {
                 db.Adjustments.Remove(a);
                 await db.SaveChangesAsync();
-                var scheduler = new SchedulingEngine(db);
-                scheduler.RunScheduler();
+                try
+                {
+                    await using var schedulerDb = await DbFactory.CreateDbContextAsync();
+                    var scheduler = new SchedulingEngine(schedulerDb);
+                    scheduler.RunScheduler();
+                }
+                catch
+                {
+                    // Keep delete successful even if scheduling refresh fails.
+                }
             }
         }
         showDeleteConfirm = false;
@@ -201,13 +241,27 @@
     private void CloseModal()
     {
         showModal = false;
+        modalError = string.Empty;
+    }
+
+    private void CloseDeleteModal()
+    {
+        showDeleteConfirm = false;
+        editingAdjustment = null;
     }
 
     private async Task RefreshData()
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var scheduler = new SchedulingEngine(db);
-        scheduler.RunScheduler();
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var scheduler = new SchedulingEngine(db);
+            scheduler.RunScheduler();
+        }
+        catch
+        {
+            // UI remains usable even if scheduler fails.
+        }
         await LoadData();
     }
 }

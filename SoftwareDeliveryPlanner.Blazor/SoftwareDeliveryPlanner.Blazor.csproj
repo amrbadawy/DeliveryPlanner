@@ -8,8 +8,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.0" />
+    <Compile Remove="Data\**\*.cs" />
+    <Compile Remove="Models\**\*.cs" />
+    <Compile Remove="Services\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SoftwareDeliveryPlanner.Application\SoftwareDeliveryPlanner.Application.csproj" />
+    <ProjectReference Include="..\SoftwareDeliveryPlanner.Infrastructure\SoftwareDeliveryPlanner.Infrastructure.csproj" />
+    <ProjectReference Include="..\SoftwareDeliveryPlanner.Domain\SoftwareDeliveryPlanner.Domain.csproj" />
   </ItemGroup>
 
 </Project>

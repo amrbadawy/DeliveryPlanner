@@ -1,0 +1,25 @@
+{
+  "allowedSpdxIds": [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "WTFPL",
+    "0BSD",
+    "Zlib",
+    "CC0-1.0"
+  ],
+  "nugetLicenseOverrides": {
+    "NetArchTest.Rules": "MIT",
+    "Mono.Cecil": "MIT",
+    "xunit.abstractions": "Apache-2.0"
+  },
+  "blockedNuGetPackages": [
+    {
+      "id": "MediatR",
+      "versionRegex": "^(1[3-9]|[2-9][0-9])\\.",
+      "reason": "MediatR 13+ uses a non-approved licensing model for this repository policy."
+    }
+  ]
+}

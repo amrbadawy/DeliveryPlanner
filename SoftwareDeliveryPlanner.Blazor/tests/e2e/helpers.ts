@@ -22,9 +22,31 @@ export function uniqueSuffix(prefix: string): string {
 }
 
 export async function fillInputByTestId(page: Page, testId: string, value: string): Promise<void> {
-  const input = page.getByTestId(testId);
-  await expect(input).toBeVisible();
-  await input.fill(value);
+  const element = page.getByTestId(testId);
+  await expect(element).toBeVisible();
+
+  const tagName = await element.evaluate((el) => el.tagName.toLowerCase());
+  if (tagName === 'select') {
+    await element.selectOption({ label: value });
+    return;
+  }
+
+  await element.fill(value);
+}
+
+export async function runSchedulerFromDashboard(page: Page): Promise<void> {
+  // More reliable for setup: trigger scheduler from Tasks refresh.
+  await gotoPage(page, '/tasks');
+  const refreshBtn = page.getByTestId('tasks-refresh');
+  await expect(refreshBtn).toBeVisible();
+  await refreshBtn.click();
+
+  const table = page.getByTestId('tasks-table');
+  await expect(table).toBeVisible();
+  await expect.poll(async () => await table.locator('tbody tr').count(), {
+    message: 'Wait tasks table after scheduler run',
+    timeout: 20_000,
+  }).toBeGreaterThan(0);
 }
 
 export async function countRowsByText(table: Locator, text: string): Promise<number> {

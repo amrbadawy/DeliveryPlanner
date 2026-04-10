@@ -23,6 +23,10 @@
                     <button type="button" class="btn-close" @onclick="CloseModal"></button>
                 </div>
                 <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(modalError))
+                    {
+                        <div class="alert alert-danger" data-testid="holidays-error">@modalError</div>
+                    }
                     <div class="mb-2">
                         <label>Holiday Name:</label>
                         <input class="form-control" @bind="holidayForm.HolidayName" data-testid="holidays-name" />
@@ -68,7 +72,7 @@
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-danger" @onclick="ConfirmDelete" data-testid="holidays-delete-confirm">Delete</button>
-                    <button class="btn btn-secondary" @onclick="() => showDeleteConfirm = false" data-testid="holidays-delete-cancel">Cancel</button>
+                    <button class="btn btn-secondary" @onclick="CloseDeleteModal" data-testid="holidays-delete-cancel">Cancel</button>
                 </div>
             </div>
         </div>
@@ -88,7 +92,7 @@
     <tbody>
         @foreach (var h in holidays)
         {
-            <tr>
+            <tr data-testid="holidays-row-@h.Id">
                 <td>@h.HolidayName</td>
                 <td>@h.HolidayDate.ToString("yyyy-MM-dd")</td>
                 <td>
@@ -113,6 +117,7 @@
     private Holiday? editingHoliday;
     private Holiday holidayForm = new();
     private DateTime holidayDateValue;
+    private string modalError = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -130,6 +135,7 @@
         holidayForm = new Holiday { HolidayType = "National" };
         holidayDateValue = DateTime.Today;
         editingHoliday = null;
+        modalError = string.Empty;
         showModal = true;
     }
 
@@ -144,6 +150,7 @@
             Notes = h.Notes
         };
         holidayDateValue = h.HolidayDate;
+        modalError = string.Empty;
         showModal = true;
     }
 
@@ -155,6 +162,13 @@
 
     private async Task SaveHoliday()
     {
+        modalError = string.Empty;
+        if (string.IsNullOrWhiteSpace(holidayForm.HolidayName))
+        {
+            modalError = "Holiday Name is required.";
+            return;
+        }
+
         await using var db = await DbFactory.CreateDbContextAsync();
 
         holidayForm.HolidayDate = holidayDateValue;
@@ -204,6 +218,13 @@
     private void CloseModal()
     {
         showModal = false;
+        editingHoliday = null;
+        modalError = string.Empty;
+    }
+
+    private void CloseDeleteModal()
+    {
+        showDeleteConfirm = false;
         editingHoliday = null;
     }
 

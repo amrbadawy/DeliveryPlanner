@@ -1,7 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const testDbPath = path.join(__dirname, '.playwright', 'planner-e2e.db');
+
+fs.mkdirSync(path.dirname(testDbPath), { recursive: true });
+process.env.PLANNER_DB_PATH = testDbPath;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -20,7 +27,7 @@ export default defineConfig({
   webServer: {
     command: 'dotnet run --project "D:\\OpenCode\\SoftwareDeliveryPlanner.Blazor\\SoftwareDeliveryPlanner.Blazor.csproj" --urls "http://localhost:2026"',
     url: 'http://localhost:2026',
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     timeout: 180_000,
     env: {
       ASPNETCORE_ENVIRONMENT: 'Development',

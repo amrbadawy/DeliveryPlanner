@@ -20,7 +20,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SoftwareDeliveryPlanner.Blazor\SoftwareDeliveryPlanner.Blazor.csproj" />
+    <PackageReference Include="FluentValidation" Version="12.1.1" />
+    <PackageReference Include="MediatR" Version="12.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SoftwareDeliveryPlanner.Application\SoftwareDeliveryPlanner.Application.csproj" />
+    <ProjectReference Include="..\SoftwareDeliveryPlanner.Domain\SoftwareDeliveryPlanner.Domain.csproj" />
+    <ProjectReference Include="..\SoftwareDeliveryPlanner.Infrastructure\SoftwareDeliveryPlanner.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
