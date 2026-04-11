@@ -5,9 +5,11 @@ using SoftwareDeliveryPlanner.Application.Abstractions;
 using SoftwareDeliveryPlanner.Application.Adjustments.Commands;
 using SoftwareDeliveryPlanner.Application.Adjustments.Queries;
 using SoftwareDeliveryPlanner.Application.Calendar.Queries;
+using SoftwareDeliveryPlanner.Application.DeliveryInsights.Queries;
 using SoftwareDeliveryPlanner.Application.Holidays.Commands;
 using SoftwareDeliveryPlanner.Application.Holidays.Queries;
 using SoftwareDeliveryPlanner.Application.Output.Queries;
+using SoftwareDeliveryPlanner.Application.Planning.Commands;
 using SoftwareDeliveryPlanner.Application.Resources.Commands;
 using SoftwareDeliveryPlanner.Application.Resources.Queries;
 using SoftwareDeliveryPlanner.Application.Tasks.Commands;
@@ -1409,6 +1411,490 @@ public class AddAdjustmentCommandValidatorEdgeTests
     {
         var result = _validator.Validate(Valid() with { Notes = null });
         Assert.True(result.IsValid);
+    }
+}
+
+// ============================================================
+// Validators — Additional Coverage (Batch 4)
+// ============================================================
+
+public class UpsertTaskCommandValidatorAdditionalTests
+{
+    private readonly UpsertTaskCommandValidator _validator = new();
+
+    private static UpsertTaskCommand Valid() => new(
+        Id: 0, TaskId: "SVC-001", ServiceName: "My Service",
+        DevEstimation: 5, MaxDev: 2, Priority: 5,
+        StrictDate: null, DependsOnTaskIds: null, IsNew: true);
+
+    [Fact]
+    public void NullTaskId_FailsValidation()
+    {
+        var result = _validator.Validate(Valid() with { TaskId = null! });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.TaskId));
+    }
+
+    [Fact]
+    public void NullServiceName_FailsValidation()
+    {
+        var result = _validator.Validate(Valid() with { ServiceName = null! });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.ServiceName));
+    }
+
+    [Fact]
+    public void BoundaryEstimation_SmallPositive_PassesValidation()
+    {
+        var result = _validator.Validate(Valid() with { DevEstimation = 0.001 });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void BoundaryMaxDev_SmallPositive_PassesValidation()
+    {
+        var result = _validator.Validate(Valid() with { MaxDev = 0.001 });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void MultipleFailures_AllErrorsReturned()
+    {
+        var result = _validator.Validate(Valid() with
+        {
+            TaskId = "",
+            ServiceName = "",
+            DevEstimation = 0,
+            MaxDev = -1,
+            Priority = 0
+        });
+        Assert.False(result.IsValid);
+        Assert.True(result.Errors.Count >= 5);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.TaskId));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.ServiceName));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.DevEstimation));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.MaxDev));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.Priority));
+    }
+
+    [Fact]
+    public void ErrorMessage_TaskId_ContainsExpectedText()
+    {
+        var result = _validator.Validate(Valid() with { TaskId = "" });
+        Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("Service ID is required"));
+    }
+
+    [Fact]
+    public void ErrorMessage_Estimation_ContainsExpectedText()
+    {
+        var result = _validator.Validate(Valid() with { DevEstimation = 0 });
+        Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("greater than zero"));
+    }
+
+    [Fact]
+    public void ErrorMessage_Priority_ContainsExpectedText()
+    {
+        var result = _validator.Validate(Valid() with { Priority = 0 });
+        Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("between 1 and 10"));
+    }
+
+    [Fact]
+    public void StrictDate_AcceptsAnyValue()
+    {
+        var result = _validator.Validate(Valid() with { StrictDate = new DateTime(2020, 1, 1) });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void DependsOnTaskIds_AcceptsAnyValue()
+    {
+        var result = _validator.Validate(Valid() with { DependsOnTaskIds = "GARBAGE,INVALID" });
+        Assert.True(result.IsValid);
+    }
+}
+
+public class UpsertResourceCommandValidatorAdditionalTests
+{
+    private readonly UpsertResourceCommandValidator _validator = new();
+
+    private static UpsertResourceCommand Valid() => new(
+        Id: 0, ResourceId: "DEV-001", ResourceName: "Alice",
+        Role: "Developer", Team: "Delivery",
+        AvailabilityPct: 100, DailyCapacity: 1,
+        StartDate: DateTime.Today, Active: "Yes",
+        Notes: null, IsNew: true);
+
+    [Fact]
+    public void NullResourceId_FailsValidation()
+    {
+        var result = _validator.Validate(Valid() with { ResourceId = null! });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertResourceCommand.ResourceId));
+    }
+
+    [Fact]
+    public void NullResourceName_FailsValidation()
+    {
+        var result = _validator.Validate(Valid() with { ResourceName = null! });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertResourceCommand.ResourceName));
+    }
+
+    [Fact]
+    public void BoundaryAvailability_Zero_PassesValidation()
+    {
+        var result = _validator.Validate(Valid() with { AvailabilityPct = 0 });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void BoundaryAvailability_Hundred_PassesValidation()
+    {
+        var result = _validator.Validate(Valid() with { AvailabilityPct = 100 });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void BoundaryCapacity_SmallPositive_PassesValidation()
+    {
+        var result = _validator.Validate(Valid() with { DailyCapacity = 0.001 });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void MultipleFailures_AllErrorsReturned()
+    {
+        var result = _validator.Validate(Valid() with
+        {
+            ResourceId = "",
+            ResourceName = "",
+            AvailabilityPct = -1,
+            DailyCapacity = 0
+        });
+        Assert.False(result.IsValid);
+        Assert.True(result.Errors.Count >= 4);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertResourceCommand.ResourceId));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertResourceCommand.ResourceName));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertResourceCommand.AvailabilityPct));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertResourceCommand.DailyCapacity));
+    }
+
+    [Fact]
+    public void UnconstrainedFields_AcceptAnyValue()
+    {
+        // Role, Team, Active, Notes, StartDate have no validation rules
+        var result = _validator.Validate(Valid() with
+        {
+            Role = "",
+            Team = "",
+            Active = "Maybe",
+            Notes = ""
+        });
+        Assert.True(result.IsValid);
+    }
+}
+
+public class AddAdjustmentCommandValidatorAdditionalTests
+{
+    private readonly AddAdjustmentCommandValidator _validator = new();
+
+    private static AddAdjustmentCommand Valid() => new(
+        ResourceId: "DEV-001",
+        AdjType: "Vacation",
+        AvailabilityPct: 0,
+        AdjStart: DateTime.Today,
+        AdjEnd: DateTime.Today.AddDays(7),
+        Notes: null);
+
+    [Fact]
+    public void NullResourceId_FailsValidation()
+    {
+        var result = _validator.Validate(Valid() with { ResourceId = null! });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(AddAdjustmentCommand.ResourceId));
+    }
+
+    [Fact]
+    public void NegativeAvailability_FailsValidation()
+    {
+        var result = _validator.Validate(Valid() with { AvailabilityPct = -5 });
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void MultipleFailures_AllErrorsReturned()
+    {
+        var result = _validator.Validate(Valid() with
+        {
+            ResourceId = "",
+            AvailabilityPct = -1,
+            AdjStart = DateTime.Today.AddDays(5),
+            AdjEnd = DateTime.Today
+        });
+        Assert.False(result.IsValid);
+        Assert.True(result.Errors.Count >= 3);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(AddAdjustmentCommand.ResourceId));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(AddAdjustmentCommand.AvailabilityPct));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(AddAdjustmentCommand.AdjEnd));
+    }
+
+    [Fact]
+    public void EmptyNotes_PassesValidation()
+    {
+        var result = _validator.Validate(Valid() with { Notes = "" });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void ErrorMessage_ResourceId_ContainsExpectedText()
+    {
+        var result = _validator.Validate(Valid() with { ResourceId = "" });
+        Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("Employee is required"));
+    }
+
+    [Fact]
+    public void ErrorMessage_DateRange_ContainsExpectedText()
+    {
+        var result = _validator.Validate(Valid() with
+        {
+            AdjStart = DateTime.Today.AddDays(5),
+            AdjEnd = DateTime.Today
+        });
+        Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("before or equal"));
+    }
+}
+
+public class UpsertHolidayCommandValidatorAdditionalTests : OrchestratorFixture
+{
+    [Fact]
+    public async Task NullHolidayName_FailsValidation()
+    {
+        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var result = await validator.ValidateAsync(new UpsertHolidayCommand(
+            Id: 0, HolidayName: null!, StartDate: new DateTime(2026, 11, 15),
+            EndDate: new DateTime(2026, 11, 15), HolidayType: "National",
+            Notes: null, IsNew: true));
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertHolidayCommand.HolidayName));
+    }
+
+    [Fact]
+    public async Task MultipleFailures_BothNameAndDateErrors()
+    {
+        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var result = await validator.ValidateAsync(new UpsertHolidayCommand(
+            Id: 0, HolidayName: "", StartDate: new DateTime(2026, 11, 20),
+            EndDate: new DateTime(2026, 11, 15), HolidayType: "National",
+            Notes: null, IsNew: true));
+        Assert.False(result.IsValid);
+        Assert.True(result.Errors.Count >= 2);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertHolidayCommand.HolidayName));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertHolidayCommand.StartDate));
+    }
+
+    [Fact]
+    public async Task OverlapErrorMessage_ContainsExpectedText()
+    {
+        await using var db = await Factory.CreateDbContextAsync();
+        db.Holidays.Add(Holiday.Create("Existing", new DateTime(2026, 12, 20), new DateTime(2026, 12, 25)));
+        await db.SaveChangesAsync();
+
+        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var result = await validator.ValidateAsync(new UpsertHolidayCommand(
+            Id: 0, HolidayName: "Overlap Test",
+            StartDate: new DateTime(2026, 12, 22),
+            EndDate: new DateTime(2026, 12, 28),
+            HolidayType: "National", Notes: null, IsNew: true));
+        Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("overlaps"));
+    }
+
+    [Fact]
+    public async Task UnconstrainedFields_HolidayType_AcceptsAnyValue()
+    {
+        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var result = await validator.ValidateAsync(new UpsertHolidayCommand(
+            Id: 0, HolidayName: "Test", StartDate: new DateTime(2026, 11, 15),
+            EndDate: new DateTime(2026, 11, 15), HolidayType: "",
+            Notes: null, IsNew: true));
+        Assert.True(result.IsValid);
+    }
+}
+
+// ============================================================
+// Handlers — Additional Coverage (Batch 5)
+// ============================================================
+
+public class HandlerCancellationTests : OrchestratorFixture
+{
+    [Fact]
+    public async Task GetTasksHandler_CancelledToken_ThrowsOperationCancelled()
+    {
+        var handler = new GetTasksQueryHandler(Orchestrator);
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            handler.Handle(new GetTasksQuery(), cts.Token));
+    }
+
+    [Fact]
+    public async Task GetHolidaysHandler_CancelledToken_ThrowsOperationCancelled()
+    {
+        var handler = new GetHolidaysQueryHandler(Orchestrator);
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            handler.Handle(new GetHolidaysQuery(), cts.Token));
+    }
+
+    [Fact]
+    public async Task GetResourcesHandler_CancelledToken_ThrowsOperationCancelled()
+    {
+        var handler = new GetResourcesQueryHandler(Orchestrator);
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            handler.Handle(new GetResourcesQuery(), cts.Token));
+    }
+
+    [Fact]
+    public async Task GetAdjustmentsHandler_CancelledToken_ThrowsOperationCancelled()
+    {
+        var handler = new GetAdjustmentsQueryHandler(Orchestrator);
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            handler.Handle(new GetAdjustmentsQuery(), cts.Token));
+    }
+
+    [Fact]
+    public async Task GetCalendarHandler_CancelledToken_ThrowsOperationCancelled()
+    {
+        await Orchestrator.RunSchedulerAsync();
+        var handler = new GetCalendarQueryHandler(Orchestrator);
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            handler.Handle(new GetCalendarQuery(), cts.Token));
+    }
+
+    [Fact]
+    public async Task GetOutputPlanHandler_CancelledToken_ThrowsOperationCancelled()
+    {
+        var handler = new GetOutputPlanQueryHandler(Orchestrator);
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            handler.Handle(new GetOutputPlanQuery(), cts.Token));
+    }
+
+    [Fact]
+    public async Task GetTimelineHandler_CancelledToken_ThrowsOperationCancelled()
+    {
+        var handler = new GetTimelineQueryHandler(Orchestrator);
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            handler.Handle(new GetTimelineQuery("DEV-001", DateTime.Today, DateTime.Today), cts.Token));
+    }
+
+    [Fact]
+    public async Task DeleteTaskHandler_CancelledToken_ThrowsOperationCancelled()
+    {
+        var handler = new DeleteTaskCommandHandler(Orchestrator);
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            handler.Handle(new DeleteTaskCommand(1), cts.Token));
+    }
+
+    [Fact]
+    public async Task DeleteResourceHandler_CancelledToken_ThrowsOperationCancelled()
+    {
+        var handler = new DeleteResourceCommandHandler(Orchestrator);
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            handler.Handle(new DeleteResourceCommand(1), cts.Token));
+    }
+
+    [Fact]
+    public async Task DeleteHolidayHandler_CancelledToken_ThrowsOperationCancelled()
+    {
+        var handler = new DeleteHolidayCommandHandler(Orchestrator);
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            handler.Handle(new DeleteHolidayCommand(1), cts.Token));
+    }
+
+    [Fact]
+    public async Task DeleteAdjustmentHandler_CancelledToken_ThrowsOperationCancelled()
+    {
+        var handler = new DeleteAdjustmentCommandHandler(Orchestrator);
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            handler.Handle(new DeleteAdjustmentCommand(1), cts.Token));
+    }
+}
+
+public class HandlerEdgeCaseTests : OrchestratorFixture
+{
+    [Fact]
+    public async Task AddAdjustmentHandler_NullNotes_PersistsNull()
+    {
+        var handler = new AddAdjustmentCommandHandler(Orchestrator);
+        await handler.Handle(new AddAdjustmentCommand(
+            ResourceId: "DEV-001", AdjType: "Vacation",
+            AvailabilityPct: 0, AdjStart: DateTime.Today,
+            AdjEnd: DateTime.Today.AddDays(3), Notes: null), CancellationToken.None);
+
+        await using var db = await Factory.CreateDbContextAsync();
+        var adj = await db.Adjustments.FirstAsync(a => a.ResourceId == "DEV-001");
+        Assert.Null(adj.Notes);
+    }
+
+    [Fact]
+    public async Task GetTaskCountHandler_AfterDelete_CountDecreases()
+    {
+        var countHandler = new GetTaskCountQueryHandler(Orchestrator);
+        var initialCount = await countHandler.Handle(new GetTaskCountQuery(), CancellationToken.None);
+
+        await using var db = await Factory.CreateDbContextAsync();
+        var firstTask = await db.Tasks.FirstAsync();
+
+        var deleteHandler = new DeleteTaskCommandHandler(Orchestrator);
+        await deleteHandler.Handle(new DeleteTaskCommand(firstTask.Id), CancellationToken.None);
+
+        var newCount = await countHandler.Handle(new GetTaskCountQuery(), CancellationToken.None);
+        Assert.Equal(initialCount - 1, newCount);
+    }
+
+    [Fact]
+    public async Task RunSchedulerHandler_ReturnsSuccessMessage()
+    {
+        var handler = new RunSchedulerCommandHandler(Orchestrator);
+        var result = await handler.Handle(new RunSchedulerCommand(), CancellationToken.None);
+        Assert.Contains("successfully scheduled", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetDashboardKpisHandler_ReturnsNonNullDto()
+    {
+        var handler = new GetDashboardKpisQueryHandler(Orchestrator);
+        var result = await handler.Handle(new GetDashboardKpisQuery(), CancellationToken.None);
+        Assert.NotNull(result);
+        Assert.True(result.TotalServices > 0);
+        Assert.True(result.ActiveResources > 0);
+    }
+
+    [Fact]
+    public async Task GetDashboardKpisHandler_AfterScheduler_TotalEstimationIsPositive()
+    {
+        await Orchestrator.RunSchedulerAsync();
+        var handler = new GetDashboardKpisQueryHandler(Orchestrator);
+        var result = await handler.Handle(new GetDashboardKpisQuery(), CancellationToken.None);
+        Assert.True(result.TotalEstimation > 0);
     }
 }
 

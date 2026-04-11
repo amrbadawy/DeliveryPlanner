@@ -588,3 +588,115 @@ public class SchedulingEngineTests : IDisposable
 
     #endregion
 }
+
+// ============================================================
+// Mon-Fri working week configuration tests
+// ============================================================
+
+public class SchedulingEngineMonFriTests : IDisposable
+{
+    private readonly PlannerDbContext _db;
+    private readonly SchedulingEngine _engine;
+
+    public SchedulingEngineMonFriTests()
+    {
+        var options = new DbContextOptionsBuilder<PlannerDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+
+        _db = new PlannerDbContext(options);
+        _db.Database.EnsureCreated();
+        _db.InitializeDefaultData();
+
+        // Change working week to Mon-Fri
+        var weekSetting = _db.Settings.First(s => s.Key == "working_week");
+        weekSetting.Value = "mon_fri";
+        _db.SaveChanges();
+
+        _engine = new SchedulingEngine(_db);
+    }
+
+    public void Dispose() => _db.Dispose();
+
+    [Fact]
+    public void IsWorkingDay_Friday_ReturnsTrue_InMonFriConfig()
+    {
+        // Friday May 8, 2026 — should be a working day in Mon-Fri
+        var friday = new DateTime(2026, 5, 8);
+        Assert.True(_engine.IsWorkingDay(friday));
+    }
+
+    [Fact]
+    public void IsWorkingDay_Saturday_ReturnsFalse_InMonFriConfig()
+    {
+        // Saturday May 9, 2026 — weekend in Mon-Fri
+        var saturday = new DateTime(2026, 5, 9);
+        Assert.False(_engine.IsWorkingDay(saturday));
+    }
+
+    [Fact]
+    public void IsWorkingDay_Sunday_ReturnsFalse_InMonFriConfig()
+    {
+        // Sunday May 10, 2026 — weekend in Mon-Fri
+        var sunday = new DateTime(2026, 5, 10);
+        Assert.False(_engine.IsWorkingDay(sunday));
+    }
+
+    [Fact]
+    public void IsWorkingDay_Monday_ReturnsTrue_InMonFriConfig()
+    {
+        var monday = new DateTime(2026, 5, 4);
+        Assert.True(_engine.IsWorkingDay(monday));
+    }
+
+    [Fact]
+    public void GetWorkingDaysBetween_OneWeek_ReturnsFive_InMonFriConfig()
+    {
+        // Mon May 4 to Sun May 10, 2026 — Mon-Fri = 5 working days
+        var start = new DateTime(2026, 5, 4);
+        var end = new DateTime(2026, 5, 10);
+        var result = _engine.GetWorkingDaysBetween(start, end);
+        Assert.Equal(5, result);
+    }
+
+    [Fact]
+    public void RunScheduler_MonFriConfig_WeekendDaysHaveZeroCapacity()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.SaveChanges();
+
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "MF-001",
+            ServiceName = "Mon-Fri Test",
+            DevEstimation = 3,
+            Priority = 5
+        });
+        _db.SaveChanges();
+
+        _engine.RunScheduler();
+
+        // Saturday and Sunday should have zero capacity
+        var weekendDays = _db.Calendar
+            .Where(c => c.CalendarDate.DayOfWeek == DayOfWeek.Saturday
+                     || c.CalendarDate.DayOfWeek == DayOfWeek.Sunday)
+            .Take(10)
+            .ToList();
+
+        Assert.NotEmpty(weekendDays);
+        Assert.All(weekendDays, d =>
+        {
+            Assert.False(d.IsWorkingDay);
+            Assert.Equal(0, d.EffectiveCapacity);
+        });
+
+        // Friday should be working
+        var fridayDays = _db.Calendar
+            .Where(c => c.CalendarDate.DayOfWeek == DayOfWeek.Friday && !c.IsHoliday)
+            .Take(5)
+            .ToList();
+
+        Assert.NotEmpty(fridayDays);
+        Assert.All(fridayDays, d => Assert.True(d.IsWorkingDay));
+    }
+}

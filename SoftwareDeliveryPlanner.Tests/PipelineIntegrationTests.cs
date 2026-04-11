@@ -509,3 +509,245 @@ public class Pipeline_TaskDependencyTests : PipelineFixture
             $"Dependent started {dep.PlannedStart} but prereq finished {prereq.PlannedFinish}");
     }
 }
+
+// ============================================================
+// 8. Adjustment pipeline: validation + persistence
+// ============================================================
+
+public class Pipeline_AdjustmentTests : PipelineFixture
+{
+    [Fact]
+    public async Task ValidAdjustment_IsPersistedThroughPipeline()
+    {
+        using var scope = Services.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+        var command = new AddAdjustmentCommand(
+            ResourceId: "DEV-001",
+            AdjType: DomainConstants.AdjustmentType.Vacation,
+            AvailabilityPct: 50,
+            AdjStart: new DateTime(2027, 1, 10),
+            AdjEnd: new DateTime(2027, 1, 15),
+            Notes: "Pipeline test adjustment");
+
+        await mediator.Send(command);
+
+        var adjustments = await mediator.Send(new GetAdjustmentsQuery());
+        Assert.Contains(adjustments, a =>
+            a.ResourceId == "DEV-001" && a.Notes == "Pipeline test adjustment");
+    }
+
+    [Fact]
+    public async Task InvalidAdjustment_EmptyResourceId_RejectedByPipeline()
+    {
+        using var scope = Services.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+        var command = new AddAdjustmentCommand(
+            ResourceId: "",
+            AdjType: DomainConstants.AdjustmentType.Vacation,
+            AvailabilityPct: 50,
+            AdjStart: new DateTime(2027, 2, 1),
+            AdjEnd: new DateTime(2027, 2, 5),
+            Notes: null);
+
+        await Assert.ThrowsAsync<ValidationException>(() => mediator.Send(command));
+    }
+
+    [Fact]
+    public async Task InvalidAdjustment_EndBeforeStart_RejectedByPipeline()
+    {
+        using var scope = Services.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+        var command = new AddAdjustmentCommand(
+            ResourceId: "DEV-001",
+            AdjType: DomainConstants.AdjustmentType.Training,
+            AvailabilityPct: 0,
+            AdjStart: new DateTime(2027, 3, 10),
+            AdjEnd: new DateTime(2027, 3, 5),  // End before start
+            Notes: null);
+
+        await Assert.ThrowsAsync<ValidationException>(() => mediator.Send(command));
+    }
+
+    [Fact]
+    public async Task InvalidAdjustment_NegativeAvailability_RejectedByPipeline()
+    {
+        using var scope = Services.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+        var command = new AddAdjustmentCommand(
+            ResourceId: "DEV-001",
+            AdjType: DomainConstants.AdjustmentType.Other,
+            AvailabilityPct: -10,
+            AdjStart: new DateTime(2027, 4, 1),
+            AdjEnd: new DateTime(2027, 4, 5),
+            Notes: null);
+
+        await Assert.ThrowsAsync<ValidationException>(() => mediator.Send(command));
+    }
+}
+
+// ============================================================
+// 9. Delete commands through pipeline (no validators)
+// ============================================================
+
+public class Pipeline_DeleteCommandTests : PipelineFixture
+{
+    [Fact]
+    public async Task DeleteResource_ThroughPipeline_RemovesResource()
+    {
+        using var scope = Services.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+        var resources = await mediator.Send(new GetResourcesQuery());
+        var first = resources.First();
+
+        await mediator.Send(new DeleteResourceCommand(first.Id));
+
+        var after = await mediator.Send(new GetResourcesQuery());
+        Assert.DoesNotContain(after, r => r.Id == first.Id);
+    }
+
+    [Fact]
+    public async Task DeleteHoliday_ThroughPipeline_RemovesHoliday()
+    {
+        using var scope = Services.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+        var holidays = await mediator.Send(new GetHolidaysQuery());
+        var first = holidays.First();
+
+        await mediator.Send(new DeleteHolidayCommand(first.Id));
+
+        var after = await mediator.Send(new GetHolidaysQuery());
+        Assert.DoesNotContain(after, h => h.Id == first.Id);
+    }
+
+    [Fact]
+    public async Task DeleteAdjustment_ThroughPipeline_RemovesAdjustment()
+    {
+        using var scope = Services.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+        // First add an adjustment so we have one to delete
+        await mediator.Send(new AddAdjustmentCommand(
+            ResourceId: "DEV-001",
+            AdjType: DomainConstants.AdjustmentType.Vacation,
+            AvailabilityPct: 0,
+            AdjStart: new DateTime(2027, 5, 1),
+            AdjEnd: new DateTime(2027, 5, 5),
+            Notes: "To be deleted"));
+
+        var adjustments = await mediator.Send(new GetAdjustmentsQuery());
+        var toDelete = adjustments.First(a => a.Notes == "To be deleted");
+
+        await mediator.Send(new DeleteAdjustmentCommand(toDelete.Id));
+
+        var after = await mediator.Send(new GetAdjustmentsQuery());
+        Assert.DoesNotContain(after, a => a.Id == toDelete.Id);
+    }
+
+    [Fact]
+    public async Task DeleteTask_NonExistent_DoesNotThrow()
+    {
+        using var scope = Services.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+        // Deleting non-existent ID should not throw
+        var ex = await Record.ExceptionAsync(() =>
+            mediator.Send(new DeleteTaskCommand(999999)));
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public async Task DeleteResource_NonExistent_DoesNotThrow()
+    {
+        using var scope = Services.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+        var ex = await Record.ExceptionAsync(() =>
+            mediator.Send(new DeleteResourceCommand(999999)));
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public async Task DeleteHoliday_NonExistent_DoesNotThrow()
+    {
+        using var scope = Services.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+        var ex = await Record.ExceptionAsync(() =>
+            mediator.Send(new DeleteHolidayCommand(999999)));
+        Assert.Null(ex);
+    }
+}
+
+// ============================================================
+// 10. Full round-trip: create → schedule → query → verify
+// ============================================================
+
+public class Pipeline_RoundTripTests : PipelineFixture
+{
+    [Fact]
+    public async Task FullRoundTrip_CreateTaskAndResource_ScheduleAndVerifyKpis()
+    {
+        using var scope = Services.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+        // Create a new task
+        await mediator.Send(new UpsertTaskCommand(
+            Id: 0,
+            TaskId: "RT-001",
+            ServiceName: "Round Trip Service",
+            DevEstimation: 5,
+            MaxDev: 1,
+            Priority: 3,
+            StrictDate: null,
+            DependsOnTaskIds: null,
+            IsNew: true));
+
+        // Run scheduler
+        var result = await mediator.Send(new RunSchedulerCommand());
+        Assert.Contains("Successfully scheduled", result);
+
+        // Get KPIs
+        var kpis = await mediator.Send(new GetDashboardKpisQuery());
+        Assert.True(kpis.TotalServices > 0);
+
+        // Get output plan and verify our task is in it
+        var plan = await mediator.Send(new GetOutputPlanQuery());
+        Assert.Contains(plan, p => (string?)p["task_id"] == "RT-001");
+    }
+
+    [Fact]
+    public async Task FullRoundTrip_UpdateTaskAndReschedule()
+    {
+        using var scope = Services.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+        // Get existing task
+        var tasks = await mediator.Send(new GetTasksQuery());
+        var existing = tasks.First();
+
+        // Update its estimation
+        await mediator.Send(new UpsertTaskCommand(
+            Id: existing.Id,
+            TaskId: existing.TaskId,
+            ServiceName: existing.ServiceName,
+            DevEstimation: existing.DevEstimation + 100,
+            MaxDev: existing.MaxDev,
+            Priority: existing.Priority,
+            StrictDate: existing.StrictDate,
+            DependsOnTaskIds: existing.DependsOnTaskIds,
+            IsNew: false));
+
+        // Reschedule
+        await mediator.Send(new RunSchedulerCommand());
+
+        // Verify updated estimation persisted
+        var updated = (await mediator.Send(new GetTasksQuery())).First(t => t.Id == existing.Id);
+        Assert.Equal(existing.DevEstimation + 100, updated.DevEstimation);
+    }
+}

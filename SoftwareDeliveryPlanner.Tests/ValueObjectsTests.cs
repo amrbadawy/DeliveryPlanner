@@ -151,6 +151,52 @@ public class TaskIdTests
     }
 
     #endregion
+
+    #region Additional edge cases
+
+    [Fact]
+    public void TryCreate_MultipleDashes_ReturnsFalse()
+    {
+        Assert.False(TaskId.TryCreate("AA-BB-11", out _));
+    }
+
+    [Fact]
+    public void TryCreate_FourCharInput_ReturnsFalse()
+    {
+        // "AB-1" is 4 chars → length < 5
+        Assert.False(TaskId.TryCreate("AB-1", out _));
+    }
+
+    [Fact]
+    public void TryCreate_DashOnly_ReturnsFalse()
+    {
+        Assert.False(TaskId.TryCreate("---", out _));
+    }
+
+    [Fact]
+    public void TryCreate_DefaultOutValueOnFailure_HasNullValue()
+    {
+        TaskId.TryCreate("INVALID", out var id);
+        Assert.Null(id.Value);
+    }
+
+    [Fact]
+    public void CaseInsensitiveEquality_ViaNormalization()
+    {
+        var a = TaskId.Create("abc-123");
+        var b = TaskId.Create("ABC-123");
+        Assert.Equal(a, b);
+    }
+
+    [Fact]
+    public void GetHashCode_EqualInstances_SameHash()
+    {
+        var a = TaskId.Create("SV-01");
+        var b = TaskId.Create("SV-01");
+        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+    }
+
+    #endregion
 }
 
 public class ResourceIdTests
@@ -263,6 +309,71 @@ public class ResourceIdTests
     }
 
     #endregion
+
+    #region Additional edge cases
+
+    [Fact]
+    public void TryCreate_WhitespaceOnly_ReturnsFalse()
+    {
+        Assert.False(ResourceId.TryCreate("   ", out _));
+    }
+
+    [Fact]
+    public void DifferentIds_AreNotEqual()
+    {
+        var a = ResourceId.Create("RES-01");
+        var b = ResourceId.Create("RES-02");
+        Assert.NotEqual(a, b);
+    }
+
+    [Fact]
+    public void TryCreate_LongerPrefix_ReturnsTrue()
+    {
+        Assert.True(ResourceId.TryCreate("ABCDE-9999", out _));
+    }
+
+    [Fact]
+    public void TryCreate_MultipleDashes_ReturnsFalse()
+    {
+        Assert.False(ResourceId.TryCreate("RES-01-02", out _));
+    }
+
+    [Fact]
+    public void TryCreate_DashOnly_ReturnsFalse()
+    {
+        Assert.False(ResourceId.TryCreate("--", out _));
+    }
+
+    [Fact]
+    public void TryCreate_DefaultOutValueOnFailure_HasNullValue()
+    {
+        ResourceId.TryCreate("BAD", out var id);
+        Assert.Null(id.Value);
+    }
+
+    [Fact]
+    public void CaseInsensitiveEquality_ViaNormalization()
+    {
+        var a = ResourceId.Create("res-01");
+        var b = ResourceId.Create("RES-01");
+        Assert.Equal(a, b);
+    }
+
+    [Fact]
+    public void GetHashCode_EqualInstances_SameHash()
+    {
+        var a = ResourceId.Create("RES-01");
+        var b = ResourceId.Create("RES-01");
+        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+    }
+
+    [Fact]
+    public void Create_NullInput_ThrowsArgumentException()
+    {
+        Assert.Throws<ArgumentException>(() => ResourceId.Create(null!));
+    }
+
+    #endregion
 }
 
 public class PercentageTests
@@ -357,6 +468,75 @@ public class PercentageTests
     }
 
     #endregion
+
+    #region Additional edge cases
+
+    [Fact]
+    public void TryCreate_NaN_ReturnsTrue_KnownGap()
+    {
+        // NaN < 0 is false AND NaN > 100 is false, so TryCreate returns true
+        // This documents a known limitation — NaN passes validation
+        var result = Percentage.TryCreate(double.NaN, out var p);
+        Assert.True(result);
+        Assert.True(double.IsNaN(p.Value));
+    }
+
+    [Fact]
+    public void TryCreate_PositiveInfinity_ReturnsFalse()
+    {
+        Assert.False(Percentage.TryCreate(double.PositiveInfinity, out _));
+    }
+
+    [Fact]
+    public void TryCreate_NegativeInfinity_ReturnsFalse()
+    {
+        Assert.False(Percentage.TryCreate(double.NegativeInfinity, out _));
+    }
+
+    [Fact]
+    public void Create_BoundaryZero_Succeeds()
+    {
+        var p = Percentage.Create(0);
+        Assert.Equal(0, p.Value);
+    }
+
+    [Fact]
+    public void Create_BoundaryHundred_Succeeds()
+    {
+        var p = Percentage.Create(100);
+        Assert.Equal(100, p.Value);
+    }
+
+    [Fact]
+    public void ToString_FractionalValue_ShowsOneDecimal()
+    {
+        var p = Percentage.Create(33.33);
+        Assert.Equal("33.3", p.ToString());
+    }
+
+    [Fact]
+    public void ToString_Zero_ShowsZeroPointZero()
+    {
+        var p = Percentage.Create(0);
+        Assert.Equal("0.0", p.ToString());
+    }
+
+    [Fact]
+    public void TryCreate_DefaultOutValueOnFailure_IsZero()
+    {
+        Percentage.TryCreate(-1, out var p);
+        Assert.Equal(0.0, p.Value);
+    }
+
+    [Fact]
+    public void GetHashCode_EqualInstances_SameHash()
+    {
+        var a = Percentage.Create(50);
+        var b = Percentage.Create(50);
+        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+    }
+
+    #endregion
 }
 
 public class DateRangeTests
@@ -435,6 +615,54 @@ public class DateRangeTests
         var a = DateRange.Create(_today, _today.AddDays(5));
         var b = DateRange.Create(_today, _today.AddDays(6));
         Assert.NotEqual(a, b);
+    }
+
+    #endregion
+
+    #region Additional edge cases
+
+    [Fact]
+    public void TryCreate_TimeStripping_ReversesApparentOrder_ReturnsFalse()
+    {
+        // start = May 6 01:00, end = May 5 23:59 → after .Date: start=May 6, end=May 5 → false
+        var start = new DateTime(2026, 5, 6, 1, 0, 0);
+        var end = new DateTime(2026, 5, 5, 23, 59, 59);
+        Assert.False(DateRange.TryCreate(start, end, out _));
+    }
+
+    [Fact]
+    public void TryCreate_SameDateDifferentTimes_ReturnsTrue()
+    {
+        // start = May 5 23:59, end = May 5 00:01 → after .Date both May 5 → true
+        var start = new DateTime(2026, 5, 5, 23, 59, 59);
+        var end = new DateTime(2026, 5, 5, 0, 0, 1);
+        Assert.True(DateRange.TryCreate(start, end, out _));
+    }
+
+    [Fact]
+    public void Create_StripsTimeComponent()
+    {
+        var start = new DateTime(2026, 5, 4, 14, 30, 0);
+        var end = new DateTime(2026, 5, 10, 8, 0, 0);
+        var r = DateRange.Create(start, end);
+        Assert.Equal(new DateTime(2026, 5, 4), r.Start);
+        Assert.Equal(new DateTime(2026, 5, 10), r.End);
+    }
+
+    [Fact]
+    public void TryCreate_DefaultOutValueOnFailure_HasMinValueDates()
+    {
+        DateRange.TryCreate(_today.AddDays(1), _today, out var r);
+        Assert.Equal(default(DateTime), r.Start);
+        Assert.Equal(default(DateTime), r.End);
+    }
+
+    [Fact]
+    public void GetHashCode_EqualInstances_SameHash()
+    {
+        var a = DateRange.Create(_today, _today.AddDays(5));
+        var b = DateRange.Create(_today, _today.AddDays(5));
+        Assert.Equal(a.GetHashCode(), b.GetHashCode());
     }
 
     #endregion

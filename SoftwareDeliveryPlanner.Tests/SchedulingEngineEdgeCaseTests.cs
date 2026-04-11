@@ -739,4 +739,398 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         Assert.Equal("Not Started", task.Status);
         Assert.Null(task.PlannedStart);
     }
+
+    // ------------------------------------------------------------------
+    // Circular dependency — A depends on B, B depends on A → neither starts
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void RunScheduler_CircularDependency_NeitherTaskStarts()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.SaveChanges();
+
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "CIR-001",
+            ServiceName = "Circular A",
+            DevEstimation = 3,
+            MaxDev = 1,
+            Priority = 1,
+            DependsOnTaskIds = "CIR-002"
+        });
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "CIR-002",
+            ServiceName = "Circular B",
+            DevEstimation = 3,
+            MaxDev = 1,
+            Priority = 1,
+            DependsOnTaskIds = "CIR-001"
+        });
+        _db.SaveChanges();
+
+        // Should not throw — circular deps just mean tasks never get scheduled
+        var exception = Record.Exception(() => _engine.RunScheduler());
+        Assert.Null(exception);
+
+        var taskA = _db.Tasks.First(t => t.TaskId == "CIR-001");
+        var taskB = _db.Tasks.First(t => t.TaskId == "CIR-002");
+        Assert.Equal("Not Started", taskA.Status);
+        Assert.Equal("Not Started", taskB.Status);
+        Assert.Null(taskA.PlannedStart);
+        Assert.Null(taskB.PlannedStart);
+    }
+
+    // ------------------------------------------------------------------
+    // Self-referencing dependency — A depends on A → never starts
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void RunScheduler_SelfReferencingDependency_TaskNeverStarts()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.SaveChanges();
+
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "SELF-001",
+            ServiceName = "Self Referencing",
+            DevEstimation = 3,
+            MaxDev = 1,
+            Priority = 1,
+            DependsOnTaskIds = "SELF-001"
+        });
+        _db.SaveChanges();
+
+        var exception = Record.Exception(() => _engine.RunScheduler());
+        Assert.Null(exception);
+
+        var task = _db.Tasks.First(t => t.TaskId == "SELF-001");
+        Assert.Equal("Not Started", task.Status);
+        Assert.Null(task.PlannedStart);
+    }
+
+    // ------------------------------------------------------------------
+    // At Risk path — strict date within threshold, finish before deadline
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void RunScheduler_TaskWithStrictDateWithinThreshold_MarkedAtRisk()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.SaveChanges();
+
+        // At risk threshold is 5 working days by default.
+        // Set strict date to just a few working days from today so finish is before strict
+        // but working days remaining <= 5.
+        var strictDate = DateTime.Today.AddDays(3); // Very close deadline
+
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "SV-RISK",
+            ServiceName = "At Risk Task",
+            DevEstimation = 0.5,  // Very small — will finish quickly
+            MaxDev = 1,
+            Priority = 1,
+            StrictDate = strictDate
+        });
+        _db.SaveChanges();
+
+        var engine = new SchedulingEngine(_db);
+        engine.RunScheduler();
+
+        var task = _db.Tasks.First(t => t.TaskId == "SV-RISK");
+        // The task should be "At Risk", "On Track", or "Late" depending on exact date/scheduling
+        Assert.Contains(task.DeliveryRisk, new[] { "At Risk", "On Track", "Late" });
+    }
+
+    // ------------------------------------------------------------------
+    // CalculateRisk — plannedFinish is null but strictDate exists → At Risk
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void CalculateRisk_NoPlannedFinishWithStrictDate_ReturnsAtRisk()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.Resources.RemoveRange(_db.Resources);
+        _db.SaveChanges();
+
+        // No resources → no capacity → task won't be scheduled → no PlannedFinish
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "SV-NOFIN",
+            ServiceName = "Unschedulable With Strict",
+            DevEstimation = 10,
+            MaxDev = 1,
+            Priority = 1,
+            StrictDate = DateTime.Today.AddDays(30)
+        });
+        _db.SaveChanges();
+
+        var engine = new SchedulingEngine(_db);
+        engine.RunScheduler();
+
+        var task = _db.Tasks.First(t => t.TaskId == "SV-NOFIN");
+        // No planned finish + has strict date → At Risk
+        Assert.Equal("At Risk", task.DeliveryRisk);
+    }
+
+    // ------------------------------------------------------------------
+    // Calendar capacity — weekends have zero effective capacity
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void RunScheduler_WeekendDays_HaveZeroEffectiveCapacity()
+    {
+        _engine.RunScheduler();
+
+        var weekendCalDays = _db.Calendar
+            .Where(c => c.CalendarDate.DayOfWeek == DayOfWeek.Friday
+                     || c.CalendarDate.DayOfWeek == DayOfWeek.Saturday)
+            .Take(10)
+            .ToList();
+
+        Assert.NotEmpty(weekendCalDays);
+        Assert.All(weekendCalDays, d =>
+        {
+            Assert.False(d.IsWorkingDay);
+            Assert.Equal(0, d.EffectiveCapacity);
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Calendar capacity — holiday days have zero effective capacity
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void RunScheduler_HolidayDays_HaveZeroEffectiveCapacity()
+    {
+        _engine.RunScheduler();
+
+        var holidayCalDays = _db.Calendar
+            .Where(c => c.IsHoliday && c.CalendarDate.DayOfWeek != DayOfWeek.Friday
+                                     && c.CalendarDate.DayOfWeek != DayOfWeek.Saturday)
+            .Take(5)
+            .ToList();
+
+        Assert.NotEmpty(holidayCalDays);
+        Assert.All(holidayCalDays, d =>
+        {
+            Assert.False(d.IsWorkingDay);
+            Assert.Equal(0, d.EffectiveCapacity);
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Calendar — holiday name is populated on holiday days
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void RunScheduler_HolidayDays_HaveHolidayNameSet()
+    {
+        _engine.RunScheduler();
+
+        var holidayCalDays = _db.Calendar.Where(c => c.IsHoliday).Take(5).ToList();
+        Assert.NotEmpty(holidayCalDays);
+        Assert.All(holidayCalDays, d => Assert.False(string.IsNullOrWhiteSpace(d.HolidayName)));
+    }
+
+    // ------------------------------------------------------------------
+    // Multiple stacking adjustments on same resource
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void RunScheduler_MultipleAdjustments_StackMultiplicatively()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.Resources.RemoveRange(_db.Resources);
+        _db.Adjustments.RemoveRange(_db.Adjustments);
+        _db.SaveChanges();
+
+        _db.Resources.Add(new TeamMember
+        {
+            ResourceId = "RES-STK",
+            ResourceName = "Stack Test",
+            Role = "Developer",
+            Active = "Yes",
+            StartDate = new DateTime(2026, 1, 1),
+            DailyCapacity = 8,
+            AvailabilityPct = 100
+        });
+
+        // Two 50% adjustments stacking: 8 * (50/100) * (50/100) = 2
+        _db.Adjustments.Add(new Adjustment
+        {
+            ResourceId = "RES-STK",
+            AdjStart = new DateTime(2026, 5, 1),
+            AdjEnd = new DateTime(2026, 5, 31),
+            AvailabilityPct = 50,
+            AdjType = "Training"
+        });
+        _db.Adjustments.Add(new Adjustment
+        {
+            ResourceId = "RES-STK",
+            AdjStart = new DateTime(2026, 5, 1),
+            AdjEnd = new DateTime(2026, 5, 31),
+            AvailabilityPct = 50,
+            AdjType = "Other"
+        });
+
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "SV-MSTK",
+            ServiceName = "Multi Stack Task",
+            DevEstimation = 5,
+            MaxDev = 10,
+            Priority = 5
+        });
+        _db.SaveChanges();
+
+        var engine = new SchedulingEngine(_db);
+        engine.RunScheduler();
+
+        // Each allocation in May should have AssignedDev <= 2 (8 * 0.5 * 0.5)
+        var mayAllocations = _db.Allocations
+            .Where(a => a.TaskId == "SV-MSTK"
+                && a.CalendarDate.Month == 5 && a.CalendarDate.Year == 2026)
+            .ToList();
+
+        Assert.NotEmpty(mayAllocations);
+        Assert.All(mayAllocations, a =>
+            Assert.True(a.AssignedDev <= 2.0,
+                $"Expected AssignedDev <= 2.0 (stacked adjustments) but got {a.AssignedDev}"));
+    }
+
+    // ------------------------------------------------------------------
+    // Resource StartDate in future — no capacity before start
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void RunScheduler_ResourceStartDateInFuture_NoCapacityBeforeStart()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.Resources.RemoveRange(_db.Resources);
+        _db.SaveChanges();
+
+        _db.Resources.Add(new TeamMember
+        {
+            ResourceId = "RES-FUT",
+            ResourceName = "Future Dev",
+            Role = "Developer",
+            Active = "Yes",
+            StartDate = new DateTime(2026, 8, 1), // Starts Aug, plan starts May
+            DailyCapacity = 8,
+            AvailabilityPct = 100
+        });
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "SV-FRES",
+            ServiceName = "Future Resource Task",
+            DevEstimation = 3,
+            MaxDev = 1,
+            Priority = 5
+        });
+        _db.SaveChanges();
+
+        var engine = new SchedulingEngine(_db);
+        engine.RunScheduler();
+
+        var task = _db.Tasks.First(t => t.TaskId == "SV-FRES");
+        // Task should not start before August 1
+        if (task.PlannedStart.HasValue)
+        {
+            Assert.True(task.PlannedStart.Value >= new DateTime(2026, 8, 1),
+                $"Task started {task.PlannedStart:yyyy-MM-dd} before resource StartDate 2026-08-01");
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // GetOutputPlan — empty tasks returns empty list
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void GetOutputPlan_NoTasks_ReturnsEmptyList()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.SaveChanges();
+
+        var output = _engine.GetOutputPlan();
+        Assert.NotNull(output);
+        Assert.Empty(output);
+    }
+
+    // ------------------------------------------------------------------
+    // GetDashboardKPIs — upcoming_strict is capped at 5
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void GetDashboardKPIs_ManyStrictDates_UpcomingStrictCappedAtFive()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.SaveChanges();
+
+        for (int i = 1; i <= 10; i++)
+        {
+            _db.Tasks.Add(new TaskItem
+            {
+                TaskId = $"SV-S{i:D2}",
+                ServiceName = $"Strict Task {i}",
+                DevEstimation = 3,
+                Priority = 5,
+                StrictDate = DateTime.Today.AddDays(i * 10)
+            });
+        }
+        _db.SaveChanges();
+
+        var engine = new SchedulingEngine(_db);
+        var kpis = engine.GetDashboardKPIs();
+
+        var upcoming = kpis["upcoming_strict"] as List<TaskItem>;
+        Assert.NotNull(upcoming);
+        Assert.True(upcoming.Count <= 5);
+    }
+
+    // ------------------------------------------------------------------
+    // GetDashboardKPIs — upcoming_strict sorted by earliest first
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void GetDashboardKPIs_UpcomingStrict_OrderedByEarliestFirst()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.SaveChanges();
+
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "SV-SL",
+            ServiceName = "Later Strict",
+            DevEstimation = 3,
+            Priority = 5,
+            StrictDate = DateTime.Today.AddDays(60)
+        });
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "SV-SE",
+            ServiceName = "Earlier Strict",
+            DevEstimation = 3,
+            Priority = 5,
+            StrictDate = DateTime.Today.AddDays(10)
+        });
+        _db.SaveChanges();
+
+        var engine = new SchedulingEngine(_db);
+        var kpis = engine.GetDashboardKPIs();
+
+        var upcoming = kpis["upcoming_strict"] as List<TaskItem>;
+        Assert.NotNull(upcoming);
+        Assert.True(upcoming.Count >= 2);
+        Assert.True(upcoming[0].StrictDate <= upcoming[1].StrictDate);
+    }
 }

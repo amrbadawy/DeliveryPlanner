@@ -213,9 +213,13 @@ public class ModelsTests
         Assert.False(cal.IsWorkingDay);
         Assert.False(cal.IsHoliday);
         Assert.Equal(0, cal.BaseCapacity);
+        Assert.Equal(0, cal.AdjCapacity);
         Assert.Equal(0, cal.EffectiveCapacity);
         Assert.Equal(0, cal.ReservedCapacity);
         Assert.Equal(0, cal.RemainingCapacity);
+        Assert.Null(cal.HolidayName);
+        Assert.Equal(default(DateTime), cal.CalendarDate);
+        Assert.Equal(0, cal.DateKey);
     }
 
     [Fact]
@@ -243,7 +247,13 @@ public class ModelsTests
         Assert.Equal(string.Empty, alloc.AllocationId);
         Assert.Equal(string.Empty, alloc.TaskId);
         Assert.Equal(0, alloc.AssignedDev);
+        Assert.Equal(0, alloc.CumulativeEffort);
+        Assert.False(alloc.IsComplete);
         Assert.Equal("Not Started", alloc.ServiceStatus);
+        Assert.Null(alloc.SchedRank);
+        Assert.Null(alloc.MaxDev);
+        Assert.Null(alloc.AvailableCapacity);
+        Assert.Null(alloc.Task);
     }
 
     [Fact]
