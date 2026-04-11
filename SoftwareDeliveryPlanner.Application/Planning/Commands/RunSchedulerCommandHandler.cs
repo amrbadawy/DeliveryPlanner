@@ -5,9 +5,9 @@ namespace SoftwareDeliveryPlanner.Application.Planning.Commands;
 
 public sealed class RunSchedulerCommandHandler : IRequestHandler<RunSchedulerCommand, string>
 {
-    private readonly ISchedulingOrchestrator _orchestrator;
+    private readonly ISchedulerService _orchestrator;
 
-    public RunSchedulerCommandHandler(ISchedulingOrchestrator orchestrator)
+    public RunSchedulerCommandHandler(ISchedulerService orchestrator)
     {
         _orchestrator = orchestrator;
     }

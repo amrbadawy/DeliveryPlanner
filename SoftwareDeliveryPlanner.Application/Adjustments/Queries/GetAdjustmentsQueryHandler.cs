@@ -6,9 +6,9 @@ namespace SoftwareDeliveryPlanner.Application.Adjustments.Queries;
 
 public sealed class GetAdjustmentsQueryHandler : IRequestHandler<GetAdjustmentsQuery, List<Adjustment>>
 {
-    private readonly ISchedulingOrchestrator _orchestrator;
+    private readonly IAdjustmentOrchestrator _orchestrator;
 
-    public GetAdjustmentsQueryHandler(ISchedulingOrchestrator orchestrator)
+    public GetAdjustmentsQueryHandler(IAdjustmentOrchestrator orchestrator)
         => _orchestrator = orchestrator;
 
     public Task<List<Adjustment>> Handle(GetAdjustmentsQuery request, CancellationToken cancellationToken)

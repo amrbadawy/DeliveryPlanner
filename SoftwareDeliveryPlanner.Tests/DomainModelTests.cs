@@ -37,6 +37,34 @@ public class TaskItemDomainTests
         Assert.Equal(date, task.StrictDate);
     }
 
+    [Fact]
+    public void Create_WithDependsOnTaskIds_SetsDependencies()
+    {
+        var task = TaskItem.Create("SVC-003", "Service", 5, 1, 5, dependsOnTaskIds: "SVC-001,SVC-002");
+        Assert.Equal("SVC-001,SVC-002", task.DependsOnTaskIds);
+    }
+
+    [Fact]
+    public void Create_WithNullDependsOnTaskIds_SetsNull()
+    {
+        var task = TaskItem.Create("SVC-003", "Service", 5, 1, 5, dependsOnTaskIds: null);
+        Assert.Null(task.DependsOnTaskIds);
+    }
+
+    [Fact]
+    public void Create_WithWhitespaceDependsOnTaskIds_SetsNull()
+    {
+        var task = TaskItem.Create("SVC-003", "Service", 5, 1, 5, dependsOnTaskIds: "   ");
+        Assert.Null(task.DependsOnTaskIds);
+    }
+
+    [Fact]
+    public void Create_WithDependsOnTaskIds_TrimsDependencies()
+    {
+        var task = TaskItem.Create("SVC-003", "Service", 5, 1, 5, dependsOnTaskIds: "  SVC-001 , SVC-002  ");
+        Assert.Equal("SVC-001 , SVC-002", task.DependsOnTaskIds);
+    }
+
     [Theory]
     [InlineData("INVALID")]
     [InlineData("")]

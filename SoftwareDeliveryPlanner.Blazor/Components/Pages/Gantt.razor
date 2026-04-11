@@ -1,0 +1,380 @@
+@page "/gantt"
+@using MediatR
+@using SoftwareDeliveryPlanner.Application.Tasks.Queries
+@using SoftwareDeliveryPlanner.Application.Planning.Commands
+@using SoftwareDeliveryPlanner.Models
+@using SoftwareDeliveryPlanner.Domain
+@inject IMediator Mediator
+
+<PageTitle>Gantt Chart</PageTitle>
+
+<h3 style="margin-bottom: 20px;">📊 Gantt Chart</h3>
+
+<div class="mb-3">
+    <button class="btn btn-secondary" @onclick="RefreshData" data-testid="gantt-refresh">🔄 Refresh</button>
+</div>
+
+@if (!scheduledTasks.Any())
+{
+    <div class="alert alert-info" data-testid="gantt-empty">
+        No scheduled tasks to display. Click Refresh to run the scheduler first.
+    </div>
+}
+else
+{
+    <div class="mb-2 text-muted" data-testid="gantt-range">
+        Plan range: <strong>@planStart.ToString("yyyy-MM-dd")</strong> to <strong>@planEnd.ToString("yyyy-MM-dd")</strong>
+        (@totalDays days)
+    </div>
+
+    <!-- Legend -->
+    <div class="d-flex gap-3 mb-3" data-testid="gantt-legend">
+        <span><span class="badge" style="background: #28a745;">&nbsp;&nbsp;</span> Completed</span>
+        <span><span class="badge" style="background: #17a2b8;">&nbsp;&nbsp;</span> In Progress</span>
+        <span><span class="badge" style="background: #6c757d;">&nbsp;&nbsp;</span> Not Started</span>
+        <span><span class="badge" style="background: #ffc107;">&nbsp;&nbsp;</span> At Risk</span>
+        <span><span class="badge" style="background: #dc3545;">&nbsp;&nbsp;</span> Late</span>
+    </div>
+
+    <!-- Month headers -->
+    <div class="gantt-container" data-testid="gantt-chart">
+        <div class="gantt-header">
+            <div class="gantt-label-col"><strong>Task</strong></div>
+            <div class="gantt-timeline-col">
+                <div class="gantt-months">
+                    @foreach (var month in GetMonthMarkers())
+                    {
+                        <div class="gantt-month" style="left: @month.LeftPct%; width: @month.WidthPct%;">
+                            @month.Label
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Task rows -->
+        @foreach (var task in scheduledTasks)
+        {
+            var barStyle = GetBarStyle(task);
+            var barColor = GetBarColor(task);
+            var tooltip = $"{task.TaskId}: {task.ServiceName}\n" +
+                          $"Start: {task.PlannedStart?.ToString("yyyy-MM-dd")}\n" +
+                          $"Finish: {task.PlannedFinish?.ToString("yyyy-MM-dd")}\n" +
+                          $"Duration: {task.Duration} days\n" +
+                          $"Status: {task.Status}\n" +
+                          $"Risk: {task.DeliveryRisk}";
+
+            <div class="gantt-row" data-testid="gantt-row-@task.TaskId">
+                <div class="gantt-label-col" title="@task.ServiceName">
+                    <span class="gantt-task-id">@task.TaskId</span>
+                    <span class="gantt-task-name">@Truncate(task.ServiceName, 18)</span>
+                </div>
+                <div class="gantt-timeline-col">
+                    @if (task.PlannedStart.HasValue && task.PlannedFinish.HasValue)
+                    {
+                        <div class="gantt-bar" style="@barStyle background: @barColor;" title="@tooltip"
+                             data-testid="gantt-bar-@task.TaskId">
+                            <span class="gantt-bar-label">@task.Duration d</span>
+                        </div>
+
+                        @if (task.StrictDate.HasValue)
+                        {
+                            var strictPct = GetDatePercent(task.StrictDate.Value);
+                            <div class="gantt-strict-marker" style="left: @strictPct%;"
+                                 title="Strict: @task.StrictDate.Value.ToString("yyyy-MM-dd")"
+                                 data-testid="gantt-strict-@task.TaskId">
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(task.DependsOnTaskIds))
+                        {
+                            <span class="gantt-dep-indicator" title="Depends on: @task.DependsOnTaskIds">🔗</span>
+                        }
+                    }
+                    else
+                    {
+                        <span class="text-muted small">Not scheduled</span>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Today marker -->
+        @{
+            var todayPct = GetDatePercent(DateTime.Today);
+            if (todayPct >= 0 && todayPct <= 100)
+            {
+                <div class="gantt-today-line" style="left: calc(200px + (@todayPct% * (100% - 200px) / 100));"
+                     data-testid="gantt-today" title="Today: @DateTime.Today.ToString("yyyy-MM-dd")">
+                </div>
+            }
+        }
+    </div>
+}
+
+<style>
+    .gantt-container {
+        position: relative;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        overflow-x: auto;
+        min-width: 800px;
+    }
+
+    .gantt-header {
+        display: flex;
+        border-bottom: 2px solid #343a40;
+        background: #343a40;
+        color: white;
+        font-size: 0.85rem;
+    }
+
+    .gantt-label-col {
+        min-width: 200px;
+        max-width: 200px;
+        padding: 6px 10px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        border-right: 1px solid #dee2e6;
+    }
+
+    .gantt-timeline-col {
+        flex: 1;
+        position: relative;
+        min-height: 32px;
+        padding: 4px 0;
+    }
+
+    .gantt-months {
+        display: flex;
+        position: relative;
+        height: 100%;
+    }
+
+    .gantt-month {
+        position: absolute;
+        text-align: center;
+        font-size: 0.75rem;
+        padding: 4px 0;
+        border-left: 1px solid rgba(255,255,255,0.3);
+    }
+
+    .gantt-row {
+        display: flex;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .gantt-row:nth-child(even) {
+        background: #f8f9fa;
+    }
+
+    .gantt-row:hover {
+        background: #e8f4fd;
+    }
+
+    .gantt-task-id {
+        font-weight: 600;
+        font-size: 0.8rem;
+        color: #495057;
+        margin-right: 6px;
+    }
+
+    .gantt-task-name {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    .gantt-bar {
+        position: absolute;
+        height: 20px;
+        top: 6px;
+        border-radius: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.7rem;
+        font-weight: 600;
+        cursor: default;
+        min-width: 2px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    }
+
+    .gantt-bar-label {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding: 0 4px;
+    }
+
+    .gantt-strict-marker {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #dc3545;
+        z-index: 2;
+    }
+
+    .gantt-strict-marker::after {
+        content: "▼";
+        position: absolute;
+        top: -2px;
+        left: -5px;
+        font-size: 0.6rem;
+        color: #dc3545;
+    }
+
+    .gantt-dep-indicator {
+        position: absolute;
+        right: 4px;
+        top: 8px;
+        font-size: 0.7rem;
+    }
+
+    .gantt-today-line {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #007bff;
+        z-index: 3;
+        opacity: 0.7;
+    }
+
+    .gantt-today-line::after {
+        content: "Today";
+        position: absolute;
+        top: 2px;
+        left: 4px;
+        font-size: 0.65rem;
+        color: #007bff;
+        white-space: nowrap;
+    }
+</style>
+
+@code {
+    private List<TaskItem> scheduledTasks = new();
+    private DateTime planStart;
+    private DateTime planEnd;
+    private int totalDays;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        var allTasks = await Mediator.Send(new GetTasksQuery());
+
+        // Only show tasks with a planned start and finish
+        scheduledTasks = allTasks
+            .Where(t => t.PlannedStart.HasValue && t.PlannedFinish.HasValue)
+            .OrderBy(t => t.PlannedStart)
+            .ThenBy(t => t.SchedulingRank)
+            .ToList();
+
+        if (scheduledTasks.Any())
+        {
+            planStart = scheduledTasks.Min(t => t.PlannedStart!.Value).Date;
+            planEnd = scheduledTasks.Max(t => t.PlannedFinish!.Value).Date;
+
+            // Extend range to include strict dates
+            var maxStrict = allTasks
+                .Where(t => t.StrictDate.HasValue)
+                .Select(t => t.StrictDate!.Value)
+                .DefaultIfEmpty(planEnd)
+                .Max();
+            if (maxStrict > planEnd)
+                planEnd = maxStrict;
+
+            // Add a small buffer
+            planStart = planStart.AddDays(-2);
+            planEnd = planEnd.AddDays(5);
+            totalDays = (int)(planEnd - planStart).TotalDays;
+            if (totalDays < 1) totalDays = 1;
+        }
+    }
+
+    private async Task RefreshData()
+    {
+        await Mediator.Send(new RunSchedulerCommand());
+        await LoadData();
+    }
+
+    private double GetDatePercent(DateTime date)
+    {
+        if (totalDays <= 0) return 0;
+        var dayOffset = (date.Date - planStart).TotalDays;
+        return Math.Round(dayOffset / totalDays * 100, 2);
+    }
+
+    private string GetBarStyle(TaskItem task)
+    {
+        if (!task.PlannedStart.HasValue || !task.PlannedFinish.HasValue)
+            return "display: none;";
+
+        var leftPct = GetDatePercent(task.PlannedStart.Value);
+        var rightPct = GetDatePercent(task.PlannedFinish.Value);
+        var widthPct = Math.Max(rightPct - leftPct, 0.5); // minimum visible width
+
+        return $"left: {leftPct}%; width: {widthPct}%;";
+    }
+
+    private string GetBarColor(TaskItem task)
+    {
+        // Color by risk first (Late/AtRisk take precedence for visual warnings)
+        if (task.DeliveryRisk == DomainConstants.DeliveryRisk.Late)
+            return "#dc3545";
+        if (task.DeliveryRisk == DomainConstants.DeliveryRisk.AtRisk)
+            return "#ffc107";
+
+        // Otherwise color by status
+        return task.Status switch
+        {
+            var s when s == DomainConstants.TaskStatus.Completed => "#28a745",
+            var s when s == DomainConstants.TaskStatus.InProgress => "#17a2b8",
+            _ => "#6c757d"
+        };
+    }
+
+    private List<MonthMarker> GetMonthMarkers()
+    {
+        var markers = new List<MonthMarker>();
+        if (totalDays <= 0) return markers;
+
+        var current = new DateTime(planStart.Year, planStart.Month, 1);
+        while (current <= planEnd)
+        {
+            var monthEnd = current.AddMonths(1).AddDays(-1);
+            if (monthEnd > planEnd) monthEnd = planEnd;
+
+            var start = current < planStart ? planStart : current;
+            var leftPct = GetDatePercent(start);
+            var rightPct = GetDatePercent(monthEnd);
+
+            markers.Add(new MonthMarker
+            {
+                Label = current.ToString("MMM yyyy"),
+                LeftPct = Math.Round(leftPct, 2),
+                WidthPct = Math.Round(Math.Max(rightPct - leftPct, 1), 2)
+            });
+
+            current = current.AddMonths(1);
+        }
+
+        return markers;
+    }
+
+    private static string Truncate(string text, int maxLength)
+        => text.Length <= maxLength ? text : text[..(maxLength - 1)] + "…";
+
+    private record MonthMarker
+    {
+        public string Label { get; init; } = "";
+        public double LeftPct { get; init; }
+        public double WidthPct { get; init; }
+    }
+}

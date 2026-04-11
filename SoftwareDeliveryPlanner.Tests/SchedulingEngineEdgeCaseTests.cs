@@ -529,4 +529,214 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         Assert.True(overallFinish > DateTime.MinValue,
             $"Expected a real date but got {overallFinish}");
     }
+
+    // ------------------------------------------------------------------
+    // Task Dependencies — dependent tasks start after prerequisites
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void RunScheduler_TaskWithDependency_StartsAfterDependencyCompletes()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.SaveChanges();
+
+        // Task A: no dependencies, estimated 5 days
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "DEP-001",
+            ServiceName = "Prerequisite Task",
+            DevEstimation = 5,
+            MaxDev = 1,
+            Priority = 1
+        });
+
+        // Task B: depends on DEP-001, estimated 3 days
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "DEP-002",
+            ServiceName = "Dependent Task",
+            DevEstimation = 3,
+            MaxDev = 1,
+            Priority = 1,
+            DependsOnTaskIds = "DEP-001"
+        });
+        _db.SaveChanges();
+
+        _engine.RunScheduler();
+
+        var prerequisite = _db.Tasks.First(t => t.TaskId == "DEP-001");
+        var dependent = _db.Tasks.First(t => t.TaskId == "DEP-002");
+
+        // Both should be scheduled
+        Assert.NotNull(prerequisite.PlannedFinish);
+        Assert.NotNull(dependent.PlannedStart);
+
+        // Dependent task must start after prerequisite finishes
+        Assert.True(dependent.PlannedStart!.Value >= prerequisite.PlannedFinish!.Value,
+            $"Dependent task started {dependent.PlannedStart} but prerequisite finished {prerequisite.PlannedFinish}");
+    }
+
+    [Fact]
+    public void RunScheduler_TaskWithMultipleDependencies_StartsAfterAllComplete()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.SaveChanges();
+
+        // Task A: 3 days
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "DEP-010",
+            ServiceName = "Prereq A",
+            DevEstimation = 3,
+            MaxDev = 1,
+            Priority = 1
+        });
+
+        // Task B: 5 days
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "DEP-011",
+            ServiceName = "Prereq B",
+            DevEstimation = 5,
+            MaxDev = 1,
+            Priority = 1
+        });
+
+        // Task C: depends on both A and B
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "DEP-012",
+            ServiceName = "Final Task",
+            DevEstimation = 2,
+            MaxDev = 1,
+            Priority = 1,
+            DependsOnTaskIds = "DEP-010,DEP-011"
+        });
+        _db.SaveChanges();
+
+        _engine.RunScheduler();
+
+        var prereqA = _db.Tasks.First(t => t.TaskId == "DEP-010");
+        var prereqB = _db.Tasks.First(t => t.TaskId == "DEP-011");
+        var final = _db.Tasks.First(t => t.TaskId == "DEP-012");
+
+        Assert.NotNull(final.PlannedStart);
+        Assert.NotNull(prereqA.PlannedFinish);
+        Assert.NotNull(prereqB.PlannedFinish);
+
+        // Must start after BOTH prerequisites finish
+        var latestPrereqFinish = prereqA.PlannedFinish!.Value > prereqB.PlannedFinish!.Value
+            ? prereqA.PlannedFinish!.Value
+            : prereqB.PlannedFinish!.Value;
+
+        Assert.True(final.PlannedStart!.Value >= latestPrereqFinish,
+            $"Final task started {final.PlannedStart} but latest prereq finished {latestPrereqFinish}");
+    }
+
+    [Fact]
+    public void RunScheduler_TaskWithNoDependency_SchedulesNormally()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.SaveChanges();
+
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "DEP-020",
+            ServiceName = "Independent Task",
+            DevEstimation = 3,
+            MaxDev = 1,
+            Priority = 1,
+            DependsOnTaskIds = null
+        });
+        _db.SaveChanges();
+
+        _engine.RunScheduler();
+
+        var task = _db.Tasks.First(t => t.TaskId == "DEP-020");
+        Assert.NotNull(task.PlannedStart);
+        Assert.Equal("Completed", task.Status);
+    }
+
+    [Fact]
+    public void RunScheduler_ChainedDependencies_SchedulesInCorrectOrder()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.SaveChanges();
+
+        // Chain: A -> B -> C
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "CHN-001",
+            ServiceName = "Chain First",
+            DevEstimation = 2,
+            MaxDev = 1,
+            Priority = 1
+        });
+
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "CHN-002",
+            ServiceName = "Chain Second",
+            DevEstimation = 2,
+            MaxDev = 1,
+            Priority = 1,
+            DependsOnTaskIds = "CHN-001"
+        });
+
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "CHN-003",
+            ServiceName = "Chain Third",
+            DevEstimation = 2,
+            MaxDev = 1,
+            Priority = 1,
+            DependsOnTaskIds = "CHN-002"
+        });
+        _db.SaveChanges();
+
+        _engine.RunScheduler();
+
+        var first = _db.Tasks.First(t => t.TaskId == "CHN-001");
+        var second = _db.Tasks.First(t => t.TaskId == "CHN-002");
+        var third = _db.Tasks.First(t => t.TaskId == "CHN-003");
+
+        Assert.NotNull(first.PlannedFinish);
+        Assert.NotNull(second.PlannedStart);
+        Assert.NotNull(second.PlannedFinish);
+        Assert.NotNull(third.PlannedStart);
+
+        Assert.True(second.PlannedStart!.Value >= first.PlannedFinish!.Value);
+        Assert.True(third.PlannedStart!.Value >= second.PlannedFinish!.Value);
+    }
+
+    [Fact]
+    public void RunScheduler_DependencyOnNonExistentTask_TaskNeverScheduled()
+    {
+        _db.Tasks.RemoveRange(_db.Tasks);
+        _db.Allocations.RemoveRange(_db.Allocations);
+        _db.SaveChanges();
+
+        // Depends on a task that doesn't exist — can never be satisfied
+        _db.Tasks.Add(new TaskItem
+        {
+            TaskId = "DEP-030",
+            ServiceName = "Orphan Dependency",
+            DevEstimation = 3,
+            MaxDev = 1,
+            Priority = 1,
+            DependsOnTaskIds = "MISSING-999"
+        });
+        _db.SaveChanges();
+
+        _engine.RunScheduler();
+
+        var task = _db.Tasks.First(t => t.TaskId == "DEP-030");
+        // Task should never start because its dependency can't be completed
+        Assert.Equal("Not Started", task.Status);
+        Assert.Null(task.PlannedStart);
+    }
 }

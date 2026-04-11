@@ -7,9 +7,9 @@ public sealed record GetOutputPlanQuery : IRequest<List<Dictionary<string, objec
 
 public sealed class GetOutputPlanQueryHandler : IRequestHandler<GetOutputPlanQuery, List<Dictionary<string, object?>>>
 {
-    private readonly ISchedulingOrchestrator _orchestrator;
+    private readonly IPlanningQueryService _orchestrator;
 
-    public GetOutputPlanQueryHandler(ISchedulingOrchestrator orchestrator)
+    public GetOutputPlanQueryHandler(IPlanningQueryService orchestrator)
         => _orchestrator = orchestrator;
 
     public Task<List<Dictionary<string, object?>>> Handle(GetOutputPlanQuery request, CancellationToken cancellationToken)

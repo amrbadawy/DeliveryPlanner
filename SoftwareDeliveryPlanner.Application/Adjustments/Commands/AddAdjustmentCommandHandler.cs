@@ -6,22 +6,20 @@ namespace SoftwareDeliveryPlanner.Application.Adjustments.Commands;
 
 public sealed class AddAdjustmentCommandHandler : IRequestHandler<AddAdjustmentCommand, Unit>
 {
-    private readonly ISchedulingOrchestrator _orchestrator;
+    private readonly IAdjustmentOrchestrator _orchestrator;
 
-    public AddAdjustmentCommandHandler(ISchedulingOrchestrator orchestrator)
+    public AddAdjustmentCommandHandler(IAdjustmentOrchestrator orchestrator)
         => _orchestrator = orchestrator;
 
     public async Task<Unit> Handle(AddAdjustmentCommand request, CancellationToken cancellationToken)
     {
-        var adjustment = new Adjustment
-        {
-            ResourceId = request.ResourceId,
-            AdjType = request.AdjType,
-            AvailabilityPct = request.AvailabilityPct,
-            AdjStart = request.AdjStart,
-            AdjEnd = request.AdjEnd,
-            Notes = request.Notes
-        };
+        var adjustment = Adjustment.Create(
+            request.ResourceId,
+            request.AdjType,
+            request.AvailabilityPct,
+            request.AdjStart,
+            request.AdjEnd,
+            request.Notes);
 
         await _orchestrator.AddAdjustmentAsync(adjustment, cancellationToken);
         return Unit.Value;
@@ -30,9 +28,9 @@ public sealed class AddAdjustmentCommandHandler : IRequestHandler<AddAdjustmentC
 
 public sealed class DeleteAdjustmentCommandHandler : IRequestHandler<DeleteAdjustmentCommand, Unit>
 {
-    private readonly ISchedulingOrchestrator _orchestrator;
+    private readonly IAdjustmentOrchestrator _orchestrator;
 
-    public DeleteAdjustmentCommandHandler(ISchedulingOrchestrator orchestrator)
+    public DeleteAdjustmentCommandHandler(IAdjustmentOrchestrator orchestrator)
         => _orchestrator = orchestrator;
 
     public async Task<Unit> Handle(DeleteAdjustmentCommand request, CancellationToken cancellationToken)

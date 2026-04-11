@@ -6,26 +6,25 @@ namespace SoftwareDeliveryPlanner.Application.Resources.Commands;
 
 public sealed class UpsertResourceCommandHandler : IRequestHandler<UpsertResourceCommand, Unit>
 {
-    private readonly ISchedulingOrchestrator _orchestrator;
+    private readonly IResourceOrchestrator _orchestrator;
 
-    public UpsertResourceCommandHandler(ISchedulingOrchestrator orchestrator)
+    public UpsertResourceCommandHandler(IResourceOrchestrator orchestrator)
         => _orchestrator = orchestrator;
 
     public async Task<Unit> Handle(UpsertResourceCommand request, CancellationToken cancellationToken)
     {
-        var resource = new TeamMember
-        {
-            Id = request.Id,
-            ResourceId = request.ResourceId,
-            ResourceName = request.ResourceName,
-            Role = request.Role,
-            Team = request.Team,
-            AvailabilityPct = request.AvailabilityPct,
-            DailyCapacity = request.DailyCapacity,
-            StartDate = request.StartDate,
-            Active = request.Active,
-            Notes = request.Notes
-        };
+        var resource = TeamMember.Create(
+            request.ResourceId,
+            request.ResourceName,
+            request.Role,
+            request.Team,
+            request.AvailabilityPct,
+            request.DailyCapacity,
+            request.StartDate,
+            request.Active,
+            request.Notes);
+
+        resource.Id = request.Id;
 
         await _orchestrator.UpsertResourceAsync(resource, request.IsNew, cancellationToken);
         return Unit.Value;
@@ -34,9 +33,9 @@ public sealed class UpsertResourceCommandHandler : IRequestHandler<UpsertResourc
 
 public sealed class DeleteResourceCommandHandler : IRequestHandler<DeleteResourceCommand, Unit>
 {
-    private readonly ISchedulingOrchestrator _orchestrator;
+    private readonly IResourceOrchestrator _orchestrator;
 
-    public DeleteResourceCommandHandler(ISchedulingOrchestrator orchestrator)
+    public DeleteResourceCommandHandler(IResourceOrchestrator orchestrator)
         => _orchestrator = orchestrator;
 
     public async Task<Unit> Handle(DeleteResourceCommand request, CancellationToken cancellationToken)

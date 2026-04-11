@@ -6,9 +6,9 @@ namespace SoftwareDeliveryPlanner.Application.Tasks.Queries;
 
 public sealed class GetTasksQueryHandler : IRequestHandler<GetTasksQuery, List<TaskItem>>
 {
-    private readonly ISchedulingOrchestrator _orchestrator;
+    private readonly ITaskOrchestrator _orchestrator;
 
-    public GetTasksQueryHandler(ISchedulingOrchestrator orchestrator)
+    public GetTasksQueryHandler(ITaskOrchestrator orchestrator)
         => _orchestrator = orchestrator;
 
     public Task<List<TaskItem>> Handle(GetTasksQuery request, CancellationToken cancellationToken)
@@ -17,9 +17,9 @@ public sealed class GetTasksQueryHandler : IRequestHandler<GetTasksQuery, List<T
 
 public sealed class GetTaskCountQueryHandler : IRequestHandler<GetTaskCountQuery, int>
 {
-    private readonly ISchedulingOrchestrator _orchestrator;
+    private readonly ITaskOrchestrator _orchestrator;
 
-    public GetTaskCountQueryHandler(ISchedulingOrchestrator orchestrator)
+    public GetTaskCountQueryHandler(ITaskOrchestrator orchestrator)
         => _orchestrator = orchestrator;
 
     public Task<int> Handle(GetTaskCountQuery request, CancellationToken cancellationToken)

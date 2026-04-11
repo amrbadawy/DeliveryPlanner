@@ -6,23 +6,23 @@ namespace SoftwareDeliveryPlanner.Application.Tasks.Commands;
 
 public sealed class UpsertTaskCommandHandler : IRequestHandler<UpsertTaskCommand, Unit>
 {
-    private readonly ISchedulingOrchestrator _orchestrator;
+    private readonly ITaskOrchestrator _orchestrator;
 
-    public UpsertTaskCommandHandler(ISchedulingOrchestrator orchestrator)
+    public UpsertTaskCommandHandler(ITaskOrchestrator orchestrator)
         => _orchestrator = orchestrator;
 
     public async Task<Unit> Handle(UpsertTaskCommand request, CancellationToken cancellationToken)
     {
-        var task = new TaskItem
-        {
-            Id = request.Id,
-            TaskId = request.TaskId,
-            ServiceName = request.ServiceName,
-            DevEstimation = request.DevEstimation,
-            MaxDev = request.MaxDev,
-            Priority = request.Priority,
-            StrictDate = request.StrictDate
-        };
+        var task = TaskItem.Create(
+            request.TaskId,
+            request.ServiceName,
+            request.DevEstimation,
+            request.MaxDev,
+            request.Priority,
+            request.StrictDate,
+            request.DependsOnTaskIds);
+
+        task.Id = request.Id;
 
         await _orchestrator.UpsertTaskAsync(task, request.IsNew, cancellationToken);
         return Unit.Value;
@@ -31,9 +31,9 @@ public sealed class UpsertTaskCommandHandler : IRequestHandler<UpsertTaskCommand
 
 public sealed class DeleteTaskCommandHandler : IRequestHandler<DeleteTaskCommand, Unit>
 {
-    private readonly ISchedulingOrchestrator _orchestrator;
+    private readonly ITaskOrchestrator _orchestrator;
 
-    public DeleteTaskCommandHandler(ISchedulingOrchestrator orchestrator)
+    public DeleteTaskCommandHandler(ITaskOrchestrator orchestrator)
         => _orchestrator = orchestrator;
 
     public async Task<Unit> Handle(DeleteTaskCommand request, CancellationToken cancellationToken)

@@ -1,4 +1,5 @@
 using SoftwareDeliveryPlanner.Data;
+using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.Models;
 
 namespace SoftwareDeliveryPlanner.Services;
@@ -7,6 +8,7 @@ public class SchedulingEngine
 {
     private readonly PlannerDbContext _db;
     private readonly int _atRiskThreshold;
+    private readonly HashSet<DayOfWeek> _weekendDays;
 
     // In-memory holiday cache — loaded once per RunScheduler call to avoid 1460+ DB queries.
     private List<Holiday>? _holidayCache;
@@ -14,8 +16,11 @@ public class SchedulingEngine
     public SchedulingEngine(PlannerDbContext db)
     {
         _db = db;
-        var setting = _db.Settings.FirstOrDefault(s => s.Key == "at_risk_threshold");
+        var setting = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.AtRiskThreshold);
         _atRiskThreshold = int.TryParse(setting?.Value, out var t) ? t : 5;
+
+        var weekSetting = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.WorkingWeek);
+        _weekendDays = DomainConstants.WorkingWeek.GetWeekendDays(weekSetting?.Value ?? DomainConstants.WorkingWeek.SunThu);
     }
 
     /// <summary>Loads holidays into an in-memory cache if not already loaded.</summary>
@@ -27,9 +32,8 @@ public class SchedulingEngine
 
     public bool IsWorkingDay(DateTime date)
     {
-        // Working days: Sunday(0), Monday(1), Tuesday(2), Wednesday(3), Thursday(4)
-        // Non-working: Friday(5), Saturday(6)
-        if ((int)date.DayOfWeek == 5 || (int)date.DayOfWeek == 6)
+        // Check weekend based on the configured working week
+        if (_weekendDays.Contains(date.DayOfWeek))
             return false;
 
         // Check holidays — date falls within any holiday range
@@ -70,7 +74,7 @@ public class SchedulingEngine
 
         foreach (var resource in resources)
         {
-            if (resource.Active != "Yes") continue;
+            if (resource.Active != DomainConstants.ActiveStatus.Yes) continue;
 
             if (date < resource.StartDate) continue;
             if (resource.EndDate.HasValue && date > resource.EndDate.Value) continue;
@@ -95,15 +99,15 @@ public class SchedulingEngine
 
     private string CalculateRisk(DateTime? plannedFinish, DateTime? strictDate)
     {
-        if (!strictDate.HasValue) return "On Track";
-        if (!plannedFinish.HasValue) return "At Risk";
+        if (!strictDate.HasValue) return DomainConstants.DeliveryRisk.OnTrack;
+        if (!plannedFinish.HasValue) return DomainConstants.DeliveryRisk.AtRisk;
 
-        if (plannedFinish.Value > strictDate.Value) return "Late";
+        if (plannedFinish.Value > strictDate.Value) return DomainConstants.DeliveryRisk.Late;
 
         var workingDaysLeft = GetWorkingDaysBetween(DateTime.Today, strictDate.Value);
-        if (workingDaysLeft <= _atRiskThreshold) return "At Risk";
+        if (workingDaysLeft <= _atRiskThreshold) return DomainConstants.DeliveryRisk.AtRisk;
 
-        return "On Track";
+        return DomainConstants.DeliveryRisk.OnTrack;
     }
 
     public string RunScheduler()
@@ -111,7 +115,7 @@ public class SchedulingEngine
         // Prime the holiday cache once at the start (eliminates 1460+ individual DB queries)
         _holidayCache = _db.Holidays.ToList();
 
-        var planStartSetting = _db.Settings.FirstOrDefault(s => s.Key == "plan_start_date");
+        var planStartSetting = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.PlanStartDate);
         var planStart = DateTime.TryParse(planStartSetting?.Value, out var ps) ? ps : new DateTime(2026, 5, 1);
         var endDate = planStart.AddDays(730);
 
@@ -120,6 +124,21 @@ public class SchedulingEngine
         var adjustments = _db.Adjustments.ToList();
 
         if (!tasks.Any()) return "No tasks to schedule";
+
+        // Build dependency lookup: TaskId -> list of prerequisite TaskIds
+        var dependencyMap = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var task in tasks)
+        {
+            var deps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(task.DependsOnTaskIds))
+            {
+                foreach (var dep in task.DependsOnTaskIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    deps.Add(dep);
+                }
+            }
+            dependencyMap[task.TaskId] = deps;
+        }
 
         // Calculate scheduling ranks
         foreach (var task in tasks)
@@ -191,6 +210,17 @@ public class SchedulingEngine
                 if (overrideStart.HasValue && calDate < overrideStart.Value.Date)
                     continue;
 
+                // Check dependency constraints: all prerequisites must be fully completed
+                if (dependencyMap.TryGetValue(taskId, out var deps) && deps.Count > 0)
+                {
+                    var allDepsCompleted = deps.All(depId =>
+                        taskEffort.ContainsKey(depId) &&
+                        tasks.Any(t => t.TaskId.Equals(depId, StringComparison.OrdinalIgnoreCase) &&
+                                       taskEffort[depId] >= t.DevEstimation));
+                    if (!allDepsCompleted)
+                        continue;
+                }
+
                 var remainingEffort = estimation - taskEffort[taskId];
                 if (remainingEffort <= 0) continue;
 
@@ -225,7 +255,7 @@ public class SchedulingEngine
                     AssignedDev = alloc,
                     CumulativeEffort = taskEffort[taskId] + alloc,
                     IsComplete = (taskEffort[taskId] + alloc) >= estimation,
-                    ServiceStatus = (taskEffort[taskId] + alloc) >= estimation ? "Completed" : "In Progress"
+                    ServiceStatus = (taskEffort[taskId] + alloc) >= estimation ? DomainConstants.TaskStatus.Completed : DomainConstants.TaskStatus.InProgress
                 };
 
                 if (!taskStartDate[taskId].HasValue)
@@ -259,11 +289,11 @@ public class SchedulingEngine
 
             string status;
             if (!plannedStart.HasValue)
-                status = "Not Started";
+                status = DomainConstants.TaskStatus.NotStarted;
             else if (taskEffort[taskId] >= task.DevEstimation)
-                status = "Completed";
+                status = DomainConstants.TaskStatus.Completed;
             else
-                status = "In Progress";
+                status = DomainConstants.TaskStatus.InProgress;
 
             string risk = CalculateRisk(plannedFinish, task.StrictDate);
 
@@ -297,7 +327,7 @@ public class SchedulingEngine
     public Dictionary<string, object> GetDashboardKPIs()
     {
         var tasks = _db.Tasks.ToList();
-        var resources = _db.Resources.Where(r => r.Active == "Yes").ToList();
+        var resources = _db.Resources.Where(r => r.Active == DomainConstants.ActiveStatus.Yes).ToList();
 
         var totalServices = tasks.Count;
         var totalEstimation = tasks.Sum(t => t.DevEstimation);
@@ -308,9 +338,9 @@ public class SchedulingEngine
         var overallFinish = finishDates.Any() ? finishDates.Max() : (DateTime?)null;
 
         var strictCount = tasks.Count(t => t.StrictDate.HasValue);
-        var onTrack = tasks.Count(t => t.DeliveryRisk == "On Track");
-        var atRisk = tasks.Count(t => t.DeliveryRisk == "At Risk");
-        var late = tasks.Count(t => t.DeliveryRisk == "Late");
+        var onTrack = tasks.Count(t => t.DeliveryRisk == DomainConstants.DeliveryRisk.OnTrack);
+        var atRisk = tasks.Count(t => t.DeliveryRisk == DomainConstants.DeliveryRisk.AtRisk);
+        var late = tasks.Count(t => t.DeliveryRisk == DomainConstants.DeliveryRisk.Late);
 
         var assignedDevs = tasks.Where(t => t.AssignedDev.HasValue && t.AssignedDev > 0).Select(t => t.AssignedDev!.Value).ToList();
         var avgAssigned = assignedDevs.Any() ? assignedDevs.Average() : 0;

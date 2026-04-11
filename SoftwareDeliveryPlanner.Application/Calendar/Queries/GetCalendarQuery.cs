@@ -8,9 +8,9 @@ public sealed record GetCalendarQuery : IRequest<List<CalendarDay>>;
 
 public sealed class GetCalendarQueryHandler : IRequestHandler<GetCalendarQuery, List<CalendarDay>>
 {
-    private readonly ISchedulingOrchestrator _orchestrator;
+    private readonly IPlanningQueryService _orchestrator;
 
-    public GetCalendarQueryHandler(ISchedulingOrchestrator orchestrator)
+    public GetCalendarQueryHandler(IPlanningQueryService orchestrator)
         => _orchestrator = orchestrator;
 
     public Task<List<CalendarDay>> Handle(GetCalendarQuery request, CancellationToken cancellationToken)

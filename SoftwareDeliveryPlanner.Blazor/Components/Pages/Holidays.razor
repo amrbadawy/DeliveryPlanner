@@ -6,6 +6,7 @@
 @using SoftwareDeliveryPlanner.Application.Planning.Commands
 @using SoftwareDeliveryPlanner.Application.Abstractions
 @using SoftwareDeliveryPlanner.Models
+@using SoftwareDeliveryPlanner.Domain
 @inject IMediator Mediator
 @inject ISchedulingOrchestrator Orchestrator
 
@@ -176,7 +177,7 @@ else
                                 </span>
                             </td>
                             <td>
-                                <span class="badge bg-@(h.HolidayType == "National" ? "primary" : h.HolidayType == "Religious" ? "warning text-dark" : "info")">
+                                <span class="badge bg-@(h.HolidayType == DomainConstants.HolidayType.National ? "primary" : h.HolidayType == DomainConstants.HolidayType.Religious ? "warning text-dark" : "info")">
                                     @h.HolidayType
                                 </span>
                             </td>
@@ -379,7 +380,7 @@ else
     private string formName = string.Empty;
     private DateTime formStartDate;
     private DateTime formEndDate;
-    private string formType = "National";
+    private string formType = DomainConstants.HolidayType.National;
     private string? formNotes;
 
     // Filters
@@ -461,7 +462,7 @@ else
         formName = string.Empty;
         formStartDate = DateTime.Today;
         formEndDate = DateTime.Today;
-        formType = "National";
+        formType = DomainConstants.HolidayType.National;
         formNotes = null;
         modalError = string.Empty;
         fieldErrors.Clear();

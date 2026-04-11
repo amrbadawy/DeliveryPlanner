@@ -1,3 +1,4 @@
+using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.Domain.SharedKernel;
 using SoftwareDeliveryPlanner.Domain.SharedKernel.ValueObjects;
 using TaskIdVO = SoftwareDeliveryPlanner.Domain.SharedKernel.ValueObjects.TaskId;
@@ -19,10 +20,11 @@ public class TaskItem
     public DateTime? PlannedStart { get; set; }
     public DateTime? PlannedFinish { get; set; }
     public int? Duration { get; set; }
-    public string Status { get; set; } = "Not Started";
-    public string DeliveryRisk { get; set; } = "On Track";
+    public string Status { get; set; } = DomainConstants.TaskStatus.NotStarted;
+    public string DeliveryRisk { get; set; } = DomainConstants.DeliveryRisk.OnTrack;
     public DateTime? OverrideStart { get; set; }
     public double? OverrideDev { get; set; }
+    public string? DependsOnTaskIds { get; set; }
     public string? Comments { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
@@ -38,7 +40,8 @@ public class TaskItem
         double devEstimation,
         double maxDev,
         int priority,
-        DateTime? strictDate = null)
+        DateTime? strictDate = null,
+        string? dependsOnTaskIds = null)
     {
         if (!TaskIdVO.TryCreate(taskId, out _))
             throw new DomainException($"Invalid Task ID '{taskId}'. Expected format: AAA-000.");
@@ -62,7 +65,8 @@ public class TaskItem
             DevEstimation = devEstimation,
             MaxDev = maxDev,
             Priority = priority,
-            StrictDate = strictDate
+            StrictDate = strictDate,
+            DependsOnTaskIds = string.IsNullOrWhiteSpace(dependsOnTaskIds) ? null : dependsOnTaskIds.Trim()
         };
     }
 }

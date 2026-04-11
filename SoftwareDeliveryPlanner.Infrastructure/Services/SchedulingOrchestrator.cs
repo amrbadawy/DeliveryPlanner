@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SoftwareDeliveryPlanner.Application.Abstractions;
 using SoftwareDeliveryPlanner.Data;
+using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.Models;
 using SoftwareDeliveryPlanner.Services;
 
@@ -87,6 +88,7 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
                 existing.MaxDev = task.MaxDev;
                 existing.Priority = task.Priority;
                 existing.StrictDate = task.StrictDate;
+                existing.DependsOnTaskIds = task.DependsOnTaskIds;
                 existing.UpdatedAt = DateTime.Now;
             }
         }
@@ -324,13 +326,17 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         DateTime startDate, DateTime endDate,
         CancellationToken cancellationToken = default)
     {
-        // Count working days in the date range (Sun-Thu, excluding Fri/Sat)
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var weekSetting = await db.Settings
+            .FirstOrDefaultAsync(s => s.Key == DomainConstants.SettingKeys.WorkingWeek, cancellationToken);
+        var weekendDays = DomainConstants.WorkingWeek.GetWeekendDays(
+            weekSetting?.Value ?? DomainConstants.WorkingWeek.SunThu);
+
         int count = 0;
         var current = startDate.Date;
         while (current <= endDate.Date)
         {
-            var dayOfWeek = (int)current.DayOfWeek;
-            if (dayOfWeek != 5 && dayOfWeek != 6) // Not Friday, Not Saturday
+            if (!weekendDays.Contains(current.DayOfWeek))
                 count++;
             current = current.AddDays(1);
         }
@@ -367,7 +373,7 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         var holidays = await db.Holidays.ToListAsync(cancellationToken);
 
         var resourcesList = await db.Resources
-            .Where(r => r.Active == "Yes")
+            .Where(r => r.Active == DomainConstants.ActiveStatus.Yes)
             .OrderBy(r => r.ResourceName)
             .ToListAsync(cancellationToken);
 

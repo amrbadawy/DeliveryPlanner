@@ -1,3 +1,4 @@
+using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.Domain.SharedKernel;
 
 namespace SoftwareDeliveryPlanner.Models;
@@ -8,7 +9,7 @@ public class Holiday
     public string HolidayName { get; set; } = string.Empty;
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
-    public string HolidayType { get; set; } = "National";
+    public string HolidayType { get; set; } = DomainConstants.HolidayType.National;
     public string? Notes { get; set; }
 
     /// <summary>Number of calendar days spanned (inclusive).</summary>
@@ -23,7 +24,7 @@ public class Holiday
         string holidayName,
         DateTime startDate,
         DateTime endDate,
-        string holidayType = "National",
+        string holidayType = DomainConstants.HolidayType.National,
         string? notes = null)
     {
         if (string.IsNullOrWhiteSpace(holidayName))
@@ -46,7 +47,7 @@ public class Holiday
     public static Holiday Create(
         string holidayName,
         DateTime date,
-        string holidayType = "National",
+        string holidayType = DomainConstants.HolidayType.National,
         string? notes = null)
         => Create(holidayName, date, date, holidayType, notes);
 }

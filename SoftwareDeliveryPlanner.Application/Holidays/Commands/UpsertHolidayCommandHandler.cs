@@ -6,9 +6,9 @@ namespace SoftwareDeliveryPlanner.Application.Holidays.Commands;
 
 public sealed class UpsertHolidayCommandHandler : IRequestHandler<UpsertHolidayCommand, Unit>
 {
-    private readonly ISchedulingOrchestrator _orchestrator;
+    private readonly IHolidayOrchestrator _orchestrator;
 
-    public UpsertHolidayCommandHandler(ISchedulingOrchestrator orchestrator)
+    public UpsertHolidayCommandHandler(IHolidayOrchestrator orchestrator)
         => _orchestrator = orchestrator;
 
     public async Task<Unit> Handle(UpsertHolidayCommand request, CancellationToken cancellationToken)
@@ -29,9 +29,9 @@ public sealed class UpsertHolidayCommandHandler : IRequestHandler<UpsertHolidayC
 
 public sealed class DeleteHolidayCommandHandler : IRequestHandler<DeleteHolidayCommand, Unit>
 {
-    private readonly ISchedulingOrchestrator _orchestrator;
+    private readonly IHolidayOrchestrator _orchestrator;
 
-    public DeleteHolidayCommandHandler(ISchedulingOrchestrator orchestrator)
+    public DeleteHolidayCommandHandler(IHolidayOrchestrator orchestrator)
         => _orchestrator = orchestrator;
 
     public async Task<Unit> Handle(DeleteHolidayCommand request, CancellationToken cancellationToken)

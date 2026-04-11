@@ -5,6 +5,7 @@
 @using SoftwareDeliveryPlanner.Application.Resources.Commands
 @using SoftwareDeliveryPlanner.Application.Planning.Commands
 @using SoftwareDeliveryPlanner.Models
+@using SoftwareDeliveryPlanner.Domain
 @inject IMediator Mediator
 
 <PageTitle>Resources</PageTitle>
@@ -14,6 +15,32 @@
 <div class="mb-3">
     <button class="btn btn-primary" @onclick="ShowAddModal" data-testid="resources-add">➕ Add Resource</button>
     <button class="btn btn-secondary" @onclick="RefreshData" data-testid="resources-refresh">🔄 Refresh</button>
+</div>
+
+<!-- Search / Filter bar -->
+<div class="row mb-3 g-2" data-testid="resources-filter-bar">
+    <div class="col-md-4">
+        <input class="form-control" placeholder="Search by ID or name..." @bind="searchTerm" @bind:event="oninput" data-testid="resources-search" />
+    </div>
+    <div class="col-md-2">
+        <select class="form-select" @bind="roleFilter" data-testid="resources-filter-role">
+            <option value="">All Roles</option>
+            <option value="@DomainConstants.ResourceRole.Developer">@DomainConstants.ResourceRole.Developer</option>
+            <option value="@DomainConstants.ResourceRole.SeniorDeveloper">@DomainConstants.ResourceRole.SeniorDeveloper</option>
+            <option value="@DomainConstants.ResourceRole.TechLead">@DomainConstants.ResourceRole.TechLead</option>
+            <option value="@DomainConstants.ResourceRole.QA">@DomainConstants.ResourceRole.QA</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <select class="form-select" @bind="activeFilter" data-testid="resources-filter-active">
+            <option value="">All</option>
+            <option value="@DomainConstants.ActiveStatus.Yes">Active</option>
+            <option value="@DomainConstants.ActiveStatus.No">Inactive</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <button class="btn btn-outline-secondary w-100" @onclick="ClearFilters" data-testid="resources-clear-filters">Clear</button>
+    </div>
 </div>
 
 @if (showModal)
@@ -92,40 +119,33 @@
 
 @if (showDeleteConfirm)
 {
-    <div class="modal d-block" style="background: rgba(0,0,0,0.5);" data-testid="resources-delete-modal">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Confirm Delete</h5>
-                </div>
-                <div class="modal-body">
-                    <p>Are you sure you want to delete this resource?</p>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-danger" @onclick="ConfirmDelete" data-testid="resources-delete-confirm">Delete</button>
-                    <button class="btn btn-secondary" @onclick="CloseDeleteModal" data-testid="resources-delete-cancel">Cancel</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <ConfirmDialog
+        Visible="true"
+        TestId="resources-delete-modal"
+        Title="Confirm Delete"
+        Message="Are you sure you want to delete this resource?"
+        OnConfirm="ConfirmDelete"
+        OnCancel="CloseDeleteModal" />
 }
+
+<ToastNotification @ref="toast" TestId="resources-toast" />
 
 <table class="table table-striped table-hover" data-testid="resources-table">
     <thead class="table-dark">
         <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Role</th>
-            <th>Team</th>
-            <th>Availability %</th>
-            <th>Capacity</th>
-            <th>Start Date</th>
-            <th>Active</th>
+            <th role="button" @onclick='() => ApplySort("ResourceId")' data-testid="resources-sort-id">ID @SortIndicator("ResourceId")</th>
+            <th role="button" @onclick='() => ApplySort("ResourceName")' data-testid="resources-sort-name">Name @SortIndicator("ResourceName")</th>
+            <th role="button" @onclick='() => ApplySort("Role")' data-testid="resources-sort-role">Role @SortIndicator("Role")</th>
+            <th role="button" @onclick='() => ApplySort("Team")' data-testid="resources-sort-team">Team @SortIndicator("Team")</th>
+            <th role="button" @onclick='() => ApplySort("AvailabilityPct")' data-testid="resources-sort-avail">Availability % @SortIndicator("AvailabilityPct")</th>
+            <th role="button" @onclick='() => ApplySort("DailyCapacity")' data-testid="resources-sort-cap">Capacity @SortIndicator("DailyCapacity")</th>
+            <th role="button" @onclick='() => ApplySort("StartDate")' data-testid="resources-sort-start">Start Date @SortIndicator("StartDate")</th>
+            <th role="button" @onclick='() => ApplySort("Active")' data-testid="resources-sort-active">Active @SortIndicator("Active")</th>
             <th>Actions</th>
         </tr>
     </thead>
     <tbody>
-        @foreach (var r in resources)
+        @foreach (var r in FilteredResources)
         {
             <tr data-testid="resources-row-@r.ResourceId">
                 <td>@r.ResourceId</td>
@@ -136,8 +156,8 @@
                 <td>@r.DailyCapacity</td>
                 <td>@r.StartDate.ToString("yyyy-MM-dd")</td>
                 <td>
-                    <span class="badge bg-@(r.Active == "Yes" ? "success" : "secondary")">
-                        @(r.Active == "Yes" ? "Yes" : "No")
+                    <span class="badge bg-@(r.Active == DomainConstants.ActiveStatus.Yes ? "success" : "secondary")">
+                        @(r.Active == DomainConstants.ActiveStatus.Yes ? DomainConstants.ActiveStatus.Yes : DomainConstants.ActiveStatus.No)
                     </span>
                 </td>
                 <td>
@@ -149,6 +169,11 @@
     </tbody>
 </table>
 
+@if (!FilteredResources.Any() && resources.Any())
+{
+    <div class="text-center text-muted py-3" data-testid="resources-no-results">No resources match the current filters.</div>
+}
+
 @code {
     private List<TeamMember> resources = new();
     private bool showModal = false;
@@ -157,6 +182,84 @@
     private TeamMember resourceForm = new();
     private DateTime startDateValue;
     private string modalError = string.Empty;
+    private ToastNotification toast = default!;
+
+    // Search/Sort/Filter state
+    private string searchTerm = string.Empty;
+    private string roleFilter = string.Empty;
+    private string activeFilter = string.Empty;
+    private string sortColumn = string.Empty;
+    private bool sortAscending = true;
+
+    private IEnumerable<TeamMember> FilteredResources
+    {
+        get
+        {
+            IEnumerable<TeamMember> result = resources;
+
+            // Search
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.Trim();
+                result = result.Where(r =>
+                    r.ResourceId.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                    r.ResourceName.Contains(term, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // Filter by role
+            if (!string.IsNullOrEmpty(roleFilter))
+                result = result.Where(r => r.Role == roleFilter);
+
+            // Filter by active status
+            if (!string.IsNullOrEmpty(activeFilter))
+                result = result.Where(r => r.Active == activeFilter);
+
+            // Sort
+            if (!string.IsNullOrEmpty(sortColumn))
+            {
+                result = sortColumn switch
+                {
+                    "ResourceId" => sortAscending ? result.OrderBy(r => r.ResourceId) : result.OrderByDescending(r => r.ResourceId),
+                    "ResourceName" => sortAscending ? result.OrderBy(r => r.ResourceName) : result.OrderByDescending(r => r.ResourceName),
+                    "Role" => sortAscending ? result.OrderBy(r => r.Role) : result.OrderByDescending(r => r.Role),
+                    "Team" => sortAscending ? result.OrderBy(r => r.Team) : result.OrderByDescending(r => r.Team),
+                    "AvailabilityPct" => sortAscending ? result.OrderBy(r => r.AvailabilityPct) : result.OrderByDescending(r => r.AvailabilityPct),
+                    "DailyCapacity" => sortAscending ? result.OrderBy(r => r.DailyCapacity) : result.OrderByDescending(r => r.DailyCapacity),
+                    "StartDate" => sortAscending ? result.OrderBy(r => r.StartDate) : result.OrderByDescending(r => r.StartDate),
+                    "Active" => sortAscending ? result.OrderBy(r => r.Active) : result.OrderByDescending(r => r.Active),
+                    _ => result
+                };
+            }
+
+            return result;
+        }
+    }
+
+    private void ApplySort(string column)
+    {
+        if (sortColumn == column)
+            sortAscending = !sortAscending;
+        else
+        {
+            sortColumn = column;
+            sortAscending = true;
+        }
+    }
+
+    private string SortIndicator(string column)
+    {
+        if (sortColumn != column) return "";
+        return sortAscending ? "▲" : "▼";
+    }
+
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        roleFilter = string.Empty;
+        activeFilter = string.Empty;
+        sortColumn = string.Empty;
+        sortAscending = true;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -174,10 +277,10 @@
         resourceForm = new TeamMember
         {
             ResourceId = $"DEV-{(count + 1):D3}",
-            Role = "Developer",
-            Team = "Delivery",
+            Role = DomainConstants.ResourceRole.Developer,
+            Team = DomainConstants.DefaultTeam,
             StartDate = DateTime.Today,
-            Active = "Yes",
+            Active = DomainConstants.ActiveStatus.Yes,
             AvailabilityPct = 100,
             DailyCapacity = 1
         };
@@ -235,6 +338,7 @@
             await Mediator.Send(command);
             await LoadResources();
             CloseModal();
+            toast.Show(editingResource == null ? "Resource added successfully." : "Resource updated successfully.");
         }
         catch (ValidationException ex)
         {
@@ -247,6 +351,7 @@
         if (editingResource != null)
         {
             await Mediator.Send(new DeleteResourceCommand(editingResource.Id));
+            toast.Show($"Resource \"{editingResource.ResourceName}\" deleted.");
         }
         showDeleteConfirm = false;
         editingResource = null;
@@ -270,5 +375,6 @@
     {
         await Mediator.Send(new RunSchedulerCommand());
         await LoadResources();
+        toast.Show("Schedule refreshed.");
     }
 }

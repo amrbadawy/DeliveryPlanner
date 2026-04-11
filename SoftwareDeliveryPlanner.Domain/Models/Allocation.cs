@@ -1,3 +1,5 @@
+using SoftwareDeliveryPlanner.Domain;
+
 namespace SoftwareDeliveryPlanner.Models;
 
 public class Allocation
@@ -13,7 +15,7 @@ public class Allocation
     public double AssignedDev { get; set; }
     public double CumulativeEffort { get; set; }
     public bool IsComplete { get; set; }
-    public string ServiceStatus { get; set; } = "Not Started";
+    public string ServiceStatus { get; set; } = DomainConstants.TaskStatus.NotStarted;
 
     // Navigation property
     public TaskItem? Task { get; set; }

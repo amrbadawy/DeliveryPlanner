@@ -2,6 +2,7 @@
 @using MediatR
 @using SoftwareDeliveryPlanner.Application.Output.Queries
 @using SoftwareDeliveryPlanner.Application.Planning.Commands
+@using SoftwareDeliveryPlanner.Domain
 @inject IMediator Mediator
 @inject IJSRuntime JS
 
@@ -77,8 +78,8 @@
     {
         return status switch
         {
-            "Completed" => "success",
-            "In Progress" => "info",
+            DomainConstants.TaskStatus.Completed => "success",
+            DomainConstants.TaskStatus.InProgress => "info",
             _ => "secondary"
         };
     }
@@ -87,9 +88,9 @@
     {
         return risk switch
         {
-            "On Track" => "success",
-            "At Risk" => "warning",
-            "Late" => "danger",
+            DomainConstants.DeliveryRisk.OnTrack => "success",
+            DomainConstants.DeliveryRisk.AtRisk => "warning",
+            DomainConstants.DeliveryRisk.Late => "danger",
             _ => "secondary"
         };
     }

@@ -11,6 +11,7 @@ public sealed record UpsertTaskCommand(
     double MaxDev,
     int Priority,
     DateTime? StrictDate,
+    string? DependsOnTaskIds,
     bool IsNew) : IRequest<Unit>;
 
 public sealed record DeleteTaskCommand(int Id) : IRequest<Unit>;

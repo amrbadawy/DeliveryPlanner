@@ -1,5 +1,6 @@
 using NetArchTest.Rules;
 using System.Collections;
+using System.Reflection;
 
 namespace SoftwareDeliveryPlanner.ArchTests;
 
@@ -75,6 +76,36 @@ public class DependencyRulesTests
             .GetResult();
 
         Assert.True(result.IsSuccessful, BuildFailureMessage(result.FailingTypeNames));
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Architecture Rule: No enums — use LookupValue entities
+    // ─────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("Domain")]
+    [InlineData("Application")]
+    [InlineData("Infrastructure")]
+    public void No_Enums_Allowed_In_Project(string layer)
+    {
+        var assembly = layer switch
+        {
+            "Domain" => typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly,
+            "Application" => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
+            "Infrastructure" => typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly,
+            _ => throw new ArgumentException($"Unknown layer: {layer}")
+        };
+
+        var enums = assembly.GetTypes()
+            .Where(t => t.IsEnum && t.IsPublic)
+            .Select(t => t.FullName ?? t.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(
+            enums.Count == 0,
+            $"Enums are forbidden (use LookupValue entities instead). " +
+            $"Found in {layer}: {string.Join(", ", enums)}");
     }
 
     private static string BuildFailureMessage(IReadOnlyCollection<string> failingTypes)

@@ -10,9 +10,9 @@ public sealed record GetTimelineQuery(
 
 public sealed class GetTimelineQueryHandler : IRequestHandler<GetTimelineQuery, TimelineDataDto>
 {
-    private readonly ISchedulingOrchestrator _orchestrator;
+    private readonly IPlanningQueryService _orchestrator;
 
-    public GetTimelineQueryHandler(ISchedulingOrchestrator orchestrator)
+    public GetTimelineQueryHandler(IPlanningQueryService orchestrator)
         => _orchestrator = orchestrator;
 
     public Task<TimelineDataDto> Handle(GetTimelineQuery request, CancellationToken cancellationToken)

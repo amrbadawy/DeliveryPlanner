@@ -1,3 +1,4 @@
+using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.Domain.SharedKernel;
 using SoftwareDeliveryPlanner.Domain.SharedKernel.ValueObjects;
 
@@ -10,7 +11,7 @@ public class Adjustment
     public DateTime AdjStart { get; set; }
     public DateTime AdjEnd { get; set; }
     public double AvailabilityPct { get; set; }
-    public string AdjType { get; set; } = "Other";
+    public string AdjType { get; set; } = DomainConstants.AdjustmentType.Other;
     public string? Notes { get; set; }
 
     // Navigation property

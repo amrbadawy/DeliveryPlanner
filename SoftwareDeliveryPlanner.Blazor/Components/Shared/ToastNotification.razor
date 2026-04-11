@@ -1,0 +1,62 @@
+@* Reusable toast notification. Auto-hides after a configurable duration. *@
+
+@if (isVisible)
+{
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+        <div class="toast show border-0 shadow" data-testid="@TestId">
+            <div class="toast-body d-flex align-items-center gap-2 bg-@CssClass text-white rounded">
+                <i class="bi @IconClass"></i>
+                <span>@Message</span>
+                <button type="button" class="btn-close btn-close-white ms-auto" @onclick="Hide"></button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string TestId { get; set; } = "toast";
+
+    private bool isVisible;
+    private string Message = string.Empty;
+    private string CssClass = "success";
+    private string IconClass = "bi-check-circle-fill";
+    private System.Threading.Timer? _timer;
+
+    public void Show(string message, string type = "success", int durationMs = 3000)
+    {
+        Message = message;
+        CssClass = type switch
+        {
+            "error" => "danger",
+            "warning" => "warning",
+            _ => "success"
+        };
+        IconClass = type switch
+        {
+            "error" => "bi-exclamation-triangle-fill",
+            "warning" => "bi-exclamation-circle-fill",
+            _ => "bi-check-circle-fill"
+        };
+        isVisible = true;
+        InvokeAsync(StateHasChanged);
+
+        _timer?.Dispose();
+        _timer = new System.Threading.Timer(_ =>
+        {
+            isVisible = false;
+            InvokeAsync(StateHasChanged);
+        }, null, durationMs, Timeout.Infinite);
+    }
+
+    public void Hide()
+    {
+        isVisible = false;
+        _timer?.Dispose();
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}

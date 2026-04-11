@@ -34,6 +34,10 @@ test.describe('Navigation and dashboard', () => {
     await page.getByTestId('nav-output').click();
     await expect(page).toHaveURL(/\/output$/);
     await expect(page.getByRole('heading', { name: /Delivery Plan/ })).toBeVisible();
+
+    await page.getByTestId('nav-gantt').click();
+    await expect(page).toHaveURL(/\/gantt$/);
+    await expect(page.getByRole('heading', { name: /Gantt Chart/ })).toBeVisible();
   });
 
   test('runs scheduler from dashboard and shows message', async ({ page }) => {

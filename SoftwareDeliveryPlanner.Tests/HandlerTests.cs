@@ -118,6 +118,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             MaxDev: 2,
             Priority: 3,
             StrictDate: null,
+            DependsOnTaskIds: null,
             IsNew: true);
 
         await handler.Handle(command, CancellationToken.None);
@@ -142,6 +143,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             MaxDev: existing.MaxDev,
             Priority: existing.Priority,
             StrictDate: null,
+            DependsOnTaskIds: null,
             IsNew: false);
 
         await handler.Handle(command, CancellationToken.None);
@@ -164,11 +166,52 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             MaxDev: 1,
             Priority: 1,
             StrictDate: strictDate,
+            DependsOnTaskIds: null,
             IsNew: true), CancellationToken.None);
 
         await using var db = await Factory.CreateDbContextAsync();
         var task = await db.Tasks.FirstAsync(t => t.TaskId == "STR-01");
         Assert.Equal(strictDate, task.StrictDate);
+    }
+
+    [Fact]
+    public async Task Handle_NewTask_WithDependsOnTaskIds_PersistsDependencies()
+    {
+        var handler = new UpsertTaskCommandHandler(Orchestrator);
+        await handler.Handle(new UpsertTaskCommand(
+            Id: 0,
+            TaskId: "DEP-01",
+            ServiceName: "Dependent Task",
+            DevEstimation: 5,
+            MaxDev: 1,
+            Priority: 1,
+            StrictDate: null,
+            DependsOnTaskIds: "SVC-001,SVC-002",
+            IsNew: true), CancellationToken.None);
+
+        await using var db = await Factory.CreateDbContextAsync();
+        var task = await db.Tasks.FirstAsync(t => t.TaskId == "DEP-01");
+        Assert.Equal("SVC-001,SVC-002", task.DependsOnTaskIds);
+    }
+
+    [Fact]
+    public async Task Handle_NewTask_WithNullDependsOnTaskIds_PersistsNull()
+    {
+        var handler = new UpsertTaskCommandHandler(Orchestrator);
+        await handler.Handle(new UpsertTaskCommand(
+            Id: 0,
+            TaskId: "NDP-01",
+            ServiceName: "No Deps Task",
+            DevEstimation: 3,
+            MaxDev: 1,
+            Priority: 1,
+            StrictDate: null,
+            DependsOnTaskIds: null,
+            IsNew: true), CancellationToken.None);
+
+        await using var db = await Factory.CreateDbContextAsync();
+        var task = await db.Tasks.FirstAsync(t => t.TaskId == "NDP-01");
+        Assert.Null(task.DependsOnTaskIds);
     }
 }
 
@@ -208,7 +251,7 @@ public class UpsertTaskCommandValidatorTests
     private static UpsertTaskCommand Valid() => new(
         Id: 0, TaskId: "SVC-001", ServiceName: "My Service",
         DevEstimation: 5, MaxDev: 2, Priority: 5,
-        StrictDate: null, IsNew: true);
+        StrictDate: null, DependsOnTaskIds: null, IsNew: true);
 
     [Fact]
     public void Valid_Command_PassesValidation()

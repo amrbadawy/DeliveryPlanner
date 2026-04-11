@@ -5,9 +5,9 @@ namespace SoftwareDeliveryPlanner.Application.DeliveryInsights.Queries;
 
 public sealed class GetDashboardKpisQueryHandler : IRequestHandler<GetDashboardKpisQuery, DashboardKpisDto>
 {
-    private readonly ISchedulingOrchestrator _orchestrator;
+    private readonly ISchedulerService _orchestrator;
 
-    public GetDashboardKpisQueryHandler(ISchedulingOrchestrator orchestrator)
+    public GetDashboardKpisQueryHandler(ISchedulerService orchestrator)
     {
         _orchestrator = orchestrator;
     }
