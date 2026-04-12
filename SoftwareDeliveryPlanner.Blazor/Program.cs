@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SoftwareDeliveryPlanner.Application;
+using SoftwareDeliveryPlanner.Application.Abstractions;
 using SoftwareDeliveryPlanner.Blazor.Components;
 using SoftwareDeliveryPlanner.Data;
 using SoftwareDeliveryPlanner.Infrastructure;
@@ -15,12 +16,15 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
-// Initialize database
+// Apply pending migrations and seed data
 using (var scope = app.Services.CreateScope())
 {
     var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<PlannerDbContext>>();
-    using var db = dbFactory.CreateDbContext();
-    db.InitializeDefaultData();
+    await using var db = await dbFactory.CreateDbContextAsync();
+    await db.Database.MigrateAsync();
+
+    var seeder = scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>();
+    await seeder.SeedAsync();
 }
 
 // Configure the HTTP request pipeline.

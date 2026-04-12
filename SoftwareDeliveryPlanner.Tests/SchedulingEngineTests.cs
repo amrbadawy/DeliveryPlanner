@@ -2,23 +2,20 @@ using Microsoft.EntityFrameworkCore;
 using SoftwareDeliveryPlanner.Data;
 using SoftwareDeliveryPlanner.Models;
 using SoftwareDeliveryPlanner.Services;
+using SoftwareDeliveryPlanner.Tests.Infrastructure;
 
 namespace SoftwareDeliveryPlanner.Tests;
 
+[Collection(DatabaseCollection.Name)]
 public class SchedulingEngineTests : IDisposable
 {
     private readonly PlannerDbContext _db;
     private readonly SchedulingEngine _engine;
 
-    public SchedulingEngineTests()
+    public SchedulingEngineTests(SqlServerContainerFixture fixture)
     {
-        var options = new DbContextOptionsBuilder<PlannerDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .Options;
-
+        var options = TestDatabaseHelper.CreateOptions(fixture);
         _db = new PlannerDbContext(options);
-        _db.Database.EnsureCreated();
-        _db.InitializeDefaultData();
         _engine = new SchedulingEngine(_db);
     }
 
@@ -593,20 +590,16 @@ public class SchedulingEngineTests : IDisposable
 // Mon-Fri working week configuration tests
 // ============================================================
 
+[Collection(DatabaseCollection.Name)]
 public class SchedulingEngineMonFriTests : IDisposable
 {
     private readonly PlannerDbContext _db;
     private readonly SchedulingEngine _engine;
 
-    public SchedulingEngineMonFriTests()
+    public SchedulingEngineMonFriTests(SqlServerContainerFixture fixture)
     {
-        var options = new DbContextOptionsBuilder<PlannerDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .Options;
-
+        var options = TestDatabaseHelper.CreateOptions(fixture);
         _db = new PlannerDbContext(options);
-        _db.Database.EnsureCreated();
-        _db.InitializeDefaultData();
 
         // Change working week to Mon-Fri
         var weekSetting = _db.Settings.First(s => s.Key == "working_week");
@@ -676,8 +669,11 @@ public class SchedulingEngineMonFriTests : IDisposable
 
         _engine.RunScheduler();
 
+        // DayOfWeek cannot be translated to SQL Server — evaluate client-side
+        var allCalDays = _db.Calendar.ToList();
+
         // Saturday and Sunday should have zero capacity
-        var weekendDays = _db.Calendar
+        var weekendDays = allCalDays
             .Where(c => c.CalendarDate.DayOfWeek == DayOfWeek.Saturday
                      || c.CalendarDate.DayOfWeek == DayOfWeek.Sunday)
             .Take(10)
@@ -691,7 +687,7 @@ public class SchedulingEngineMonFriTests : IDisposable
         });
 
         // Friday should be working
-        var fridayDays = _db.Calendar
+        var fridayDays = allCalDays
             .Where(c => c.CalendarDate.DayOfWeek == DayOfWeek.Friday && !c.IsHoliday)
             .Take(5)
             .ToList();

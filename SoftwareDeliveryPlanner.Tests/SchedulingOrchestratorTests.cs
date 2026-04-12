@@ -3,6 +3,7 @@ using SoftwareDeliveryPlanner.Application.Abstractions;
 using SoftwareDeliveryPlanner.Data;
 using SoftwareDeliveryPlanner.Infrastructure.Services;
 using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Tests.Infrastructure;
 
 namespace SoftwareDeliveryPlanner.Tests;
 
@@ -11,22 +12,15 @@ namespace SoftwareDeliveryPlanner.Tests;
 /// These tests verify that the orchestrator correctly adapts SchedulingEngine results
 /// into the DashboardKpisDto expected by the Application layer.
 /// </summary>
+[Collection(DatabaseCollection.Name)]
 public class SchedulingOrchestratorTests : IAsyncDisposable
 {
     private readonly IDbContextFactory<PlannerDbContext> _factory;
 
-    public SchedulingOrchestratorTests()
+    public SchedulingOrchestratorTests(SqlServerContainerFixture fixture)
     {
-        var options = new DbContextOptionsBuilder<PlannerDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .Options;
-
+        var options = TestDatabaseHelper.CreateOptions(fixture);
         _factory = new TestDbContextFactory(options);
-
-        // Seed default data via the first context
-        using var db = new PlannerDbContext(options);
-        db.Database.EnsureCreated();
-        db.InitializeDefaultData();
     }
 
     public async ValueTask DisposeAsync() => await Task.CompletedTask;
@@ -949,26 +943,4 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     }
 
     #endregion
-}
-
-// ---------------------------------------------------------------------------
-// Test helper: minimal IDbContextFactory implementation
-// ---------------------------------------------------------------------------
-
-file sealed class TestDbContextFactory : IDbContextFactory<PlannerDbContext>
-{
-    private readonly DbContextOptions<PlannerDbContext> _options;
-
-    public TestDbContextFactory(DbContextOptions<PlannerDbContext> options)
-    {
-        _options = options;
-    }
-
-    public PlannerDbContext CreateDbContext() => new(_options);
-
-    public Task<PlannerDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(new PlannerDbContext(_options));
-    }
 }

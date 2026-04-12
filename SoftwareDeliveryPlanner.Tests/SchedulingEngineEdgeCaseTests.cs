@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SoftwareDeliveryPlanner.Data;
 using SoftwareDeliveryPlanner.Models;
 using SoftwareDeliveryPlanner.Services;
+using SoftwareDeliveryPlanner.Tests.Infrastructure;
 
 namespace SoftwareDeliveryPlanner.Tests;
 
@@ -9,20 +10,16 @@ namespace SoftwareDeliveryPlanner.Tests;
 /// Edge-case tests for SchedulingEngine covering code paths not exercised
 /// by the main SchedulingEngineTests fixture.
 /// </summary>
+[Collection(DatabaseCollection.Name)]
 public class SchedulingEngineEdgeCaseTests : IDisposable
 {
     private readonly PlannerDbContext _db;
     private readonly SchedulingEngine _engine;
 
-    public SchedulingEngineEdgeCaseTests()
+    public SchedulingEngineEdgeCaseTests(SqlServerContainerFixture fixture)
     {
-        var options = new DbContextOptionsBuilder<PlannerDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .Options;
-
+        var options = TestDatabaseHelper.CreateOptions(fixture);
         _db = new PlannerDbContext(options);
-        _db.Database.EnsureCreated();
-        _db.InitializeDefaultData();
         _engine = new SchedulingEngine(_db);
     }
 
@@ -889,7 +886,9 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     {
         _engine.RunScheduler();
 
+        // DayOfWeek cannot be translated to SQL Server — evaluate client-side
         var weekendCalDays = _db.Calendar
+            .ToList()
             .Where(c => c.CalendarDate.DayOfWeek == DayOfWeek.Friday
                      || c.CalendarDate.DayOfWeek == DayOfWeek.Saturday)
             .Take(10)
@@ -912,9 +911,12 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     {
         _engine.RunScheduler();
 
+        // DayOfWeek cannot be translated to SQL Server — evaluate client-side
         var holidayCalDays = _db.Calendar
-            .Where(c => c.IsHoliday && c.CalendarDate.DayOfWeek != DayOfWeek.Friday
-                                     && c.CalendarDate.DayOfWeek != DayOfWeek.Saturday)
+            .Where(c => c.IsHoliday)
+            .ToList()
+            .Where(c => c.CalendarDate.DayOfWeek != DayOfWeek.Friday
+                     && c.CalendarDate.DayOfWeek != DayOfWeek.Saturday)
             .Take(5)
             .ToList();
 
