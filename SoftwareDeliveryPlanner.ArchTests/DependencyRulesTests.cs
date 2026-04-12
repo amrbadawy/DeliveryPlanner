@@ -292,4 +292,20 @@ public class DependencyRulesTests
 
         Assert.True(result.IsSuccessful, BuildFailureMessage(result.FailingTypeNames));
     }
+
+    // ─────────────────────────────────────────────────────────
+    // Architecture Rule: Application layer must not reference EF Core
+    // ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Application_Does_Not_Depend_On_EntityFramework()
+    {
+        var result = Types
+            .InAssembly(typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly)
+            .ShouldNot()
+            .HaveDependencyOn("Microsoft.EntityFrameworkCore")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, BuildFailureMessage(result.FailingTypeNames));
+    }
 }
