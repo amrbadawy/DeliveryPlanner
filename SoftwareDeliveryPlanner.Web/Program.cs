@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SoftwareDeliveryPlanner.Application;
 using SoftwareDeliveryPlanner.Application.Abstractions;
-using SoftwareDeliveryPlanner.Blazor.Components;
+using SoftwareDeliveryPlanner.Web.Components;
 using SoftwareDeliveryPlanner.Data;
 using SoftwareDeliveryPlanner.Infrastructure;
 

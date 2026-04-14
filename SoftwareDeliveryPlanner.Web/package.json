@@ -1,7 +1,7 @@
 {
-  "name": "softwaredeliveryplanner.blazor",
+  "name": "softwaredeliveryplanner.web",
   "version": "1.0.0",
-  "description": "Playwright e2e tests for SoftwareDeliveryPlanner.Blazor",
+  "description": "Playwright e2e tests for SoftwareDeliveryPlanner.Web",
   "scripts": {
     "test:e2e:smoke": "playwright test tests/e2e/smoke.spec.ts",
     "test:e2e": "playwright test",

@@ -41,7 +41,7 @@ jobs:
           node-version: '22'
 
       - name: Install Playwright Dependencies
-        working-directory: SoftwareDeliveryPlanner.Blazor
+        working-directory: SoftwareDeliveryPlanner.Web
         run: npm ci
 
       - name: Verify License Policy
@@ -49,5 +49,5 @@ jobs:
         run: .github/scripts/verify-licenses.ps1 -RootPath . -PolicyFile .github/license-policy.json
 
       - name: Playwright Smoke
-        working-directory: SoftwareDeliveryPlanner.Blazor
+        working-directory: SoftwareDeliveryPlanner.Web
         run: npm run test:e2e:smoke

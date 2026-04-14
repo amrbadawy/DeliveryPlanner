@@ -32,12 +32,12 @@ public class DependencyRulesTests
     }
 
     [Fact]
-    public void Domain_Does_Not_Depend_On_Blazor()
+    public void Domain_Does_Not_Depend_On_Web()
     {
         var result = Types
             .InAssembly(typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly)
             .ShouldNot()
-            .HaveDependencyOn("SoftwareDeliveryPlanner.Blazor")
+            .HaveDependencyOn("SoftwareDeliveryPlanner.Web")
             .GetResult();
 
         Assert.True(result.IsSuccessful, BuildFailureMessage(result.FailingTypeNames));
@@ -56,24 +56,24 @@ public class DependencyRulesTests
     }
 
     [Fact]
-    public void Application_Does_Not_Depend_On_Blazor()
+    public void Application_Does_Not_Depend_On_Web()
     {
         var result = Types
             .InAssembly(typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly)
             .ShouldNot()
-            .HaveDependencyOn("SoftwareDeliveryPlanner.Blazor")
+            .HaveDependencyOn("SoftwareDeliveryPlanner.Web")
             .GetResult();
 
         Assert.True(result.IsSuccessful, BuildFailureMessage(result.FailingTypeNames));
     }
 
     [Fact]
-    public void Infrastructure_Does_Not_Depend_On_Blazor()
+    public void Infrastructure_Does_Not_Depend_On_Web()
     {
         var result = Types
             .InAssembly(typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly)
             .ShouldNot()
-            .HaveDependencyOn("SoftwareDeliveryPlanner.Blazor")
+            .HaveDependencyOn("SoftwareDeliveryPlanner.Web")
             .GetResult();
 
         Assert.True(result.IsSuccessful, BuildFailureMessage(result.FailingTypeNames));
@@ -190,8 +190,8 @@ public class DependencyRulesTests
     }
 
     // ─────────────────────────────────────────────────────────
-    // Architecture Rule: No enums in Blazor project
-    // Note: Blazor assembly requires ASP.NET Core runtime which
+    // Architecture Rule: No enums in Web project
+    // Note: Web assembly requires ASP.NET Core runtime which
     // is not available in the test runner. The enum ban for
     // Domain/Application/Infrastructure is enforced by the
     // No_Enums_Allowed_In_Project test above.

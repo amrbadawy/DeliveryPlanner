@@ -4,7 +4,7 @@ This repository contains a Blazor application and a shared test project for soft
 
 ## Projects
 
-- `SoftwareDeliveryPlanner.Blazor/` - Blazor web application.
+- `SoftwareDeliveryPlanner.Web/` - Blazor web application.
 - `SoftwareDeliveryPlanner.Tests/` - xUnit tests.
 - `SoftwareDeliveryPlanner.slnx` - Solution file.
 
@@ -16,7 +16,7 @@ This repository contains a Blazor application and a shared test project for soft
 
 ## Bootstrap Assets
 
-Bootstrap files under `SoftwareDeliveryPlanner.Blazor/wwwroot/lib/bootstrap/` are intentionally vendored and committed.
+Bootstrap files under `SoftwareDeliveryPlanner.Web/wwwroot/lib/bootstrap/` are intentionally vendored and committed.
 
 ## Build and Test
 
@@ -30,8 +30,8 @@ dotnet test SoftwareDeliveryPlanner.ArchTests/SoftwareDeliveryPlanner.ArchTests.
 
 # Optional but recommended quality gates
 pwsh .github/scripts/verify-licenses.ps1 -RootPath . -PolicyFile .github/license-policy.json
-npm --prefix SoftwareDeliveryPlanner.Blazor ci
-npm --prefix SoftwareDeliveryPlanner.Blazor run test:e2e:smoke
+npm --prefix SoftwareDeliveryPlanner.Web ci
+npm --prefix SoftwareDeliveryPlanner.Web run test:e2e:smoke
 ```
 
 ## Run Applications
@@ -39,7 +39,7 @@ npm --prefix SoftwareDeliveryPlanner.Blazor run test:e2e:smoke
 ### Blazor App
 
 ```bash
-dotnet run --project SoftwareDeliveryPlanner.Blazor/SoftwareDeliveryPlanner.Blazor.csproj
+dotnet run --project SoftwareDeliveryPlanner.Web/SoftwareDeliveryPlanner.Web.csproj
 ```
 
 ## CI
