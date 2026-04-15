@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SoftwareDeliveryPlanner.Application.Abstractions;
-using SoftwareDeliveryPlanner.Data;
 using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Infrastructure.Services;
 
@@ -20,8 +19,10 @@ public static class DependencyInjection
             options.UseSqlServer(connectionString);
         });
 
+        services.AddScoped<IDatabaseMigrator, DatabaseMigrator>();
         services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
         services.AddScoped<ISchedulingOrchestrator, SchedulingOrchestrator>();
+        services.AddSingleton(TimeProvider.System);
 
         // Forward focused interfaces to the composite orchestrator instance
         services.AddScoped<ISchedulerService>(sp => sp.GetRequiredService<ISchedulingOrchestrator>());

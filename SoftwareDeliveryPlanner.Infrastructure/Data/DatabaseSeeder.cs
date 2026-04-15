@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using SoftwareDeliveryPlanner.Application.Abstractions;
-using SoftwareDeliveryPlanner.Data;
+using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Domain;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Infrastructure.Data;
 
@@ -11,7 +11,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Data;
 /// Lookup/reference data is handled by EF Core HasData() in migrations.
 /// This seeder handles environment-specific data that may vary per deployment.
 /// </summary>
-public class DatabaseSeeder : IDatabaseSeeder
+internal sealed class DatabaseSeeder : IDatabaseSeeder
 {
     private readonly IDbContextFactory<PlannerDbContext> _dbFactory;
 

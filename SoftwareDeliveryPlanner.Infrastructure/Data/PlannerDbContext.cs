@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
-namespace SoftwareDeliveryPlanner.Data;
+namespace SoftwareDeliveryPlanner.Infrastructure.Data;
 
-public class PlannerDbContext : DbContext
+internal class PlannerDbContext : DbContext
 {
     public DbSet<TaskItem> Tasks { get; set; }
     public DbSet<TeamMember> Resources { get; set; }

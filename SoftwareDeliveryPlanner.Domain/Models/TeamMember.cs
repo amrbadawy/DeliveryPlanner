@@ -3,7 +3,7 @@ using SoftwareDeliveryPlanner.Domain.SharedKernel;
 using ResourceIdVO = SoftwareDeliveryPlanner.Domain.SharedKernel.ValueObjects.ResourceId;
 using PercentageVO = SoftwareDeliveryPlanner.Domain.SharedKernel.ValueObjects.Percentage;
 
-namespace SoftwareDeliveryPlanner.Models;
+namespace SoftwareDeliveryPlanner.Domain.Models;
 
 public class TeamMember
 {
@@ -18,7 +18,7 @@ public class TeamMember
     public DateTime? EndDate { get; set; }
     public string Active { get; set; } = DomainConstants.ActiveStatus.Yes;
     public string? Notes { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime CreatedAt { get; set; }
 
     // ── Domain factory ────────────────────────────────────────────────────────
     /// <summary>

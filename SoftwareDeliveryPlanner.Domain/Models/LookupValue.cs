@@ -1,4 +1,4 @@
-namespace SoftwareDeliveryPlanner.Models;
+namespace SoftwareDeliveryPlanner.Domain.Models;
 
 /// <summary>
 /// Generic lookup entity stored in the database. All categorical values

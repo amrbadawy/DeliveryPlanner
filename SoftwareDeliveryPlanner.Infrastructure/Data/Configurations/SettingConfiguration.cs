@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Infrastructure.Data.Configurations;
 
-public class SettingConfiguration : IEntityTypeConfiguration<Setting>
+public sealed class SettingConfiguration : IEntityTypeConfiguration<Setting>
 {
     public void Configure(EntityTypeBuilder<Setting> builder)
     {

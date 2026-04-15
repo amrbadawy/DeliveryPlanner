@@ -1,12 +1,12 @@
 using MediatR;
 using SoftwareDeliveryPlanner.Application.Abstractions;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Application.Calendar.Queries;
 
 public sealed record GetCalendarQuery : IRequest<List<CalendarDay>>;
 
-public sealed class GetCalendarQueryHandler : IRequestHandler<GetCalendarQuery, List<CalendarDay>>
+internal sealed class GetCalendarQueryHandler : IRequestHandler<GetCalendarQuery, List<CalendarDay>>
 {
     private readonly IPlanningQueryService _orchestrator;
 

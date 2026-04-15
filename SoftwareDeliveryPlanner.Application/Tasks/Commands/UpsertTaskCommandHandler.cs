@@ -1,10 +1,10 @@
 using MediatR;
 using SoftwareDeliveryPlanner.Application.Abstractions;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Application.Tasks.Commands;
 
-public sealed class UpsertTaskCommandHandler : IRequestHandler<UpsertTaskCommand, Unit>
+internal sealed class UpsertTaskCommandHandler : IRequestHandler<UpsertTaskCommand, Unit>
 {
     private readonly ITaskOrchestrator _orchestrator;
 
@@ -29,7 +29,7 @@ public sealed class UpsertTaskCommandHandler : IRequestHandler<UpsertTaskCommand
     }
 }
 
-public sealed class DeleteTaskCommandHandler : IRequestHandler<DeleteTaskCommand, Unit>
+internal sealed class DeleteTaskCommandHandler : IRequestHandler<DeleteTaskCommand, Unit>
 {
     private readonly ITaskOrchestrator _orchestrator;
 

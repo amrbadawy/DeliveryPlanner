@@ -3,7 +3,7 @@ using SoftwareDeliveryPlanner.Application.Abstractions;
 
 namespace SoftwareDeliveryPlanner.Application.Planning.Commands;
 
-public sealed class RunSchedulerCommandHandler : IRequestHandler<RunSchedulerCommand, string>
+internal sealed class RunSchedulerCommandHandler : IRequestHandler<RunSchedulerCommand, string>
 {
     private readonly ISchedulerService _orchestrator;
 

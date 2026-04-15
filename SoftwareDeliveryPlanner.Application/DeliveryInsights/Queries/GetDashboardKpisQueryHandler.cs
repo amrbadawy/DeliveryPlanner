@@ -3,7 +3,7 @@ using SoftwareDeliveryPlanner.Application.Abstractions;
 
 namespace SoftwareDeliveryPlanner.Application.DeliveryInsights.Queries;
 
-public sealed class GetDashboardKpisQueryHandler : IRequestHandler<GetDashboardKpisQuery, DashboardKpisDto>
+internal sealed class GetDashboardKpisQueryHandler : IRequestHandler<GetDashboardKpisQuery, DashboardKpisDto>
 {
     private readonly ISchedulerService _orchestrator;
 

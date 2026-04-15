@@ -1,4 +1,4 @@
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Application.Abstractions;
 
@@ -66,5 +66,5 @@ public interface IPlanningQueryService
 {
     Task<List<CalendarDay>> GetCalendarAsync(CancellationToken cancellationToken = default);
     Task<TimelineDataDto> GetTimelineDataAsync(string resourceId, DateTime start, DateTime end, CancellationToken cancellationToken = default);
-    Task<List<Dictionary<string, object?>>> GetOutputPlanAsync(CancellationToken cancellationToken = default);
+    Task<List<OutputPlanRowDto>> GetOutputPlanAsync(CancellationToken cancellationToken = default);
 }

@@ -1,19 +1,22 @@
 using Microsoft.EntityFrameworkCore;
 using SoftwareDeliveryPlanner.Application.Abstractions;
-using SoftwareDeliveryPlanner.Data;
+using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Domain;
-using SoftwareDeliveryPlanner.Models;
-using SoftwareDeliveryPlanner.Services;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Infrastructure.Services;
 
-public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
+internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
 {
     private readonly IDbContextFactory<PlannerDbContext> _dbFactory;
+    private readonly TimeProvider _timeProvider;
 
-    public SchedulingOrchestrator(IDbContextFactory<PlannerDbContext> dbFactory)
+    public SchedulingOrchestrator(
+        IDbContextFactory<PlannerDbContext> dbFactory,
+        TimeProvider timeProvider)
     {
         _dbFactory = dbFactory;
+        _timeProvider = timeProvider;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -23,7 +26,7 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
     public async Task<string> RunSchedulerAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        var scheduler = new SchedulingEngine(db);
+        var scheduler = new SchedulingEngine(db, _timeProvider);
         return scheduler.RunScheduler();
     }
 
@@ -34,7 +37,7 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
     public async Task<DashboardKpisDto> GetDashboardKpisAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        var scheduler = new SchedulingEngine(db);
+        var scheduler = new SchedulingEngine(db, _timeProvider);
         var kpis = scheduler.GetDashboardKPIs();
 
         var rawFinish = kpis["overall_finish"] as DateTime?;
@@ -71,11 +74,12 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
     public async Task UpsertTaskAsync(TaskItem task, bool isNew, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var now = _timeProvider.GetLocalNow().LocalDateTime;
 
         if (isNew)
         {
-            task.CreatedAt = DateTime.Now;
-            task.UpdatedAt = DateTime.Now;
+            task.CreatedAt = now;
+            task.UpdatedAt = now;
             db.Tasks.Add(task);
         }
         else
@@ -89,14 +93,14 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
                 existing.Priority = task.Priority;
                 existing.StrictDate = task.StrictDate;
                 existing.DependsOnTaskIds = task.DependsOnTaskIds;
-                existing.UpdatedAt = DateTime.Now;
+                existing.UpdatedAt = now;
             }
         }
 
         await db.SaveChangesAsync(cancellationToken);
 
         await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        new SchedulingEngine(schedulerDb).RunScheduler();
+        new SchedulingEngine(schedulerDb, _timeProvider).RunScheduler();
     }
 
     public async Task DeleteTaskAsync(int id, CancellationToken cancellationToken = default)
@@ -110,7 +114,7 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         }
 
         await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        new SchedulingEngine(schedulerDb).RunScheduler();
+        new SchedulingEngine(schedulerDb, _timeProvider).RunScheduler();
     }
 
     // ─────────────────────────────────────────────────────────
@@ -132,10 +136,11 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
     public async Task UpsertResourceAsync(TeamMember resource, bool isNew, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var now = _timeProvider.GetLocalNow().LocalDateTime;
 
         if (isNew)
         {
-            resource.CreatedAt = DateTime.Now;
+            resource.CreatedAt = now;
             db.Resources.Add(resource);
         }
         else
@@ -157,7 +162,7 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         await db.SaveChangesAsync(cancellationToken);
 
         await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        new SchedulingEngine(schedulerDb).RunScheduler();
+        new SchedulingEngine(schedulerDb, _timeProvider).RunScheduler();
     }
 
     public async Task DeleteResourceAsync(int id, CancellationToken cancellationToken = default)
@@ -171,7 +176,7 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         }
 
         await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        new SchedulingEngine(schedulerDb).RunScheduler();
+        new SchedulingEngine(schedulerDb, _timeProvider).RunScheduler();
     }
 
     // ─────────────────────────────────────────────────────────
@@ -191,7 +196,7 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         await db.SaveChangesAsync(cancellationToken);
 
         await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        new SchedulingEngine(schedulerDb).RunScheduler();
+        new SchedulingEngine(schedulerDb, _timeProvider).RunScheduler();
     }
 
     public async Task DeleteAdjustmentAsync(int id, CancellationToken cancellationToken = default)
@@ -205,7 +210,7 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         }
 
         await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        new SchedulingEngine(schedulerDb).RunScheduler();
+        new SchedulingEngine(schedulerDb, _timeProvider).RunScheduler();
     }
 
     // ─────────────────────────────────────────────────────────
@@ -242,7 +247,7 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         await db.SaveChangesAsync(cancellationToken);
 
         await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        new SchedulingEngine(schedulerDb).RunScheduler();
+        new SchedulingEngine(schedulerDb, _timeProvider).RunScheduler();
     }
 
     public async Task DeleteHolidayAsync(int id, CancellationToken cancellationToken = default)
@@ -256,7 +261,7 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         }
 
         await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        new SchedulingEngine(schedulerDb).RunScheduler();
+        new SchedulingEngine(schedulerDb, _timeProvider).RunScheduler();
     }
 
     public async Task<bool> HasHolidayOverlapAsync(
@@ -316,7 +321,7 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
             await db.SaveChangesAsync(cancellationToken);
 
             await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
-            new SchedulingEngine(schedulerDb).RunScheduler();
+            new SchedulingEngine(schedulerDb, _timeProvider).RunScheduler();
         }
 
         return copied;
@@ -458,10 +463,10 @@ public sealed class SchedulingOrchestrator : ISchedulingOrchestrator
     // Output Plan
     // ─────────────────────────────────────────────────────────
 
-    public async Task<List<Dictionary<string, object?>>> GetOutputPlanAsync(CancellationToken cancellationToken = default)
+    public async Task<List<OutputPlanRowDto>> GetOutputPlanAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        var scheduler = new SchedulingEngine(db);
+        var scheduler = new SchedulingEngine(db, _timeProvider);
         return scheduler.GetOutputPlan();
     }
 }

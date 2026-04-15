@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using SoftwareDeliveryPlanner.Data;
-using SoftwareDeliveryPlanner.Models;
-using SoftwareDeliveryPlanner.Services;
+using SoftwareDeliveryPlanner.Infrastructure.Data;
+using SoftwareDeliveryPlanner.Domain.Models;
+using SoftwareDeliveryPlanner.Infrastructure.Services;
 using SoftwareDeliveryPlanner.Tests.Infrastructure;
 
 namespace SoftwareDeliveryPlanner.Tests;
@@ -20,7 +20,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     {
         var options = TestDatabaseHelper.CreateOptions(fixture);
         _db = new PlannerDbContext(options);
-        _engine = new SchedulingEngine(_db);
+        _engine = new SchedulingEngine(_db, TimeProvider.System);
     }
 
     public void Dispose() => _db.Dispose();
@@ -117,7 +117,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         });
         _db.SaveChanges();
 
-        var engine = new SchedulingEngine(_db);
+        var engine = new SchedulingEngine(_db, TimeProvider.System);
         var kpis = engine.GetDashboardKPIs();
 
         // active_resources counts resources where Active == "Yes" (no date filter in GetDashboardKPIs)
@@ -156,7 +156,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         });
         _db.SaveChanges();
 
-        var engine = new SchedulingEngine(_db);
+        var engine = new SchedulingEngine(_db, TimeProvider.System);
         var result = engine.RunScheduler();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-NOCP");
@@ -207,7 +207,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         });
         _db.SaveChanges();
 
-        var engine = new SchedulingEngine(_db);
+        var engine = new SchedulingEngine(_db, TimeProvider.System);
         engine.RunScheduler();
 
         var allocations = _db.Allocations
@@ -240,7 +240,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         });
         _db.SaveChanges();
 
-        var engine = new SchedulingEngine(_db);
+        var engine = new SchedulingEngine(_db, TimeProvider.System);
 
         // Should not throw; zero-estimation tasks just get "Not Started" (no effort remaining)
         var exception = Record.Exception(() => engine.RunScheduler());
@@ -258,7 +258,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.SaveChanges();
 
-        var engine = new SchedulingEngine(_db);
+        var engine = new SchedulingEngine(_db, TimeProvider.System);
         var kpis = engine.GetDashboardKPIs();
 
         // With no finish dates, overallFinish falls back to DateTime.MinValue
@@ -284,7 +284,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         });
         _db.SaveChanges();
 
-        var engine = new SchedulingEngine(_db);
+        var engine = new SchedulingEngine(_db, TimeProvider.System);
         var kpis = engine.GetDashboardKPIs();
 
         Assert.Equal(0.0, (double)kpis["avg_assigned"]);
@@ -314,7 +314,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         });
         _db.SaveChanges();
 
-        var engine = new SchedulingEngine(_db);
+        var engine = new SchedulingEngine(_db, TimeProvider.System);
         engine.RunScheduler();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-LATE");
@@ -433,7 +433,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         });
         _db.SaveChanges();
 
-        var engine = new SchedulingEngine(_db);
+        var engine = new SchedulingEngine(_db, TimeProvider.System);
         engine.RunScheduler();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-INAC");
@@ -837,7 +837,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         });
         _db.SaveChanges();
 
-        var engine = new SchedulingEngine(_db);
+        var engine = new SchedulingEngine(_db, TimeProvider.System);
         engine.RunScheduler();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-RISK");
@@ -869,7 +869,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         });
         _db.SaveChanges();
 
-        var engine = new SchedulingEngine(_db);
+        var engine = new SchedulingEngine(_db, TimeProvider.System);
         engine.RunScheduler();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-NOFIN");
@@ -994,7 +994,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         });
         _db.SaveChanges();
 
-        var engine = new SchedulingEngine(_db);
+        var engine = new SchedulingEngine(_db, TimeProvider.System);
         engine.RunScheduler();
 
         // Each allocation in May should have AssignedDev <= 2 (8 * 0.5 * 0.5)
@@ -1041,7 +1041,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         });
         _db.SaveChanges();
 
-        var engine = new SchedulingEngine(_db);
+        var engine = new SchedulingEngine(_db, TimeProvider.System);
         engine.RunScheduler();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-FRES");
@@ -1091,7 +1091,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         }
         _db.SaveChanges();
 
-        var engine = new SchedulingEngine(_db);
+        var engine = new SchedulingEngine(_db, TimeProvider.System);
         var kpis = engine.GetDashboardKPIs();
 
         var upcoming = kpis["upcoming_strict"] as List<TaskItem>;
@@ -1127,7 +1127,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         });
         _db.SaveChanges();
 
-        var engine = new SchedulingEngine(_db);
+        var engine = new SchedulingEngine(_db, TimeProvider.System);
         var kpis = engine.GetDashboardKPIs();
 
         var upcoming = kpis["upcoming_strict"] as List<TaskItem>;

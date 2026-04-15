@@ -1,7 +1,7 @@
 using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.Domain.SharedKernel;
 
-namespace SoftwareDeliveryPlanner.Models;
+namespace SoftwareDeliveryPlanner.Domain.Models;
 
 public class Holiday
 {

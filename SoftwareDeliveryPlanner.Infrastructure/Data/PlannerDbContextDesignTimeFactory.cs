@@ -1,15 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace SoftwareDeliveryPlanner.Data;
+namespace SoftwareDeliveryPlanner.Infrastructure.Data;
 
 /// <summary>
 /// Design-time factory used by <c>dotnet ef</c> CLI tooling to construct the
 /// DbContext when generating migrations. This factory is never used at runtime.
 /// </summary>
-public class PlannerDbContextDesignTimeFactory : IDesignTimeDbContextFactory<PlannerDbContext>
+internal class PlannerDbContextDesignTimeFactory : IDesignTimeDbContextFactory<PlannerDbContext>
 {
-    public PlannerDbContext CreateDbContext(string[] args)
+    PlannerDbContext IDesignTimeDbContextFactory<PlannerDbContext>.CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<PlannerDbContext>();
 

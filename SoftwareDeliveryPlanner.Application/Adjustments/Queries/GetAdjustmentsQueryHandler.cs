@@ -1,10 +1,10 @@
 using MediatR;
 using SoftwareDeliveryPlanner.Application.Abstractions;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Application.Adjustments.Queries;
 
-public sealed class GetAdjustmentsQueryHandler : IRequestHandler<GetAdjustmentsQuery, List<Adjustment>>
+internal sealed class GetAdjustmentsQueryHandler : IRequestHandler<GetAdjustmentsQuery, List<Adjustment>>
 {
     private readonly IAdjustmentOrchestrator _orchestrator;
 

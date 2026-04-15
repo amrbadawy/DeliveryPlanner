@@ -1,11 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SoftwareDeliveryPlanner.Domain;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Infrastructure.Data.Configurations;
 
-public class LookupValueConfiguration : IEntityTypeConfiguration<LookupValue>
+public sealed class LookupValueConfiguration : IEntityTypeConfiguration<LookupValue>
 {
     public void Configure(EntityTypeBuilder<LookupValue> builder)
     {

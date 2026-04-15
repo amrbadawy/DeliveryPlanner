@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Infrastructure.Data.Configurations;
 
-public class AllocationConfiguration : IEntityTypeConfiguration<Allocation>
+public sealed class AllocationConfiguration : IEntityTypeConfiguration<Allocation>
 {
     public void Configure(EntityTypeBuilder<Allocation> builder)
     {

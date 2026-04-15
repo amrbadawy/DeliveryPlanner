@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using SoftwareDeliveryPlanner.Data;
-using SoftwareDeliveryPlanner.Models;
-using SoftwareDeliveryPlanner.Services;
+using SoftwareDeliveryPlanner.Infrastructure.Data;
+using SoftwareDeliveryPlanner.Domain.Models;
+using SoftwareDeliveryPlanner.Infrastructure.Services;
 using SoftwareDeliveryPlanner.Tests.Infrastructure;
 
 namespace SoftwareDeliveryPlanner.Tests;
@@ -16,7 +16,7 @@ public class SchedulingEngineTests : IDisposable
     {
         var options = TestDatabaseHelper.CreateOptions(fixture);
         _db = new PlannerDbContext(options);
-        _engine = new SchedulingEngine(_db);
+        _engine = new SchedulingEngine(_db, TimeProvider.System);
     }
 
     public void Dispose()
@@ -563,11 +563,9 @@ public class SchedulingEngineTests : IDisposable
         if (output.Count > 0)
         {
             var first = output[0];
-            Assert.Contains("task_id", first.Keys);
-            Assert.Contains("service_name", first.Keys);
-            Assert.Contains("planned_start", first.Keys);
-            Assert.Contains("planned_finish", first.Keys);
-            Assert.Contains("status", first.Keys);
+            Assert.NotNull(first.TaskId);
+            Assert.NotNull(first.ServiceName);
+            Assert.NotNull(first.Status);
         }
     }
 
@@ -577,8 +575,8 @@ public class SchedulingEngineTests : IDisposable
         var output = _engine.GetOutputPlan();
         for (int i = 1; i < output.Count; i++)
         {
-            var prev = (int)output[i - 1]["num"]!;
-            var curr = (int)output[i]["num"]!;
+            var prev = output[i - 1].Num;
+            var curr = output[i].Num;
             Assert.True(prev < curr);
         }
     }
@@ -606,7 +604,7 @@ public class SchedulingEngineMonFriTests : IDisposable
         weekSetting.Value = "mon_fri";
         _db.SaveChanges();
 
-        _engine = new SchedulingEngine(_db);
+        _engine = new SchedulingEngine(_db, TimeProvider.System);
     }
 
     public void Dispose() => _db.Dispose();

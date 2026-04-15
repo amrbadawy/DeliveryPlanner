@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Infrastructure.Data.Configurations;
 
-public class AdjustmentConfiguration : IEntityTypeConfiguration<Adjustment>
+public sealed class AdjustmentConfiguration : IEntityTypeConfiguration<Adjustment>
 {
     public void Configure(EntityTypeBuilder<Adjustment> builder)
     {

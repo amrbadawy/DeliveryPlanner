@@ -1,5 +1,6 @@
 @page "/output"
 @using MediatR
+@using SoftwareDeliveryPlanner.Application.Abstractions
 @using SoftwareDeliveryPlanner.Application.Output.Queries
 @using SoftwareDeliveryPlanner.Application.Planning.Commands
 @using SoftwareDeliveryPlanner.Domain
@@ -36,23 +37,23 @@
         @foreach (var item in output)
         {
             <tr>
-                <td>@item["num"]</td>
-                <td>@item["task_id"]</td>
-                <td>@item["service_name"]</td>
-                <td>@item["assigned_dev"]</td>
-                <td>@item["planned_start"]</td>
-                <td>@item["planned_finish"]</td>
-                <td>@item["duration"]</td>
-                <td>@item["dev_estimation"]</td>
-                <td>@item["strict_date"]</td>
+                <td>@item.Num</td>
+                <td>@item.TaskId</td>
+                <td>@item.ServiceName</td>
+                <td>@item.AssignedDev</td>
+                <td>@item.PlannedStart</td>
+                <td>@item.PlannedFinish</td>
+                <td>@item.Duration</td>
+                <td>@item.DevEstimation</td>
+                <td>@item.StrictDate</td>
                 <td>
-                    <span class="badge bg-@GetStatusColor(item["status"]?.ToString())">
-                        @item["status"]
+                    <span class="badge bg-@GetStatusColor(item.Status)">
+                        @item.Status
                     </span>
                 </td>
                 <td>
-                    <span class="badge bg-@GetRiskColor(item["delivery_risk"]?.ToString())">
-                        @item["delivery_risk"]
+                    <span class="badge bg-@GetRiskColor(item.DeliveryRisk)">
+                        @item.DeliveryRisk
                     </span>
                 </td>
             </tr>
@@ -61,7 +62,7 @@
 </table>
 
 @code {
-    private List<Dictionary<string, object?>> output = new();
+    private List<OutputPlanRowDto> output = new();
     private string exportStatus = string.Empty;
 
     protected override async Task OnInitializedAsync()
@@ -110,17 +111,17 @@
 
             foreach (var item in output)
             {
-                var num = GetCsvValue(item, "num");
-                var taskId = GetCsvValue(item, "task_id");
-                var service = GetCsvValue(item, "service_name").Replace(",", ";").Replace("\r", " ").Replace("\n", " ");
-                var assignedDev = GetCsvValue(item, "assigned_dev");
-                var plannedStart = GetCsvValue(item, "planned_start");
-                var plannedFinish = GetCsvValue(item, "planned_finish");
-                var duration = GetCsvValue(item, "duration");
-                var estimation = GetCsvValue(item, "dev_estimation");
-                var strictDate = GetCsvValue(item, "strict_date");
-                var status = GetCsvValue(item, "status");
-                var risk = GetCsvValue(item, "delivery_risk");
+                var num = item.Num.ToString();
+                var taskId = item.TaskId;
+                var service = item.ServiceName.Replace(",", ";").Replace("\r", " ").Replace("\n", " ");
+                var assignedDev = item.AssignedDev?.ToString() ?? string.Empty;
+                var plannedStart = item.PlannedStart ?? string.Empty;
+                var plannedFinish = item.PlannedFinish ?? string.Empty;
+                var duration = item.Duration?.ToString() ?? string.Empty;
+                var estimation = item.DevEstimation.ToString();
+                var strictDate = item.StrictDate ?? string.Empty;
+                var status = item.Status;
+                var risk = item.DeliveryRisk;
 
                 csv += $"{num},{taskId},{service},{assignedDev},{plannedStart},{plannedFinish},{duration},{estimation},{strictDate},{status},{risk}\n";
             }
@@ -133,11 +134,6 @@
         {
             exportStatus = "Export failed";
         }
-    }
-
-    private static string GetCsvValue(Dictionary<string, object?> item, string key)
-    {
-        return item.TryGetValue(key, out var value) ? value?.ToString() ?? string.Empty : string.Empty;
     }
 
     private async Task RefreshData()

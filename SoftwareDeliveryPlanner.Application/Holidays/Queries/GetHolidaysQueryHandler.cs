@@ -1,10 +1,10 @@
 using MediatR;
 using SoftwareDeliveryPlanner.Application.Abstractions;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Application.Holidays.Queries;
 
-public sealed class GetHolidaysQueryHandler : IRequestHandler<GetHolidaysQuery, List<Holiday>>
+internal sealed class GetHolidaysQueryHandler : IRequestHandler<GetHolidaysQuery, List<Holiday>>
 {
     private readonly IHolidayOrchestrator _orchestrator;
 

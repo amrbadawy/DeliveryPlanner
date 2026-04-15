@@ -1,10 +1,10 @@
 using MediatR;
 using SoftwareDeliveryPlanner.Application.Abstractions;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Application.Holidays.Commands;
 
-public sealed class UpsertHolidayCommandHandler : IRequestHandler<UpsertHolidayCommand, Unit>
+internal sealed class UpsertHolidayCommandHandler : IRequestHandler<UpsertHolidayCommand, Unit>
 {
     private readonly IHolidayOrchestrator _orchestrator;
 
@@ -27,7 +27,7 @@ public sealed class UpsertHolidayCommandHandler : IRequestHandler<UpsertHolidayC
     }
 }
 
-public sealed class DeleteHolidayCommandHandler : IRequestHandler<DeleteHolidayCommand, Unit>
+internal sealed class DeleteHolidayCommandHandler : IRequestHandler<DeleteHolidayCommand, Unit>
 {
     private readonly IHolidayOrchestrator _orchestrator;
 

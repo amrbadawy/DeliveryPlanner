@@ -1,10 +1,10 @@
 using MediatR;
 using SoftwareDeliveryPlanner.Application.Abstractions;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Application.Tasks.Queries;
 
-public sealed class GetTasksQueryHandler : IRequestHandler<GetTasksQuery, List<TaskItem>>
+internal sealed class GetTasksQueryHandler : IRequestHandler<GetTasksQuery, List<TaskItem>>
 {
     private readonly ITaskOrchestrator _orchestrator;
 
@@ -15,7 +15,7 @@ public sealed class GetTasksQueryHandler : IRequestHandler<GetTasksQuery, List<T
         => _orchestrator.GetTasksAsync(cancellationToken);
 }
 
-public sealed class GetTaskCountQueryHandler : IRequestHandler<GetTaskCountQuery, int>
+internal sealed class GetTaskCountQueryHandler : IRequestHandler<GetTaskCountQuery, int>
 {
     private readonly ITaskOrchestrator _orchestrator;
 

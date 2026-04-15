@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Infrastructure.Data.Configurations;
 
-public class CalendarDayConfiguration : IEntityTypeConfiguration<CalendarDay>
+public sealed class CalendarDayConfiguration : IEntityTypeConfiguration<CalendarDay>
 {
     public void Configure(EntityTypeBuilder<CalendarDay> builder)
     {

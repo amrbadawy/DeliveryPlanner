@@ -1,4 +1,4 @@
-namespace SoftwareDeliveryPlanner.Models;
+namespace SoftwareDeliveryPlanner.Domain.Models;
 
 public class CalendarDay
 {

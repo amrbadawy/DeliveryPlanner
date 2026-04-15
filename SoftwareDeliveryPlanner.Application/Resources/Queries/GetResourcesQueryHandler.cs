@@ -1,10 +1,10 @@
 using MediatR;
 using SoftwareDeliveryPlanner.Application.Abstractions;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Application.Resources.Queries;
 
-public sealed class GetResourcesQueryHandler : IRequestHandler<GetResourcesQuery, List<TeamMember>>
+internal sealed class GetResourcesQueryHandler : IRequestHandler<GetResourcesQuery, List<TeamMember>>
 {
     private readonly IResourceOrchestrator _orchestrator;
 
@@ -15,7 +15,7 @@ public sealed class GetResourcesQueryHandler : IRequestHandler<GetResourcesQuery
         => _orchestrator.GetResourcesAsync(cancellationToken);
 }
 
-public sealed class GetResourceCountQueryHandler : IRequestHandler<GetResourceCountQuery, int>
+internal sealed class GetResourceCountQueryHandler : IRequestHandler<GetResourceCountQuery, int>
 {
     private readonly IResourceOrchestrator _orchestrator;
 

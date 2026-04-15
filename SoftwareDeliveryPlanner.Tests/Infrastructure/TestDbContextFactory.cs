@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using SoftwareDeliveryPlanner.Data;
+using SoftwareDeliveryPlanner.Infrastructure.Data;
 
 namespace SoftwareDeliveryPlanner.Tests.Infrastructure;
 
@@ -7,11 +7,11 @@ namespace SoftwareDeliveryPlanner.Tests.Infrastructure;
 /// IDbContextFactory implementation backed by SQL Server for test use.
 /// Reusable across test files without conflicting file-scoped declarations.
 /// </summary>
-public sealed class TestDbContextFactory : IDbContextFactory<PlannerDbContext>
+internal sealed class TestDbContextFactory : IDbContextFactory<PlannerDbContext>
 {
     private readonly DbContextOptions<PlannerDbContext> _options;
 
-    public TestDbContextFactory(DbContextOptions<PlannerDbContext> options)
+    internal TestDbContextFactory(DbContextOptions<PlannerDbContext> options)
         => _options = options;
 
     public PlannerDbContext CreateDbContext() => new(_options);

@@ -1,21 +1,24 @@
-using SoftwareDeliveryPlanner.Data;
+using SoftwareDeliveryPlanner.Application.Abstractions;
+using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Domain;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
-namespace SoftwareDeliveryPlanner.Services;
+namespace SoftwareDeliveryPlanner.Infrastructure.Services;
 
-public class SchedulingEngine
+internal class SchedulingEngine
 {
     private readonly PlannerDbContext _db;
+    private readonly TimeProvider _timeProvider;
     private readonly int _atRiskThreshold;
     private readonly HashSet<DayOfWeek> _weekendDays;
 
     // In-memory holiday cache — loaded once per RunScheduler call to avoid 1460+ DB queries.
     private List<Holiday>? _holidayCache;
 
-    public SchedulingEngine(PlannerDbContext db)
+    public SchedulingEngine(PlannerDbContext db, TimeProvider timeProvider)
     {
         _db = db;
+        _timeProvider = timeProvider;
         var setting = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.AtRiskThreshold);
         _atRiskThreshold = int.TryParse(setting?.Value, out var t) ? t : 5;
 
@@ -104,7 +107,8 @@ public class SchedulingEngine
 
         if (plannedFinish.Value > strictDate.Value) return DomainConstants.DeliveryRisk.Late;
 
-        var workingDaysLeft = GetWorkingDaysBetween(DateTime.Today, strictDate.Value);
+        var today = _timeProvider.GetLocalNow().LocalDateTime.Date;
+        var workingDaysLeft = GetWorkingDaysBetween(today, strictDate.Value);
         if (workingDaysLeft <= _atRiskThreshold) return DomainConstants.DeliveryRisk.AtRisk;
 
         return DomainConstants.DeliveryRisk.OnTrack;
@@ -274,6 +278,7 @@ public class SchedulingEngine
         _db.Allocations.AddRange(allocations);
 
         // Update tasks
+        var now = _timeProvider.GetLocalNow().LocalDateTime;
         foreach (var task in tasks)
         {
             var taskId = task.TaskId;
@@ -303,7 +308,7 @@ public class SchedulingEngine
             task.Duration = duration;
             task.Status = status;
             task.DeliveryRisk = risk;
-            task.UpdatedAt = DateTime.Now;
+            task.UpdatedAt = now;
         }
 
         // Update calendar reserved/remaining capacity
@@ -345,7 +350,8 @@ public class SchedulingEngine
         var assignedDevs = tasks.Where(t => t.AssignedDev.HasValue && t.AssignedDev > 0).Select(t => t.AssignedDev!.Value).ToList();
         var avgAssigned = assignedDevs.Any() ? assignedDevs.Average() : 0;
 
-        var upcomingStrict = tasks.Where(t => t.StrictDate.HasValue && t.StrictDate >= DateTime.Today)
+        var today = _timeProvider.GetLocalNow().LocalDateTime.Date;
+        var upcomingStrict = tasks.Where(t => t.StrictDate.HasValue && t.StrictDate >= today)
             .OrderBy(t => t.StrictDate)
             .Take(5)
             .ToList();
@@ -366,28 +372,26 @@ public class SchedulingEngine
         };
     }
 
-    public List<Dictionary<string, object?>> GetOutputPlan()
+    public List<OutputPlanRowDto> GetOutputPlan()
     {
         var tasks = _db.Tasks.OrderBy(t => t.SchedulingRank).ToList();
-        var output = new List<Dictionary<string, object?>>();
+        var output = new List<OutputPlanRowDto>();
 
         for (int i = 0; i < tasks.Count; i++)
         {
             var task = tasks[i];
-            output.Add(new Dictionary<string, object?>
-            {
-                ["num"] = i + 1,
-                ["task_id"] = task.TaskId,
-                ["service_name"] = task.ServiceName,
-                ["assigned_dev"] = task.AssignedDev,
-                ["planned_start"] = task.PlannedStart?.ToString("yyyy-MM-dd"),
-                ["planned_finish"] = task.PlannedFinish?.ToString("yyyy-MM-dd"),
-                ["duration"] = task.Duration,
-                ["dev_estimation"] = task.DevEstimation,
-                ["strict_date"] = task.StrictDate?.ToString("yyyy-MM-dd"),
-                ["status"] = task.Status,
-                ["delivery_risk"] = task.DeliveryRisk
-            });
+            output.Add(new OutputPlanRowDto(
+                Num: i + 1,
+                TaskId: task.TaskId,
+                ServiceName: task.ServiceName,
+                AssignedDev: task.AssignedDev,
+                PlannedStart: task.PlannedStart?.ToString("yyyy-MM-dd"),
+                PlannedFinish: task.PlannedFinish?.ToString("yyyy-MM-dd"),
+                Duration: task.Duration,
+                DevEstimation: task.DevEstimation,
+                StrictDate: task.StrictDate?.ToString("yyyy-MM-dd"),
+                Status: task.Status,
+                DeliveryRisk: task.DeliveryRisk));
         }
 
         return output;

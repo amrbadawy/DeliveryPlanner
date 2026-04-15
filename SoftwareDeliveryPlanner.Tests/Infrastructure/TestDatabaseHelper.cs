@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using SoftwareDeliveryPlanner.Data;
+using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Domain;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Tests.Infrastructure;
 
@@ -9,13 +9,13 @@ namespace SoftwareDeliveryPlanner.Tests.Infrastructure;
 /// Provides helper methods for setting up test databases on the shared
 /// SQL Server container. Creates fresh databases and seeds default data.
 /// </summary>
-public static class TestDatabaseHelper
+internal static class TestDatabaseHelper
 {
     /// <summary>
     /// Creates DbContextOptions configured for an isolated SQL Server database.
     /// Applies all migrations and optionally seeds default data.
     /// </summary>
-    public static DbContextOptions<PlannerDbContext> CreateOptions(
+    internal static DbContextOptions<PlannerDbContext> CreateOptions(
         SqlServerContainerFixture fixture,
         bool seedData = true)
     {
@@ -40,7 +40,7 @@ public static class TestDatabaseHelper
     /// Seeds the same default data that was previously in InitializeDefaultData().
     /// Lookup data is already handled by migrations via HasData().
     /// </summary>
-    public static void SeedDefaultData(PlannerDbContext db)
+    internal static void SeedDefaultData(PlannerDbContext db)
     {
         if (db.Tasks.Any()) return;
 

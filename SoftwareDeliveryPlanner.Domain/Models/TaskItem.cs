@@ -3,7 +3,7 @@ using SoftwareDeliveryPlanner.Domain.SharedKernel;
 using SoftwareDeliveryPlanner.Domain.SharedKernel.ValueObjects;
 using TaskIdVO = SoftwareDeliveryPlanner.Domain.SharedKernel.ValueObjects.TaskId;
 
-namespace SoftwareDeliveryPlanner.Models;
+namespace SoftwareDeliveryPlanner.Domain.Models;
 
 public class TaskItem
 {
@@ -26,8 +26,8 @@ public class TaskItem
     public double? OverrideDev { get; set; }
     public string? DependsOnTaskIds { get; set; }
     public string? Comments { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
-    public DateTime UpdatedAt { get; set; } = DateTime.Now;
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 
     // ── Domain factory ────────────────────────────────────────────────────────
     /// <summary>

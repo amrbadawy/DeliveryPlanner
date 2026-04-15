@@ -1,10 +1,10 @@
 using MediatR;
 using SoftwareDeliveryPlanner.Application.Abstractions;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Application.Resources.Commands;
 
-public sealed class UpsertResourceCommandHandler : IRequestHandler<UpsertResourceCommand, Unit>
+internal sealed class UpsertResourceCommandHandler : IRequestHandler<UpsertResourceCommand, Unit>
 {
     private readonly IResourceOrchestrator _orchestrator;
 
@@ -31,7 +31,7 @@ public sealed class UpsertResourceCommandHandler : IRequestHandler<UpsertResourc
     }
 }
 
-public sealed class DeleteResourceCommandHandler : IRequestHandler<DeleteResourceCommand, Unit>
+internal sealed class DeleteResourceCommandHandler : IRequestHandler<DeleteResourceCommand, Unit>
 {
     private readonly IResourceOrchestrator _orchestrator;
 

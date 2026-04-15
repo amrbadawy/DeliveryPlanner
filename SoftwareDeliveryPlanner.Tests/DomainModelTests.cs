@@ -1,6 +1,6 @@
 using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.Domain.SharedKernel;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Tests;
 

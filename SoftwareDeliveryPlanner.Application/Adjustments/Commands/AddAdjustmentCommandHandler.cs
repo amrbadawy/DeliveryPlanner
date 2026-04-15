@@ -1,10 +1,10 @@
 using MediatR;
 using SoftwareDeliveryPlanner.Application.Abstractions;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Application.Adjustments.Commands;
 
-public sealed class AddAdjustmentCommandHandler : IRequestHandler<AddAdjustmentCommand, Unit>
+internal sealed class AddAdjustmentCommandHandler : IRequestHandler<AddAdjustmentCommand, Unit>
 {
     private readonly IAdjustmentOrchestrator _orchestrator;
 
@@ -26,7 +26,7 @@ public sealed class AddAdjustmentCommandHandler : IRequestHandler<AddAdjustmentC
     }
 }
 
-public sealed class DeleteAdjustmentCommandHandler : IRequestHandler<DeleteAdjustmentCommand, Unit>
+internal sealed class DeleteAdjustmentCommandHandler : IRequestHandler<DeleteAdjustmentCommand, Unit>
 {
     private readonly IAdjustmentOrchestrator _orchestrator;
 

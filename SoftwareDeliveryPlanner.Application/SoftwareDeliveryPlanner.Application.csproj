@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="SoftwareDeliveryPlanner.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\SoftwareDeliveryPlanner.Domain\SoftwareDeliveryPlanner.Domain.csproj" />
   </ItemGroup>
 

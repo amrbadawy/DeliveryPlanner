@@ -1,8 +1,6 @@
-using Microsoft.EntityFrameworkCore;
 using SoftwareDeliveryPlanner.Application;
 using SoftwareDeliveryPlanner.Application.Abstractions;
 using SoftwareDeliveryPlanner.Web.Components;
-using SoftwareDeliveryPlanner.Data;
 using SoftwareDeliveryPlanner.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,9 +17,8 @@ var app = builder.Build();
 // Apply pending migrations and seed data
 using (var scope = app.Services.CreateScope())
 {
-    var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<PlannerDbContext>>();
-    await using var db = await dbFactory.CreateDbContextAsync();
-    await db.Database.MigrateAsync();
+    var migrator = scope.ServiceProvider.GetRequiredService<IDatabaseMigrator>();
+    await migrator.MigrateAsync();
 
     var seeder = scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>();
     await seeder.SeedAsync();

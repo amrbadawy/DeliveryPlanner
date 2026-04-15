@@ -1,5 +1,5 @@
 using MediatR;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Application.Resources.Queries;
 
