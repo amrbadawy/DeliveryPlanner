@@ -1012,6 +1012,180 @@ public class DependencyRulesTests
     }
 
     // ─────────────────────────────────────────────────────────
+    // Wave 5: Enterprise Architecture Rules
+    // ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void EF_Configurations_Must_Be_Sealed()
+    {
+        var assembly = typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly;
+
+        var configTypes = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract && t.IsPublic)
+            .Where(t => t.GetInterfaces().Any(i =>
+                i.IsGenericType && i.GetGenericTypeDefinition().FullName == "Microsoft.EntityFrameworkCore.IEntityTypeConfiguration`1"))
+            .ToList();
+
+        var unsealed = configTypes
+            .Where(t => !t.IsSealed)
+            .Select(t => t.FullName ?? t.Name)
+            .ToList();
+
+        Assert.True(unsealed.Count == 0,
+            $"All EF Core IEntityTypeConfiguration<T> implementations must be sealed. Unsealed: {string.Join(", ", unsealed)}");
+    }
+
+    [Fact]
+    public void DbContext_Must_Be_Internal_To_Infrastructure()
+    {
+        var assembly = typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly;
+
+        var dbContextTypes = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract)
+            .Where(t => IsAssignableToName(t, "Microsoft.EntityFrameworkCore.DbContext"))
+            .ToList();
+
+        var publicContexts = dbContextTypes
+            .Where(t => t.IsPublic)
+            .Select(t => t.FullName ?? t.Name)
+            .ToList();
+
+        Assert.True(publicContexts.Count == 0,
+            $"DbContext types must be internal to Infrastructure. Public contexts found: {string.Join(", ", publicContexts)}");
+    }
+
+    [Fact]
+    public void Application_Handlers_Must_Be_Internal()
+    {
+        var assembly = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+
+        var handlerTypes = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract)
+            .Where(t => t.GetInterfaces().Any(i =>
+                i.IsGenericType && i.GetGenericTypeDefinition() == typeof(MediatR.IRequestHandler<,>)))
+            .ToList();
+
+        var publicHandlers = handlerTypes
+            .Where(t => t.IsPublic)
+            .Select(t => t.FullName ?? t.Name)
+            .ToList();
+
+        Assert.True(publicHandlers.Count == 0,
+            $"MediatR IRequestHandler<,> implementations must be internal. Public handlers found: {string.Join(", ", publicHandlers)}");
+    }
+
+    [Fact]
+    public void Queries_Must_Not_Return_Untyped_Dictionary()
+    {
+        var assembly = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+
+        var queryTypes = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract)
+            .Where(t => t.GetInterfaces().Any(i =>
+                i.IsGenericType && i.GetGenericTypeDefinition() == typeof(MediatR.IRequest<>)))
+            .ToList();
+
+        var violatingQueries = new List<string>();
+
+        foreach (var query in queryTypes)
+        {
+            var iface = query.GetInterfaces()
+                .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(MediatR.IRequest<>));
+            if (iface == null) continue;
+
+            var returnType = iface.GenericTypeArguments[0];
+            if (returnType.IsGenericType &&
+                returnType.GetGenericTypeDefinition() == typeof(Dictionary<,>))
+            {
+                violatingQueries.Add($"{query.FullName} -> {returnType.Name}");
+            }
+        }
+
+        Assert.True(violatingQueries.Count == 0,
+            $"Query handlers must not return untyped Dictionary<,>. Violating queries: {string.Join(", ", violatingQueries)}");
+    }
+
+    [Theory]
+    [InlineData("Domain", "SoftwareDeliveryPlanner.Domain")]
+    [InlineData("Application", "SoftwareDeliveryPlanner.Application")]
+    [InlineData("Infrastructure", "SoftwareDeliveryPlanner.Infrastructure")]
+    public void Types_In_Assembly_Must_Use_Layer_Namespace(string layer, string expectedNamespace)
+    {
+        var assembly = layer switch
+        {
+            "Domain" => typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly,
+            "Application" => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
+            "Infrastructure" => typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly,
+            _ => throw new ArgumentException($"Unknown layer: {layer}")
+        };
+
+        var violatingTypes = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract && t.IsPublic)
+            .Where(t => !t.Namespace?.StartsWith(expectedNamespace, StringComparison.Ordinal) ?? true)
+            .Select(t => $"{t.FullName} (namespace: {t.Namespace})")
+            .ToList();
+
+        Assert.True(violatingTypes.Count == 0,
+            $"All public types in {layer} must be in the '{expectedNamespace}.*' namespace. " +
+            $"Violating types:{Environment.NewLine}{string.Join(Environment.NewLine, violatingTypes)}");
+    }
+
+    [Theory]
+    [InlineData("Domain")]
+    [InlineData("Infrastructure")]
+    public void DateTime_Now_Must_Not_Be_Used_In_Domain_Or_Infrastructure(string layer)
+    {
+        var basePath = layer switch
+        {
+            "Domain" => Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "SoftwareDeliveryPlanner.Domain"),
+            "Infrastructure" => Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "SoftwareDeliveryPlanner.Infrastructure"),
+            _ => throw new ArgumentException($"Unknown layer: {layer}")
+        };
+
+        basePath = Path.GetFullPath(basePath);
+
+        if (!Directory.Exists(basePath))
+        {
+            basePath = layer switch
+            {
+                "Domain" => Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "SoftwareDeliveryPlanner.Domain"),
+                "Infrastructure" => Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "SoftwareDeliveryPlanner.Infrastructure"),
+                _ => throw new ArgumentException($"Unknown layer: {layer}")
+            };
+            basePath = Path.GetFullPath(basePath);
+        }
+
+        if (!Directory.Exists(basePath))
+        {
+            Assert.True(false, $"Directory not found for {layer}: {basePath}");
+            return;
+        }
+
+        var csFiles = Directory.GetFiles(basePath, "*.cs", SearchOption.AllDirectories);
+
+        var violations = new List<string>();
+
+        foreach (var file in csFiles)
+        {
+            var content = File.ReadAllText(file);
+            var lines = content.Split('\n');
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i];
+                if (line.Contains("DateTime.Now") || line.Contains("DateTime.UtcNow"))
+                {
+                    var relativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), file);
+                    violations.Add($"{relativePath}:{i + 1} — {line.Trim()}");
+                }
+            }
+        }
+
+        Assert.True(violations.Count == 0,
+            $"DateTime.Now/DateTime.UtcNow is forbidden in {layer}. Use injected TimeProvider instead. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
     // Helpers
     // ─────────────────────────────────────────────────────────
 

@@ -17,7 +17,7 @@ using SoftwareDeliveryPlanner.Application.Resources.Queries;
 using SoftwareDeliveryPlanner.Application.Tasks.Commands;
 using SoftwareDeliveryPlanner.Application.Tasks.Queries;
 using SoftwareDeliveryPlanner.Application.Timeline.Queries;
-using SoftwareDeliveryPlanner.Data;
+using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.Infrastructure.Services;
 using SoftwareDeliveryPlanner.Tests.Infrastructure;
@@ -750,7 +750,7 @@ public class Pipeline_RoundTripTests : PipelineFixture
 
         // Get output plan and verify our task is in it
         var plan = await mediator.Send(new GetOutputPlanQuery());
-        Assert.Contains(plan, p => (string?)p["task_id"] == "RT-001");
+        Assert.Contains(plan, p => p.TaskId == "RT-001");
     }
 
     [Fact]

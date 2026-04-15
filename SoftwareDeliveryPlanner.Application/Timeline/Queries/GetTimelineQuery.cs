@@ -8,7 +8,7 @@ public sealed record GetTimelineQuery(
     DateTime Start,
     DateTime End) : IRequest<TimelineDataDto>;
 
-public sealed class GetTimelineQueryHandler : IRequestHandler<GetTimelineQuery, TimelineDataDto>
+internal sealed class GetTimelineQueryHandler : IRequestHandler<GetTimelineQuery, TimelineDataDto>
 {
     private readonly IPlanningQueryService _orchestrator;
 

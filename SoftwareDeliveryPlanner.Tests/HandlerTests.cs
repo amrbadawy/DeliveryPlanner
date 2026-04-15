@@ -15,9 +15,9 @@ using SoftwareDeliveryPlanner.Application.Resources.Queries;
 using SoftwareDeliveryPlanner.Application.Tasks.Commands;
 using SoftwareDeliveryPlanner.Application.Tasks.Queries;
 using SoftwareDeliveryPlanner.Application.Timeline.Queries;
-using SoftwareDeliveryPlanner.Data;
+using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Infrastructure.Services;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 using SoftwareDeliveryPlanner.Tests.Infrastructure;
 
 namespace SoftwareDeliveryPlanner.Tests;
@@ -28,15 +28,15 @@ namespace SoftwareDeliveryPlanner.Tests;
 
 public abstract class OrchestratorFixture : IAsyncDisposable
 {
-    protected readonly IDbContextFactory<PlannerDbContext> Factory;
-    protected readonly SchedulingOrchestrator Orchestrator;
+    private protected readonly IDbContextFactory<PlannerDbContext> Factory;
+    private protected readonly ISchedulingOrchestrator Orchestrator;
 
     protected OrchestratorFixture(SqlServerContainerFixture fixture)
     {
         var options = TestDatabaseHelper.CreateOptions(fixture);
 
         Factory = new TestDbContextFactory(options);
-        Orchestrator = new SchedulingOrchestrator(Factory);
+        Orchestrator = new SchedulingOrchestrator(Factory, TimeProvider.System);
     }
 
     public async ValueTask DisposeAsync() => await Task.CompletedTask;
@@ -1110,10 +1110,10 @@ public class GetOutputPlanQueryHandlerTests : OrchestratorFixture
 
         foreach (var row in result)
         {
-            Assert.True(row.ContainsKey("task_id"));
-            Assert.True(row.ContainsKey("service_name"));
-            Assert.True(row.ContainsKey("status"));
-            Assert.True(row.ContainsKey("delivery_risk"));
+            Assert.NotNull(row.TaskId);
+            Assert.NotNull(row.ServiceName);
+            Assert.NotNull(row.Status);
+            Assert.NotNull(row.DeliveryRisk);
         }
     }
 }

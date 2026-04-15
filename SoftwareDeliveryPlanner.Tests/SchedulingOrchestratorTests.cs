@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using SoftwareDeliveryPlanner.Application.Abstractions;
-using SoftwareDeliveryPlanner.Data;
+using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Infrastructure.Services;
-using SoftwareDeliveryPlanner.Models;
+using SoftwareDeliveryPlanner.Domain.Models;
 using SoftwareDeliveryPlanner.Tests.Infrastructure;
 
 namespace SoftwareDeliveryPlanner.Tests;
@@ -30,7 +30,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task RunSchedulerAsync_WithTasks_ReturnsSuccessMessage()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var result = await orchestrator.RunSchedulerAsync();
         Assert.Contains("successfully scheduled", result, StringComparison.OrdinalIgnoreCase);
     }
@@ -42,7 +42,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         db.Tasks.RemoveRange(db.Tasks);
         await db.SaveChangesAsync();
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var result = await orchestrator.RunSchedulerAsync();
         Assert.Equal("No tasks to schedule", result);
     }
@@ -51,7 +51,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     public async Task RunSchedulerAsync_RespectsDefaultData()
     {
         // Default data has tasks; scheduler should complete and produce allocations
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         await orchestrator.RunSchedulerAsync();
 
         await using var db = await _factory.CreateDbContextAsync();
@@ -65,7 +65,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task GetDashboardKpisAsync_ReturnsNonNullDto()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var dto = await orchestrator.GetDashboardKpisAsync();
         Assert.NotNull(dto);
     }
@@ -73,7 +73,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task GetDashboardKpisAsync_TotalServices_IsPositive()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var dto = await orchestrator.GetDashboardKpisAsync();
         Assert.True(dto.TotalServices > 0);
     }
@@ -81,7 +81,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task GetDashboardKpisAsync_ActiveResources_IsPositive()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var dto = await orchestrator.GetDashboardKpisAsync();
         Assert.True(dto.ActiveResources > 0);
     }
@@ -89,7 +89,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task GetDashboardKpisAsync_TotalCapacity_IsPositive()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var dto = await orchestrator.GetDashboardKpisAsync();
         Assert.True(dto.TotalCapacity > 0);
     }
@@ -97,7 +97,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task GetDashboardKpisAsync_RiskCounts_AreNonNegative()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var dto = await orchestrator.GetDashboardKpisAsync();
         Assert.True(dto.OnTrack >= 0);
         Assert.True(dto.AtRisk >= 0);
@@ -107,7 +107,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task GetDashboardKpisAsync_AvgAssigned_IsNonNegative()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var dto = await orchestrator.GetDashboardKpisAsync();
         Assert.True(dto.AvgAssigned >= 0);
     }
@@ -132,7 +132,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         });
         await db.SaveChangesAsync();
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var dto = await orchestrator.GetDashboardKpisAsync();
         Assert.Null(dto.OverallFinish);
     }
@@ -164,7 +164,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         });
         await db.SaveChangesAsync();
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var dto = await orchestrator.GetDashboardKpisAsync();
 
         // The orchestrator maps overall_finish: if overall_finish == DateTime.MinValue → null
@@ -182,7 +182,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             orchestrator.RunSchedulerAsync(cts.Token));
@@ -194,7 +194,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             orchestrator.GetDashboardKpisAsync(cts.Token));
@@ -207,7 +207,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task GetHolidaysAsync_ReturnsOrderedByStartDate()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var holidays = await orchestrator.GetHolidaysAsync();
 
         Assert.True(holidays.Count > 1);
@@ -221,7 +221,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task UpsertHolidayAsync_NewHoliday_PersistsInDb()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var holiday = new Holiday
         {
             HolidayName = "Test New Holiday",
@@ -258,7 +258,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
             Notes = existing.Notes
         };
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         await orchestrator.UpsertHolidayAsync(updated, isNew: false);
 
         // Assert
@@ -272,7 +272,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task UpsertHolidayAsync_UpdateNonExistent_DoesNotThrow()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var ghost = new Holiday
         {
             Id = 999999,
@@ -297,7 +297,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         var existingId = existing.Id;
 
         // Act
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         await orchestrator.DeleteHolidayAsync(existingId);
 
         // Assert
@@ -309,7 +309,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task DeleteHolidayAsync_NonExistent_DoesNotThrow()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
 
         var exception = await Record.ExceptionAsync(() =>
             orchestrator.DeleteHolidayAsync(999999));
@@ -325,7 +325,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     public async Task HasHolidayOverlapAsync_OverlappingRange_ReturnsTrue()
     {
         // Eid Al-Fitr: Mar 30 - Apr 2, 2026. Overlap with Mar 31 - Apr 1.
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var result = await orchestrator.HasHolidayOverlapAsync(
             new DateTime(2026, 3, 31), new DateTime(2026, 4, 1));
 
@@ -336,7 +336,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     public async Task HasHolidayOverlapAsync_NonOverlappingRange_ReturnsFalse()
     {
         // No holiday in July 2026
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var result = await orchestrator.HasHolidayOverlapAsync(
             new DateTime(2026, 7, 10), new DateTime(2026, 7, 15));
 
@@ -347,7 +347,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     public async Task HasHolidayOverlapAsync_ExactSameRange_ReturnsTrue()
     {
         // National Day: Sep 23, 2026
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var result = await orchestrator.HasHolidayOverlapAsync(
             new DateTime(2026, 9, 23), new DateTime(2026, 9, 23));
 
@@ -362,7 +362,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         var nationalDay = await db.Holidays.FirstAsync(h => h.StartDate == new DateTime(2026, 9, 23));
         var nationalDayId = nationalDay.Id;
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var result = await orchestrator.HasHolidayOverlapAsync(
             new DateTime(2026, 9, 23), new DateTime(2026, 9, 23), excludeId: nationalDayId);
 
@@ -373,7 +373,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     public async Task HasHolidayOverlapAsync_AdjacentDates_ReturnsFalse()
     {
         // Eid Al-Fitr ends Apr 2, 2026. Check Apr 3 (day after) — no overlap.
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var result = await orchestrator.HasHolidayOverlapAsync(
             new DateTime(2026, 4, 3), new DateTime(2026, 4, 3));
 
@@ -387,7 +387,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task CopyHolidaysToYearAsync_CopiesHolidaysToNewYear()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var copied = await orchestrator.CopyHolidaysToYearAsync(2026, 2027);
 
         Assert.True(copied > 0);
@@ -412,7 +412,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         });
         await db.SaveChangesAsync();
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
 
         // Get count of 2026 holidays
         await using var countDb = await _factory.CreateDbContextAsync();
@@ -428,7 +428,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     public async Task CopyHolidaysToYearAsync_NothingToCopy_ReturnsZero()
     {
         // Copy from year 2099 which has no holidays
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var copied = await orchestrator.CopyHolidaysToYearAsync(2099, 2100);
 
         Assert.Equal(0, copied);
@@ -442,7 +442,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     public async Task GetHolidayWorkingDaysLostAsync_FullWeek_ReturnsFive()
     {
         // Sun Jun 7 to Sat Jun 13, 2026 — working days: Sun, Mon, Tue, Wed, Thu = 5
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var result = await orchestrator.GetHolidayWorkingDaysLostAsync(
             new DateTime(2026, 6, 7), new DateTime(2026, 6, 13));
 
@@ -453,7 +453,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     public async Task GetHolidayWorkingDaysLostAsync_WeekendOnly_ReturnsZero()
     {
         // Fri Jun 5 to Sat Jun 6, 2026 — both are weekend
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var result = await orchestrator.GetHolidayWorkingDaysLostAsync(
             new DateTime(2026, 6, 5), new DateTime(2026, 6, 6));
 
@@ -464,7 +464,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     public async Task GetHolidayWorkingDaysLostAsync_SingleWorkday_ReturnsOne()
     {
         // Sun Jun 7, 2026 — Sunday is a workday
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var result = await orchestrator.GetHolidayWorkingDaysLostAsync(
             new DateTime(2026, 6, 7), new DateTime(2026, 6, 7));
 
@@ -475,7 +475,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     public async Task GetHolidayWorkingDaysLostAsync_SingleWeekendDay_ReturnsZero()
     {
         // Fri Jun 5, 2026 — Friday is weekend
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var result = await orchestrator.GetHolidayWorkingDaysLostAsync(
             new DateTime(2026, 6, 5), new DateTime(2026, 6, 5));
 
@@ -492,7 +492,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             orchestrator.GetTasksAsync(cts.Token));
@@ -504,7 +504,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             orchestrator.GetHolidaysAsync(cts.Token));
@@ -517,7 +517,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task GetTasksAsync_ReturnsOrderedBySchedulingRank()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var tasks = await orchestrator.GetTasksAsync();
         Assert.True(tasks.Count > 0);
     }
@@ -525,7 +525,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task GetTaskCountAsync_ReturnsCorrectCount()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var count = await orchestrator.GetTaskCountAsync();
         Assert.True(count > 0);
 
@@ -536,7 +536,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task UpsertTaskAsync_NewTask_PersistsInDb()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var task = new TaskItem
         {
             TaskId = "SV-NEW",
@@ -572,7 +572,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
             Priority = 3
         };
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         await orchestrator.UpsertTaskAsync(updated, isNew: false);
 
         await using var verifyDb = await _factory.CreateDbContextAsync();
@@ -590,7 +590,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         var existing = await db.Tasks.FirstAsync();
         var existingId = existing.Id;
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         await orchestrator.DeleteTaskAsync(existingId);
 
         await using var verifyDb = await _factory.CreateDbContextAsync();
@@ -601,7 +601,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task DeleteTaskAsync_NonExistent_DoesNotThrow()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var exception = await Record.ExceptionAsync(() =>
             orchestrator.DeleteTaskAsync(999999));
         Assert.Null(exception);
@@ -614,7 +614,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task GetResourcesAsync_ReturnsSeededResources()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var resources = await orchestrator.GetResourcesAsync();
         Assert.True(resources.Count > 0);
     }
@@ -622,7 +622,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task GetResourceCountAsync_ReturnsCorrectCount()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var count = await orchestrator.GetResourceCountAsync();
         Assert.True(count > 0);
 
@@ -633,7 +633,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task UpsertResourceAsync_NewResource_PersistsInDb()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var resource = new TeamMember
         {
             ResourceId = "RES-NEW",
@@ -674,7 +674,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
             Active = "Yes"
         };
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         await orchestrator.UpsertResourceAsync(updated, isNew: false);
 
         await using var verifyDb = await _factory.CreateDbContextAsync();
@@ -692,7 +692,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         var existing = await db.Resources.FirstAsync();
         var existingId = existing.Id;
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         await orchestrator.DeleteResourceAsync(existingId);
 
         await using var verifyDb = await _factory.CreateDbContextAsync();
@@ -703,7 +703,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task DeleteResourceAsync_NonExistent_DoesNotThrow()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var exception = await Record.ExceptionAsync(() =>
             orchestrator.DeleteResourceAsync(999999));
         Assert.Null(exception);
@@ -716,7 +716,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task GetAdjustmentsAsync_ReturnsListFromDb()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var adjustments = await orchestrator.GetAdjustmentsAsync();
         Assert.NotNull(adjustments);
         // Seeded data may or may not have adjustments; just verify it doesn't throw
@@ -725,7 +725,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task AddAdjustmentAsync_PersistsInDb()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var adjustment = new Adjustment
         {
             ResourceId = "DEV-001",
@@ -762,7 +762,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         await db.SaveChangesAsync();
         var adjId = adj.Id;
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         await orchestrator.DeleteAdjustmentAsync(adjId);
 
         await using var verifyDb = await _factory.CreateDbContextAsync();
@@ -773,7 +773,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task DeleteAdjustmentAsync_NonExistent_DoesNotThrow()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var exception = await Record.ExceptionAsync(() =>
             orchestrator.DeleteAdjustmentAsync(999999));
         Assert.Null(exception);
@@ -786,7 +786,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task GetCalendarAsync_AfterScheduler_ReturnsOrderedDays()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         await orchestrator.RunSchedulerAsync();
 
         var calendar = await orchestrator.GetCalendarAsync();
@@ -805,7 +805,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task GetOutputPlanAsync_ReturnsTaskPlan()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var plan = await orchestrator.GetOutputPlanAsync();
         Assert.NotNull(plan);
         Assert.True(plan.Count > 0);
@@ -818,7 +818,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task GetTimelineDataAsync_ReturnsExpectedDayCount()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         await orchestrator.RunSchedulerAsync();
 
         await using var db = await _factory.CreateDbContextAsync();
@@ -835,7 +835,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task GetTimelineDataAsync_WeekendsHaveCorrectStatus()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         await orchestrator.RunSchedulerAsync();
 
         await using var db = await _factory.CreateDbContextAsync();
@@ -864,7 +864,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     public async Task CopyHolidaysToYearAsync_SameYear_ReturnsZero()
     {
         // Copying from 2026 to 2026 should skip all because they all overlap with themselves
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         var copied = await orchestrator.CopyHolidaysToYearAsync(2026, 2026);
         Assert.Equal(0, copied);
     }
@@ -872,7 +872,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     [Fact]
     public async Task CopyHolidaysToYearAsync_CalledTwice_SecondCallReturnsZero()
     {
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
 
         // First copy: should succeed
         var firstCopy = await orchestrator.CopyHolidaysToYearAsync(2026, 2030);
@@ -893,7 +893,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             orchestrator.GetResourcesAsync(cts.Token));
     }
@@ -904,7 +904,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             orchestrator.GetAdjustmentsAsync(cts.Token));
     }
@@ -915,7 +915,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             orchestrator.GetCalendarAsync(cts.Token));
     }
@@ -926,7 +926,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             orchestrator.GetOutputPlanAsync(cts.Token));
     }
@@ -937,7 +937,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        var orchestrator = new SchedulingOrchestrator(_factory);
+        var orchestrator = new SchedulingOrchestrator(_factory, TimeProvider.System);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             orchestrator.GetTimelineDataAsync("DEV-001", DateTime.Today, DateTime.Today.AddDays(7), cts.Token));
     }
