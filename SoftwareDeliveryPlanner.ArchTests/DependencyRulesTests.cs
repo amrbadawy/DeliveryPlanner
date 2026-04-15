@@ -529,4 +529,312 @@ public class DependencyRulesTests
             $"Domain value objects must not have public setters — they must be immutable. " +
             $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
     }
+
+    // ─────────────────────────────────────────────────────────
+    // Architecture Rule: Commands must be record types
+    // Records are immutable by design — a class-based command can
+    // be mutated between pipeline behaviors, silently corrupting state.
+    // ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Commands_Must_Be_Record_Types()
+    {
+        var assembly = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+
+        var commandTypes = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract && t.Name.EndsWith("Command"))
+            .ToList();
+
+        // C# records compile to classes with a compiler-generated <Clone>$ method.
+        var violations = commandTypes
+            .Where(t => t.GetMethod("<Clone>$") == null)
+            .Select(t => t.FullName ?? t.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"All commands must be 'record' types, not plain classes. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Architecture Rule: Queries must be record types
+    // Same reasoning as commands — immutable intent objects.
+    // ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Queries_Must_Be_Record_Types()
+    {
+        var assembly = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+
+        var queryTypes = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract && t.Name.EndsWith("Query"))
+            .ToList();
+
+        var violations = queryTypes
+            .Where(t => t.GetMethod("<Clone>$") == null)
+            .Select(t => t.FullName ?? t.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"All queries must be 'record' types, not plain classes. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Architecture Rule: Validators must be sealed
+    // Open validators allow inheritance-based composition which
+    // produces unpredictable validation chains. Parallel to the
+    // handler sealed rule.
+    // ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Validators_Must_Be_Sealed()
+    {
+        var assembly = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+
+        var validators = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract && t.BaseType is { IsGenericType: true }
+                && t.BaseType.GetGenericTypeDefinition().FullName!.Contains("AbstractValidator"))
+            .ToList();
+
+        var violations = validators
+            .Where(t => !t.IsSealed)
+            .Select(t => t.FullName ?? t.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"All validators must be sealed. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Architecture Rule: Pipeline behaviors must be sealed
+    // Unsealed behaviors invite inheritance which produces
+    // unpredictable pipeline execution order and side effects.
+    // ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Pipeline_Behaviors_Must_Be_Sealed()
+    {
+        var assembly = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+
+        var behaviors = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract)
+            .Where(t => t.GetInterfaces().Any(i =>
+                i.IsGenericType &&
+                i.GetGenericTypeDefinition() == typeof(MediatR.IPipelineBehavior<,>)))
+            .ToList();
+
+        var violations = behaviors
+            .Where(t => !t.IsSealed)
+            .Select(t => t.FullName ?? t.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"All MediatR pipeline behaviors must be sealed. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Architecture Rule: Every DbSet<T> must have an explicit
+    // IEntityTypeConfiguration<T> in Infrastructure.
+    // Without this, EF Core silently falls back to convention-based
+    // mapping, producing wrong column types or missing indexes in prod.
+    // Uses string-based type matching to avoid adding an EF Core
+    // dependency to this architecture test project.
+    // ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Every_DbSet_Must_Have_Explicit_Configuration()
+    {
+        var infraAssembly = typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly;
+
+        const string dbSetFullName        = "Microsoft.EntityFrameworkCore.DbSet`1";
+        const string dbContextFullName    = "Microsoft.EntityFrameworkCore.DbContext";
+        const string entityConfigFullName = "Microsoft.EntityFrameworkCore.IEntityTypeConfiguration`1";
+
+        // Find the DbContext subclass in Infrastructure
+        var dbContextType = infraAssembly.GetTypes()
+            .FirstOrDefault(t => t.IsClass && !t.IsAbstract
+                && IsAssignableToName(t, dbContextFullName));
+
+        Assert.NotNull(dbContextType);
+
+        // Collect all entity types exposed as DbSet<T> properties
+        var dbSetEntityTypes = dbContextType!.GetProperties()
+            .Where(p => p.PropertyType.IsGenericType
+                && p.PropertyType.GetGenericTypeDefinition().FullName == dbSetFullName)
+            .Select(p => p.PropertyType.GetGenericArguments()[0])
+            .ToHashSet();
+
+        // Collect all entity types that have an explicit IEntityTypeConfiguration<T>
+        var configuredEntityTypes = infraAssembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract)
+            .SelectMany(t => t.GetInterfaces()
+                .Where(i => i.IsGenericType
+                    && i.GetGenericTypeDefinition().FullName == entityConfigFullName)
+                .Select(i => i.GetGenericArguments()[0]))
+            .ToHashSet();
+
+        var missing = dbSetEntityTypes
+            .Where(e => !configuredEntityTypes.Contains(e))
+            .Select(e => e.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(missing.Count == 0,
+            $"Every DbSet<T> in the DbContext must have an explicit IEntityTypeConfiguration<T>. " +
+            $"Missing:{Environment.NewLine}{string.Join(Environment.NewLine, missing)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Architecture Rule: EF entity configurations must only exist
+    // in the Infrastructure layer. A configuration file in Domain
+    // or Application would pull an EF Core dependency into the
+    // wrong layer and break the persistence boundary.
+    // ─────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("Domain")]
+    [InlineData("Application")]
+    public void EF_Configurations_Must_Not_Exist_Outside_Infrastructure(string layer)
+    {
+        const string entityConfigFullName = "Microsoft.EntityFrameworkCore.IEntityTypeConfiguration`1";
+
+        var assembly = layer switch
+        {
+            "Domain"      => typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly,
+            "Application" => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
+            _             => throw new ArgumentException($"Unknown layer: {layer}")
+        };
+
+        var violations = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract)
+            .Where(t => t.GetInterfaces().Any(i =>
+                i.IsGenericType &&
+                i.GetGenericTypeDefinition().FullName == entityConfigFullName))
+            .Select(t => t.FullName ?? t.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"IEntityTypeConfiguration<T> implementations must only exist in Infrastructure. " +
+            $"Found in {layer}:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Architecture Rule: Public concrete classes in the Infrastructure
+    // layer (namespace SoftwareDeliveryPlanner.Infrastructure.*) must
+    // implement at least one interface from the Application layer.
+    // This ensures the abstraction boundary is always owned by Application,
+    // and no Infrastructure class is directly consumed without a contract.
+    //
+    // Excluded by design:
+    //   - DbContext subclasses (persistence host, not a service)
+    //   - IEntityTypeConfiguration<T> implementations (EF mapping, not services)
+    //   - Design-time factories (*DesignTimeFactory, used only by EF tooling)
+    //   - AssemblyMarker (marker type, no behaviour)
+    // Note: SchedulingEngine lives in namespace SoftwareDeliveryPlanner.Services
+    // (not .Infrastructure.*) and is an internal implementation detail of
+    // SchedulingOrchestrator — it should be made internal in a future cleanup.
+    // ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Infrastructure_Services_Must_Implement_Application_Interface()
+    {
+        var infraAssembly = typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly;
+        var appAssembly   = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+
+        const string dbContextFullName    = "Microsoft.EntityFrameworkCore.DbContext";
+        const string entityConfigFullName = "Microsoft.EntityFrameworkCore.IEntityTypeConfiguration`1";
+
+        var appInterfaces = appAssembly.GetTypes()
+            .Where(t => t.IsInterface)
+            .ToHashSet();
+
+        var serviceClasses = infraAssembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract && !t.IsGenericTypeDefinition && t.IsPublic)
+            .Where(t => t.Namespace != null
+                && t.Namespace.StartsWith("SoftwareDeliveryPlanner.Infrastructure",
+                    StringComparison.Ordinal)
+                && !t.Namespace.Contains("Migrations"))
+            .Where(t => !IsAssignableToName(t, dbContextFullName))
+            .Where(t => !t.GetInterfaces().Any(i =>
+                i.IsGenericType &&
+                i.GetGenericTypeDefinition().FullName == entityConfigFullName))
+            .Where(t => !t.Name.EndsWith("DesignTimeFactory"))
+            .Where(t => t.Name != "AssemblyMarker")
+            .ToList();
+
+        var violations = serviceClasses
+            .Where(t => !t.GetInterfaces().Any(i => appInterfaces.Contains(i)))
+            .Select(t => t.FullName ?? t.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"All public Infrastructure service classes must implement an Application-layer interface. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Architecture Rule: No async void methods in Domain or Application
+    // async void cannot be awaited, exceptions are swallowed (crashing
+    // the process in Blazor Server), and the method bypasses the
+    // MediatR pipeline entirely. Always use async Task instead.
+    // ─────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("Domain")]
+    [InlineData("Application")]
+    public void No_Async_Void_Methods(string layer)
+    {
+        var assembly = layer switch
+        {
+            "Domain"      => typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly,
+            "Application" => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
+            _             => throw new ArgumentException($"Unknown layer: {layer}")
+        };
+
+        var violations = assembly.GetTypes()
+            .SelectMany(t => t.GetMethods(
+                BindingFlags.Public | BindingFlags.NonPublic |
+                BindingFlags.Instance | BindingFlags.Static |
+                BindingFlags.DeclaredOnly))
+            .Where(m => m.ReturnType == typeof(void))
+            .Where(m => m.GetCustomAttributes(
+                typeof(System.Runtime.CompilerServices.AsyncStateMachineAttribute),
+                inherit: false).Length > 0)
+            .Select(m => $"{m.DeclaringType?.Name}.{m.Name}")
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"async void methods are forbidden in {layer} — use async Task instead. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Checks whether <paramref name="type"/> is assignable to a base type
+    /// identified by its full name, without requiring a direct assembly reference.
+    /// Walks the full inheritance chain.
+    /// </summary>
+    private static bool IsAssignableToName(Type type, string fullName)
+    {
+        var current = type;
+        while (current != null)
+        {
+            if (current.FullName == fullName) return true;
+            current = current.BaseType;
+        }
+        return false;
+    }
 }
