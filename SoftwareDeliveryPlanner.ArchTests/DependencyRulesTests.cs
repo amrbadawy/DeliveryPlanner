@@ -819,6 +819,199 @@ public class DependencyRulesTests
     }
 
     // ─────────────────────────────────────────────────────────
+    // Architecture Rule: Domain must not inject ILogger<T>
+    // Domain objects are pure business logic — logging is an
+    // infrastructure concern. ILogger injection drags a logging
+    // abstraction into the domain, coupling it to the logging
+    // infrastructure and making it harder to test.
+    // ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Domain_Must_Not_Inject_ILogger()
+    {
+        var assembly = typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly;
+
+        const string iLoggerGenericName = "Microsoft.Extensions.Logging.ILogger`1";
+
+        var violations = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract)
+            .Where(t => t.GetConstructors().Any(c =>
+                c.GetParameters().Any(p =>
+                    p.ParameterType.IsGenericType &&
+                    p.ParameterType.GetGenericTypeDefinition().FullName == iLoggerGenericName)))
+            .Select(t => t.FullName ?? t.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"Domain classes must not inject ILogger<T> — logging is an infrastructure concern. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Architecture Rule: No IServiceProvider injection in
+    // Domain or Application (service locator anti-pattern).
+    // Hidden dependencies make classes untestable, break the
+    // dependency inversion principle, and obscure the true
+    // dependency graph.
+    // ─────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("Domain")]
+    [InlineData("Application")]
+    public void No_IServiceProvider_Injection(string layer)
+    {
+        var assembly = layer switch
+        {
+            "Domain"      => typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly,
+            "Application" => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
+            _             => throw new ArgumentException($"Unknown layer: {layer}")
+        };
+
+        const string serviceProviderFullName = "System.IServiceProvider";
+
+        var violations = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract)
+            .Where(t => t.GetConstructors().Any(c =>
+                c.GetParameters().Any(p =>
+                    p.ParameterType.FullName == serviceProviderFullName)))
+            .Select(t => t.FullName ?? t.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"IServiceProvider injection is forbidden in {layer} — it is a service locator anti-pattern. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Architecture Rule: Handlers must not directly inject
+    // other handlers. Cross-handler calls must go through
+    // ISender (MediatR pipeline) to preserve pipeline
+    // behaviors (validation, logging, transactions, etc.).
+    // ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Handlers_Must_Not_Inject_Other_Handlers()
+    {
+        var assembly = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+
+        var handlerTypes = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract)
+            .Where(t => t.GetInterfaces().Any(i =>
+                i.IsGenericType && i.GetGenericTypeDefinition() == typeof(MediatR.IRequestHandler<,>)))
+            .ToHashSet();
+
+        var violations = handlerTypes
+            .Where(handler => handler.GetConstructors()
+                .Any(c => c.GetParameters()
+                    .Any(p => handlerTypes.Contains(p.ParameterType))))
+            .Select(t => t.FullName ?? t.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"Handlers must not inject other handlers directly — use ISender to dispatch through the pipeline. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Architecture Rule: Application DTOs must be sealed record types.
+    // DTOs cross layer boundaries as return values. Records
+    // enforce value equality and immutability; sealed prevents
+    // inheritance-based mutation of the DTO contract.
+    // ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Application_DTOs_Must_Be_Sealed_Record_Types()
+    {
+        var assembly = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+
+        var dtoTypes = assembly.GetTypes()
+            .Where(t => t.Name.EndsWith("Dto"))
+            .ToList();
+
+        Assert.NotEmpty(dtoTypes);
+
+        var violations = dtoTypes
+            .Where(t => !t.IsSealed || t.GetMethod("<Clone>$") == null)
+            .Select(t => t.FullName ?? t.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"All Application DTOs must be 'sealed record' types. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Architecture Rule: No mutable static fields in Domain
+    // or Application. Blazor Server shares one process across
+    // all user sessions — mutable statics are shared state
+    // that causes data leaks and race conditions between
+    // concurrent user requests.
+    // ─────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("Domain")]
+    [InlineData("Application")]
+    public void No_Mutable_Static_Fields(string layer)
+    {
+        var assembly = layer switch
+        {
+            "Domain"      => typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly,
+            "Application" => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
+            _             => throw new ArgumentException($"Unknown layer: {layer}")
+        };
+
+        var violations = assembly.GetTypes()
+            .SelectMany(t => t.GetFields(
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+            .Where(f => !f.IsLiteral && !f.IsInitOnly)
+            // Exclude fields with CompilerGeneratedAttribute (compiler-generated backing fields)
+            .Where(f => !f.GetCustomAttributes(
+                typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false).Any())
+            // Exclude fields on compiler-generated types (e.g. <>c lambda cache classes, <>O delegate cache)
+            .Where(f => f.DeclaringType?.GetCustomAttributes(
+                typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false).Any() != true)
+            .Select(f => $"{f.DeclaringType?.Name}.{f.Name}")
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"Mutable static fields are forbidden in {layer} — use dependency injection instead. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Architecture Rule: Application and Infrastructure must
+    // each contain a DependencyInjection static class.
+    // Each layer is responsible for registering its own services.
+    // Centralising registrations in the host is a dependency
+    // inversion violation and makes layers non-portable.
+    // ─────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("Application")]
+    [InlineData("Infrastructure")]
+    public void Layer_Must_Have_DependencyInjection_Static_Class(string layer)
+    {
+        var assembly = layer switch
+        {
+            "Application"    => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
+            "Infrastructure" => typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly,
+            _                => throw new ArgumentException($"Unknown layer: {layer}")
+        };
+
+        // In C#, 'static class' compiles to abstract + sealed in IL.
+        var hasClass = assembly.GetTypes()
+            .Any(t => t.Name == "DependencyInjection" && t.IsClass && t.IsAbstract && t.IsSealed);
+
+        Assert.True(hasClass,
+            $"{layer} must contain a 'DependencyInjection' static class to own its own service registrations.");
+    }
+
+    // ─────────────────────────────────────────────────────────
     // Helpers
     // ─────────────────────────────────────────────────────────
 
