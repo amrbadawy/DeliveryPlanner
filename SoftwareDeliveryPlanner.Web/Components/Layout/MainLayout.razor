@@ -1,19 +1,24 @@
 @inherits LayoutComponentBase
 
 <div class="page">
-    <div class="sidebar" style="background: #2c3e50;">
-        <div class="brand" style="padding: 20px; color: white; font-size: 18px; font-weight: bold; text-align: center; border-bottom: 1px solid #34495e;">
-            Software Delivery Planner
+    <div class="sidebar">
+        <div class="brand">
+            <i class="bi bi-kanban me-2"></i>
+            <span>Delivery Planner</span>
         </div>
         <NavMenu />
     </div>
 
-    <main style="background: #f5f6fa;">
-        <div class="top-row px-4" style="background: #3498db; color: white;">
-            <span style="font-weight: 500;">Software Delivery Planner</span>
+    <main>
+        <div class="top-row px-4">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item active">Software Delivery Planner</li>
+                </ol>
+            </nav>
         </div>
 
-        <article class="content px-4" style="padding: 20px;">
+        <article class="content px-4">
             @Body
         </article>
     </main>
@@ -22,5 +27,5 @@
 <div id="blazor-error-ui" data-nosnippet>
     An unexpected error has occurred
     <a href="." class="reload">Reload</a>
-    <span class="dismiss">✕</span>
+    <span class="dismiss">&#x2715;</span>
 </div>

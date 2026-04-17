@@ -61,4 +61,5 @@ public interface IPlanningQueryService
     Task<List<CalendarDay>> GetCalendarAsync(CancellationToken cancellationToken = default);
     Task<TimelineDataDto> GetTimelineDataAsync(string resourceId, DateTime start, DateTime end, CancellationToken cancellationToken = default);
     Task<List<OutputPlanRowDto>> GetOutputPlanAsync(CancellationToken cancellationToken = default);
+    Task<TaskTimelineDto> GetTaskTimelineAsync(string taskId, CancellationToken cancellationToken = default);
 }

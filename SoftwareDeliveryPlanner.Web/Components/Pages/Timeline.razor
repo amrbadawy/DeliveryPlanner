@@ -8,61 +8,80 @@
 
 <PageTitle>Employee Timeline</PageTitle>
 
-<h3 style="margin-bottom: 20px;">🗓️ Employee Timeline</h3>
+<div class="d-flex justify-content-between align-items-start mb-4 page-header">
+    <div>
+        <h3 class="mb-1"><i class="bi bi-calendar-range me-2"></i>Employee Timeline</h3>
+        <p class="page-subtitle">View employee day-by-day schedule and status</p>
+    </div>
+</div>
 
-<div class="row mb-3">
-    <div class="col-md-3">
-        <label>Employee:</label>
-        <select class="form-control" @onchange="OnResourceChanged" data-testid="timeline-resource">
-            @foreach (var r in resources)
+@if (!isLoaded)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 text-muted">Loading timeline...</p>
+    </div>
+}
+else
+{
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label class="form-label">Employee:</label>
+            <select class="form-control" @onchange="OnResourceChanged" data-testid="timeline-resource">
+                @foreach (var r in resources)
+                {
+                    <option value="@r.ResourceId">@r.ResourceName</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Start Date:</label>
+            <input class="form-control" type="date" @bind="startDate" data-testid="timeline-start-date" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">End Date:</label>
+            <input class="form-control" type="date" @bind="endDate" data-testid="timeline-end-date" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-primary w-100" @onclick="LoadTimeline" data-testid="timeline-refresh">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <div class="timeline-container" style="overflow-x: auto; padding: 10px;" data-testid="timeline-container">
+        <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+            @foreach (var day in timelineDays)
             {
-                <option value="@r.ResourceId">@r.ResourceName</option>
+                <div style="
+                    width: 100px; 
+                    height: 80px; 
+                    border: 1px solid #ddd; 
+                    border-radius: 5px;
+                    padding: 5px;
+                    text-align: center;
+                    background: @GetDayColor(day.Status);
+                    font-size: 12px;">
+                    <div style="font-weight: bold;">@day.Date.ToString("MMM") @day.DateDisplay</div>
+                    <div style="margin-top: 5px;">@day.StatusText</div>
+                </div>
             }
-        </select>
+        </div>
     </div>
-    <div class="col-md-3">
-        <label>Start Date:</label>
-        <input class="form-control" type="date" @bind="startDate" data-testid="timeline-start-date" />
-    </div>
-    <div class="col-md-3">
-        <label>End Date:</label>
-        <input class="form-control" type="date" @bind="endDate" data-testid="timeline-end-date" />
-    </div>
-    <div class="col-md-3">
-        <label>&nbsp;</label>
-        <button class="btn btn-primary w-100" @onclick="LoadTimeline" data-testid="timeline-refresh">🔄 Refresh</button>
-    </div>
-</div>
 
-<div class="timeline-container" style="overflow-x: auto; padding: 10px;" data-testid="timeline-container">
-    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-        @foreach (var day in timelineDays)
-        {
-            <div style="
-                width: 100px; 
-                height: 80px; 
-                border: 1px solid #ddd; 
-                border-radius: 5px;
-                padding: 5px;
-                text-align: center;
-                background: @GetDayColor(day.Status);
-                font-size: 12px;">
-                <div style="font-weight: bold;">@day.Date.ToString("MMM") @day.DateDisplay</div>
-                <div style="margin-top: 5px;">@day.StatusText</div>
-            </div>
-        }
+    <div class="mt-3">
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <div><span style="display: inline-block; width: 20px; height: 20px; background: var(--color-success-light); border: 1px solid #ccc;"></span> Working Day</div>
+            <div><span style="display: inline-block; width: 20px; height: 20px; background: var(--color-neutral-light); border: 1px solid #ccc;"></span> Weekend</div>
+            <div><span style="display: inline-block; width: 20px; height: 20px; background: var(--color-warning-light); border: 1px solid #ccc;"></span> Holiday</div>
+            <div><span style="display: inline-block; width: 20px; height: 20px; background: var(--color-accent-light); border: 1px solid #ccc;"></span> Adjustment</div>
+            <div><span style="display: inline-block; width: 20px; height: 20px; background: var(--color-info-light); border: 1px solid #ccc;"></span> Task</div>
+        </div>
     </div>
-</div>
-
-<div class="mt-3">
-    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-        <div><span style="display: inline-block; width: 20px; height: 20px; background: #d4edda; border: 1px solid #ccc;"></span> Working Day</div>
-        <div><span style="display: inline-block; width: 20px; height: 20px; background: #f8f9fa; border: 1px solid #ccc;"></span> Weekend</div>
-        <div><span style="display: inline-block; width: 20px; height: 20px; background: #fff3cd; border: 1px solid #ccc;"></span> Holiday</div>
-        <div><span style="display: inline-block; width: 20px; height: 20px; background: #cce5ff; border: 1px solid #ccc;"></span> Adjustment</div>
-        <div><span style="display: inline-block; width: 20px; height: 20px; background: #d1ecf1; border: 1px solid #ccc;"></span> Task</div>
-    </div>
-</div>
+}
 
 @code {
     private List<TeamMember> resources = new();
@@ -70,6 +89,7 @@
     private string selectedResourceId = "";
     private DateTime startDate = DateTime.Today.AddDays(-7);
     private DateTime endDate = DateTime.Today.AddMonths(2);
+    private bool isLoaded = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -80,6 +100,7 @@
             selectedResourceId = resources.First().ResourceId;
             await LoadTimeline();
         }
+        isLoaded = true;
     }
 
     private async Task OnResourceChanged(ChangeEventArgs e)
@@ -99,11 +120,11 @@
 
     private static string GetDayColor(TimelineDayStatus status) => status switch
     {
-        TimelineDayStatus.Weekend => "#f8f9fa",
-        TimelineDayStatus.Holiday => "#fff3cd",
-        TimelineDayStatus.Adjustment => "#cce5ff",
-        TimelineDayStatus.Working => "#d1ecf1",
-        TimelineDayStatus.Free => "#d4edda",
+        TimelineDayStatus.Weekend => "var(--color-neutral-light)",
+        TimelineDayStatus.Holiday => "var(--color-warning-light)",
+        TimelineDayStatus.Adjustment => "var(--color-accent-light)",
+        TimelineDayStatus.Working => "var(--color-info-light)",
+        TimelineDayStatus.Free => "var(--color-success-light)",
         _ => "#ffffff"
     };
 }

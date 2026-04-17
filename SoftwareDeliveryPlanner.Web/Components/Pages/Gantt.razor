@@ -8,10 +8,16 @@
 
 <PageTitle>Gantt Chart</PageTitle>
 
-<h3 style="margin-bottom: 20px;">📊 Gantt Chart</h3>
-
-<div class="mb-3">
-    <button class="btn btn-secondary" @onclick="RefreshData" data-testid="gantt-refresh">🔄 Refresh</button>
+<div class="d-flex justify-content-between align-items-start mb-4 page-header">
+    <div>
+        <h3 class="mb-1"><i class="bi bi-bar-chart-steps me-2"></i>Gantt Chart</h3>
+        <p class="page-subtitle">Visual timeline of task scheduling and progress</p>
+    </div>
+    <div>
+        <button class="btn btn-outline-secondary" @onclick="RefreshData" data-testid="gantt-refresh">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+    </div>
 </div>
 
 @if (!scheduledTasks.Any())
@@ -29,11 +35,11 @@ else
 
     <!-- Legend -->
     <div class="d-flex gap-3 mb-3" data-testid="gantt-legend">
-        <span><span class="badge" style="background: #28a745;">&nbsp;&nbsp;</span> Completed</span>
-        <span><span class="badge" style="background: #17a2b8;">&nbsp;&nbsp;</span> In Progress</span>
-        <span><span class="badge" style="background: #6c757d;">&nbsp;&nbsp;</span> Not Started</span>
-        <span><span class="badge" style="background: #ffc107;">&nbsp;&nbsp;</span> At Risk</span>
-        <span><span class="badge" style="background: #dc3545;">&nbsp;&nbsp;</span> Late</span>
+        <span><span class="badge" style="background: var(--color-success);">&nbsp;&nbsp;</span> Completed</span>
+        <span><span class="badge" style="background: var(--color-info);">&nbsp;&nbsp;</span> In Progress</span>
+        <span><span class="badge" style="background: var(--color-neutral);">&nbsp;&nbsp;</span> Not Started</span>
+        <span><span class="badge" style="background: var(--color-warning);">&nbsp;&nbsp;</span> At Risk</span>
+        <span><span class="badge" style="background: var(--color-danger);">&nbsp;&nbsp;</span> Late</span>
     </div>
 
     <!-- Month headers -->
@@ -88,7 +94,7 @@ else
 
                         @if (!string.IsNullOrWhiteSpace(task.DependsOnTaskIds))
                         {
-                            <span class="gantt-dep-indicator" title="Depends on: @task.DependsOnTaskIds">🔗</span>
+                            <span class="gantt-dep-indicator" title="Depends on: @task.DependsOnTaskIds"><i class="bi bi-link-45deg"></i></span>
                         }
                     }
                     else
@@ -115,16 +121,16 @@ else
 <style>
     .gantt-container {
         position: relative;
-        border: 1px solid #dee2e6;
-        border-radius: 4px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
         overflow-x: auto;
         min-width: 800px;
     }
 
     .gantt-header {
         display: flex;
-        border-bottom: 2px solid #343a40;
-        background: #343a40;
+        border-bottom: 2px solid var(--color-sidebar);
+        background: var(--color-sidebar);
         color: white;
         font-size: 0.85rem;
     }
@@ -136,7 +142,7 @@ else
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        border-right: 1px solid #dee2e6;
+        border-right: 1px solid var(--color-border);
     }
 
     .gantt-timeline-col {
@@ -162,34 +168,34 @@ else
 
     .gantt-row {
         display: flex;
-        border-bottom: 1px solid #e9ecef;
+        border-bottom: 1px solid var(--color-border-light);
     }
 
     .gantt-row:nth-child(even) {
-        background: #f8f9fa;
+        background: var(--color-bg-secondary);
     }
 
     .gantt-row:hover {
-        background: #e8f4fd;
+        background: var(--color-accent-light);
     }
 
     .gantt-task-id {
         font-weight: 600;
         font-size: 0.8rem;
-        color: #495057;
+        color: var(--color-text-secondary);
         margin-right: 6px;
     }
 
     .gantt-task-name {
         font-size: 0.8rem;
-        color: #6c757d;
+        color: var(--color-text-muted);
     }
 
     .gantt-bar {
         position: absolute;
         height: 20px;
         top: 6px;
-        border-radius: 3px;
+        border-radius: var(--radius-sm);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -213,7 +219,7 @@ else
         top: 0;
         bottom: 0;
         width: 2px;
-        background: #dc3545;
+        background: var(--color-danger);
         z-index: 2;
     }
 
@@ -223,7 +229,7 @@ else
         top: -2px;
         left: -5px;
         font-size: 0.6rem;
-        color: #dc3545;
+        color: var(--color-danger);
     }
 
     .gantt-dep-indicator {
@@ -238,7 +244,7 @@ else
         top: 0;
         bottom: 0;
         width: 2px;
-        background: #007bff;
+        background: var(--color-accent);
         z-index: 3;
         opacity: 0.7;
     }
@@ -249,7 +255,7 @@ else
         top: 2px;
         left: 4px;
         font-size: 0.65rem;
-        color: #007bff;
+        color: var(--color-accent);
         white-space: nowrap;
     }
 </style>
@@ -328,16 +334,16 @@ else
     {
         // Color by risk first (Late/AtRisk take precedence for visual warnings)
         if (task.DeliveryRisk == DomainConstants.DeliveryRisk.Late)
-            return "#dc3545";
+            return "#dc2626";
         if (task.DeliveryRisk == DomainConstants.DeliveryRisk.AtRisk)
-            return "#ffc107";
+            return "#f59e0b";
 
         // Otherwise color by status
         return task.Status switch
         {
-            var s when s == DomainConstants.TaskStatus.Completed => "#28a745",
-            var s when s == DomainConstants.TaskStatus.InProgress => "#17a2b8",
-            _ => "#6c757d"
+            var s when s == DomainConstants.TaskStatus.Completed => "#16a34a",
+            var s when s == DomainConstants.TaskStatus.InProgress => "#0ea5e9",
+            _ => "#64748b"
         };
     }
 

@@ -1,0 +1,161 @@
+@page "/tasks/{TaskId}"
+@using MediatR
+@using SoftwareDeliveryPlanner.Application.Tasks.Queries
+@using SoftwareDeliveryPlanner.Application.Abstractions
+@using SoftwareDeliveryPlanner.Domain.Models
+@using SoftwareDeliveryPlanner.Domain
+@inject IMediator Mediator
+@inject NavigationManager NavigationManager
+
+<PageTitle>Task Details - @TaskId</PageTitle>
+
+@if (isLoading)
+{
+    <p><em>Loading task details...</em></p>
+}
+else if (task == null)
+{
+    <p><em>Task not found.</em></p>
+    <button class="btn btn-secondary" @onclick="GoBack" data-testid="task-details-back"><i class="bi bi-arrow-left me-1"></i> Back to Tasks</button>
+}
+else
+{
+    <div class="page-header mb-4">
+        <nav aria-label="breadcrumb" class="mb-2">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/tasks">Task Register</a></li>
+                <li class="breadcrumb-item active">@task.TaskId</li>
+            </ol>
+        </nav>
+        <h3 class="mb-1"><i class="bi bi-file-earmark-text me-2"></i>@task.ServiceName</h3>
+    </div>
+
+    <div class="card mb-3" data-testid="task-details-card">
+        <div class="card-header bg-transparent">
+            <strong>@task.ServiceName</strong>
+        </div>
+        <div class="card-body">
+            <dl class="row">
+                <dt class="col-sm-3">Service Name</dt>
+                <dd class="col-sm-9" data-testid="td-service-name">@task.ServiceName</dd>
+                
+                <dt class="col-sm-3">Estimation (days)</dt>
+                <dd class="col-sm-9" data-testid="td-dev-estimation">@task.DevEstimation</dd>
+
+                <dt class="col-sm-3">Max Developers</dt>
+                <dd class="col-sm-9" data-testid="td-max-dev">@task.MaxDev</dd>
+
+                <dt class="col-sm-3">Priority</dt>
+                <dd class="col-sm-9" data-testid="td-priority">@task.Priority</dd>
+
+                <dt class="col-sm-3">Strict Date</dt>
+                <dd class="col-sm-9" data-testid="td-strict-date">@(task.StrictDate?.ToString("yyyy-MM-dd") ?? "None")</dd>
+                
+                <dt class="col-sm-3">Dependencies</dt>
+                <dd class="col-sm-9" data-testid="td-depends-on">@(string.IsNullOrWhiteSpace(task.DependsOnTaskIds) ? "None" : task.DependsOnTaskIds)</dd>
+
+                <dt class="col-sm-3">Status</dt>
+                <dd class="col-sm-9" data-testid="td-status">
+                    <span class="badge bg-@(task.Status == DomainConstants.TaskStatus.Completed ? "success" : task.Status == DomainConstants.TaskStatus.InProgress ? "info" : "secondary")">
+                        @task.Status
+                    </span>
+                </dd>
+
+                <dt class="col-sm-3">Risk</dt>
+                <dd class="col-sm-9" data-testid="td-risk">
+                    <span class="badge bg-@(task.DeliveryRisk == DomainConstants.DeliveryRisk.OnTrack ? "success" : task.DeliveryRisk == DomainConstants.DeliveryRisk.AtRisk ? "warning" : "danger")">
+                        @task.DeliveryRisk
+                    </span>
+                </dd>
+
+                <dt class="col-sm-3">Planned Start</dt>
+                <dd class="col-sm-9" data-testid="td-planned-start">@(task.PlannedStart?.ToString("yyyy-MM-dd") ?? "N/A")</dd>
+
+                <dt class="col-sm-3">Planned Finish</dt>
+                <dd class="col-sm-9" data-testid="td-planned-finish">@(task.PlannedFinish?.ToString("yyyy-MM-dd") ?? "N/A")</dd>
+
+                <dt class="col-sm-3">Duration (days)</dt>
+                <dd class="col-sm-9" data-testid="td-duration">@task.Duration</dd>
+            </dl>
+        </div>
+        <div class="card-footer">
+            <button class="btn btn-secondary" @onclick="GoBack" data-testid="task-details-back-bottom"><i class="bi bi-arrow-left me-1"></i> Back to Tasks</button>
+        </div>
+    </div>
+
+    <h4 class="mt-4 mb-3"><i class="bi bi-calendar-range me-2"></i>Assignment Timeline</h4>
+    @if (isTimelineLoading)
+    {
+        <p><em>Loading timeline...</em></p>
+    }
+    else if (timeline == null || !timeline.Days.Any())
+    {
+        <p><em>No timeline data available for this task. It may not be scheduled yet.</em></p>
+    }
+    else
+    {
+        <table class="table table-bordered table-sm" data-testid="task-timeline-table">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 15%">Date</th>
+                    <th style="width: 20%">Status</th>
+                    <th style="width: 65%">Assigned Developers</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var day in timeline.Days)
+                {
+                    <tr class="@(day.IsWorkingDay ? "" : "table-secondary")">
+                        <td>@day.DateDisplay</td>
+                        <td>@day.StatusText</td>
+                        <td>
+                            @if (day.AssignedDevelopers.Any())
+                            {
+                                @foreach (var dev in day.AssignedDevelopers)
+                                {
+                                    <span class="badge bg-primary me-1">@dev</span>
+                                }
+                            }
+                            else if (day.IsWorkingDay)
+                            {
+                                <span class="text-muted">None</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    [Parameter]
+    public string TaskId { get; set; } = string.Empty;
+
+    private TaskItem? task;
+    private TaskTimelineDto? timeline;
+    private bool isLoading = true;
+    private bool isTimelineLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Mediator.Send(new GetTaskByIdQuery(TaskId));
+        if (result.IsSuccess)
+        {
+            task = result.Value;
+        }
+        isLoading = false;
+
+        var timelineResult = await Mediator.Send(new GetTaskTimelineQuery(TaskId));
+        if (timelineResult.IsSuccess)
+        {
+            timeline = timelineResult.Value;
+        }
+        isTimelineLoading = false;
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/tasks");
+    }
+}

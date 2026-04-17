@@ -6,85 +6,119 @@
 
 <PageTitle>Dashboard</PageTitle>
 
-<h3 style="margin-bottom: 20px;">📊 Dashboard</h3>
-
-<div class="row">
-    <div class="col-md-3">
-        <div class="card text-white bg-primary mb-3">
-            <div class="card-header">Total Services</div>
-            <div class="card-body">
-                <h4 class="card-title">@totalServices</h4>
-            </div>
-        </div>
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-start mb-4 page-header">
+    <div>
+        <h3 class="mb-1"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h3>
+        <p class="page-subtitle">Overview of your delivery schedule and key metrics</p>
     </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-success mb-3">
-            <div class="card-header">Total Estimation (days)</div>
-            <div class="card-body">
-                <h4 class="card-title">@totalEstimation</h4>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-info mb-3">
-            <div class="card-header">Active Resources</div>
-            <div class="card-body">
-                <h4 class="card-title">@activeResources</h4>
-                <small>Capacity: @totalCapacity.ToString("F1")</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-warning mb-3">
-            <div class="card-header">Projected Finish</div>
-            <div class="card-body">
-                <h4 class="card-title">@overallFinish</h4>
-            </div>
-        </div>
+    <div>
+        <button class="btn btn-primary" @onclick="RunScheduler" data-testid="btn-run-scheduler">
+            <i class="bi bi-arrow-clockwise me-1"></i> Run Scheduler
+        </button>
     </div>
 </div>
 
-<div class="row">
-    <div class="col-md-4">
-        <div class="card mb-3">
-            <div class="card-header bg-success text-white">✅ On Track</div>
-            <div class="card-body">
-                <h2 style="color: green;">@onTrack</h2>
+@if (!isLoaded)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="text-muted mt-2">Loading dashboard...</p>
+    </div>
+}
+else
+{
+    <!-- KPI Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="kpi-card p-3">
+                <div class="kpi-label">Total Services</div>
+                <div class="kpi-value text-primary">@totalServices</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-card kpi-success p-3">
+                <div class="kpi-label">Total Estimation</div>
+                <div class="kpi-value" style="color: var(--color-success);">@totalEstimation <small class="text-muted fw-normal" style="font-size: 0.875rem;">days</small></div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-card kpi-info p-3">
+                <div class="kpi-label">Active Resources</div>
+                <div class="kpi-value" style="color: var(--color-info);">@activeResources</div>
+                <div class="text-muted" style="font-size: 0.75rem;">Capacity: @totalCapacity.ToString("F1")</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-card kpi-warning p-3">
+                <div class="kpi-label">Projected Finish</div>
+                <div class="kpi-value" style="color: var(--color-warning); font-size: 1.125rem;">@overallFinish</div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card mb-3">
-            <div class="card-header bg-warning text-white">⚠️ At Risk</div>
-            <div class="card-body">
-                <h2 style="color: orange;">@atRisk</h2>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card mb-3">
-            <div class="card-header bg-danger text-white">🔴 Late</div>
-            <div class="card-body">
-                <h2 style="color: red;">@late</h2>
-            </div>
-        </div>
-    </div>
-</div>
 
-<div class="row mt-3">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">📈 Statistics</div>
-            <div class="card-body">
-                <p>Avg Assigned Developers: <strong>@avgAssigned</strong></p>
-                <button class="btn btn-primary" @onclick="RunScheduler" data-testid="btn-run-scheduler">
-                    🔄 Run Scheduler
-                </button>
-                <span style="margin-left: 10px;" data-testid="scheduler-result">@schedulerResult</span>
+    <!-- Status Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="kpi-card kpi-success p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="kpi-label">On Track</div>
+                        <div class="kpi-value" style="color: var(--color-success);">@onTrack</div>
+                    </div>
+                    <i class="bi bi-check-circle" style="font-size: 2rem; color: var(--color-success); opacity: 0.3;"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="kpi-card kpi-warning p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="kpi-label">At Risk</div>
+                        <div class="kpi-value" style="color: var(--color-warning);">@atRisk</div>
+                    </div>
+                    <i class="bi bi-exclamation-triangle" style="font-size: 2rem; color: var(--color-warning); opacity: 0.3;"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="kpi-card kpi-danger p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="kpi-label">Late</div>
+                        <div class="kpi-value" style="color: var(--color-danger);">@late</div>
+                    </div>
+                    <i class="bi bi-x-circle" style="font-size: 2rem; color: var(--color-danger); opacity: 0.3;"></i>
+                </div>
             </div>
         </div>
     </div>
-</div>
+
+    <!-- Statistics Card -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent border-bottom">
+            <i class="bi bi-graph-up me-2"></i>Statistics
+        </div>
+        <div class="card-body">
+            <div class="d-flex align-items-center gap-4">
+                <div>
+                    <span class="text-muted">Avg Assigned Developers:</span>
+                    <strong class="ms-1">@avgAssigned</strong>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(schedulerResult))
+            {
+                <div class="mt-2">
+                    <span class="badge bg-light text-dark" data-testid="scheduler-result">
+                        <i class="bi bi-info-circle me-1"></i> @schedulerResult
+                    </span>
+                </div>
+            }
+        </div>
+    </div>
+}
 
 @code {
     private int totalServices = 0;
@@ -97,10 +131,12 @@
     private int late = 0;
     private double avgAssigned = 0;
     private string schedulerResult = "";
+    private bool isLoaded = false;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadKPIs();
+        isLoaded = true;
     }
 
     private async Task LoadKPIs()

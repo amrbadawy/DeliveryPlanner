@@ -28,6 +28,71 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
         return engine.GetOutputPlan();
     }
 
+    public async Task<TaskTimelineDto> GetTaskTimelineAsync(string taskId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await ReadOnlyDbFactory.CreateDbContextAsync(cancellationToken);
+
+        var task = await db.Tasks.FirstOrDefaultAsync(t => t.TaskId == taskId, cancellationToken);
+        if (task == null || !task.PlannedStart.HasValue || !task.PlannedFinish.HasValue)
+        {
+            return new TaskTimelineDto(new List<TaskAssignmentDayDto>());
+        }
+
+        var weekSetting = await db.Settings
+            .FirstOrDefaultAsync(s => s.Key == DomainConstants.SettingKeys.WorkingWeek, cancellationToken);
+        var weekendDays = DomainConstants.WorkingWeek.GetWeekendDays(
+            weekSetting?.Value ?? DomainConstants.WorkingWeek.SunThu);
+
+        var holidays = await db.Holidays.ToListAsync(cancellationToken);
+
+        var resourcesList = await db.Resources
+            .Where(r => r.Active == DomainConstants.ActiveStatus.Yes)
+            .OrderBy(r => r.ResourceName)
+            .ToListAsync(cancellationToken);
+
+        var allocations = await db.Allocations
+            .Where(a => a.TaskId == taskId)
+            .ToListAsync(cancellationToken);
+
+        var days = new List<TaskAssignmentDayDto>();
+        var current = task.PlannedStart.Value;
+        var end = task.PlannedFinish.Value;
+
+        while (current <= end)
+        {
+            var isWeekend = weekendDays.Contains(current.DayOfWeek);
+            var isHoliday = holidays.Any(h => h.StartDate.Date <= current.Date && h.EndDate.Date >= current.Date);
+
+            string statusText = "Working";
+            if (isWeekend) statusText = "Weekend";
+            else if (isHoliday) statusText = "Holiday";
+
+            var dayAllocs = allocations.Where(a => a.CalendarDate.Date == current.Date).ToList();
+            double dayCapacity = dayAllocs.Sum(a => a.AssignedDev);
+
+            var assignedDevs = new List<string>();
+            if (dayCapacity > 0)
+            {
+                int numDevs = (int)Math.Ceiling(dayCapacity);
+                for (int i = 0; i < Math.Min(numDevs, resourcesList.Count); i++)
+                {
+                    assignedDevs.Add(resourcesList[i].ResourceName);
+                }
+            }
+
+            days.Add(new TaskAssignmentDayDto(
+                Date: current,
+                DateDisplay: $"{current.Day} {current:ddd}",
+                IsWorkingDay: !isWeekend && !isHoliday,
+                StatusText: statusText,
+                AssignedDevelopers: assignedDevs));
+
+            current = current.AddDays(1);
+        }
+
+        return new TaskTimelineDto(days);
+    }
+
     public async Task<TimelineDataDto> GetTimelineDataAsync(
         string resourceId,
         DateTime start,

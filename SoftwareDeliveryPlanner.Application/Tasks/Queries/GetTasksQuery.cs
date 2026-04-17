@@ -7,3 +7,5 @@ namespace SoftwareDeliveryPlanner.Application.Tasks.Queries;
 public sealed record GetTasksQuery : IRequest<Result<List<TaskItem>>>;
 
 public sealed record GetTaskCountQuery : IRequest<Result<int>>;
+
+public sealed record GetTaskByIdQuery(string TaskId) : IRequest<Result<TaskItem?>>;
