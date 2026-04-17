@@ -14,7 +14,9 @@ public sealed record TimelineDayDto(
     DateTime Date,
     string DateDisplay,
     TimelineDayStatus Status,
-    string StatusText);
+    string StatusText,
+    string? TaskId = null,
+    string? TaskName = null);
 
 public sealed record TimelineDataDto(
     List<TimelineDayDto> Days);

@@ -182,7 +182,9 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
                 Date: current,
                 DateDisplay: $"{current.Day} {current:ddd}",
                 Status: status,
-                StatusText: statusText));
+                StatusText: statusText,
+                TaskId: workingTask?.TaskId,
+                TaskName: workingTask?.ServiceName));
 
             current = current.AddDays(1);
         }

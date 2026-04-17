@@ -66,7 +66,16 @@ else
                     background: @GetDayColor(day.Status);
                     font-size: 12px;">
                     <div style="font-weight: bold;">@day.Date.ToString("MMM") @day.DateDisplay</div>
-                    <div style="margin-top: 5px;">@day.StatusText</div>
+                    <div style="margin-top: 5px;">
+                        @if (!string.IsNullOrEmpty(day.TaskId))
+                        {
+                            <a href="/tasks/@day.TaskId" style="color: inherit; text-decoration: underline;">@day.TaskName</a>
+                        }
+                        else
+                        {
+                            @day.StatusText
+                        }
+                    </div>
                 </div>
             }
         </div>
