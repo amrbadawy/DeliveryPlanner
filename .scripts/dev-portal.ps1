@@ -25,8 +25,9 @@ function Stop-ByPort {
 }
 
 function Start-Portal {
+    $projectPath = Join-Path $PSScriptRoot "..\SoftwareDeliveryPlanner.Web\SoftwareDeliveryPlanner.Web.csproj"
     Write-Host "Starting Portal (Blazor Web)..."
-    dotnet run --project ".\SoftwareDeliveryPlanner.Web\SoftwareDeliveryPlanner.Web.csproj" --launch-profile https
+    dotnet run --project $projectPath --launch-profile https
 }
 
 if (-not $RunOnly) {
