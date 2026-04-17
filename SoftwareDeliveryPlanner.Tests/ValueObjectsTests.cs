@@ -1,4 +1,4 @@
-using SoftwareDeliveryPlanner.Domain.SharedKernel.ValueObjects;
+using SoftwareDeliveryPlanner.SharedKernel.ValueObjects;
 
 namespace SoftwareDeliveryPlanner.Tests;
 

@@ -9,13 +9,16 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Services;
 internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
 {
     private readonly IDbContextFactory<PlannerDbContext> _dbFactory;
+    private readonly IDbContextFactory<ReadOnlyPlannerDbContext> _readOnlyDbFactory;
     private readonly TimeProvider _timeProvider;
 
     public SchedulingOrchestrator(
         IDbContextFactory<PlannerDbContext> dbFactory,
+        IDbContextFactory<ReadOnlyPlannerDbContext> readOnlyDbFactory,
         TimeProvider timeProvider)
     {
         _dbFactory = dbFactory;
+        _readOnlyDbFactory = readOnlyDbFactory;
         _timeProvider = timeProvider;
     }
 
@@ -61,13 +64,13 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
 
     public async Task<List<TaskItem>> GetTasksAsync(CancellationToken cancellationToken = default)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var db = await _readOnlyDbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Tasks.OrderBy(t => t.SchedulingRank ?? 999).ToListAsync(cancellationToken);
     }
 
     public async Task<int> GetTaskCountAsync(CancellationToken cancellationToken = default)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var db = await _readOnlyDbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Tasks.CountAsync(cancellationToken);
     }
 
@@ -123,13 +126,13 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
 
     public async Task<List<TeamMember>> GetResourcesAsync(CancellationToken cancellationToken = default)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var db = await _readOnlyDbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Resources.ToListAsync(cancellationToken);
     }
 
     public async Task<int> GetResourceCountAsync(CancellationToken cancellationToken = default)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var db = await _readOnlyDbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Resources.CountAsync(cancellationToken);
     }
 
@@ -185,7 +188,7 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
 
     public async Task<List<Adjustment>> GetAdjustmentsAsync(CancellationToken cancellationToken = default)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var db = await _readOnlyDbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Adjustments.ToListAsync(cancellationToken);
     }
 
@@ -219,7 +222,7 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
 
     public async Task<List<Holiday>> GetHolidaysAsync(CancellationToken cancellationToken = default)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var db = await _readOnlyDbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Holidays.OrderBy(h => h.StartDate).ToListAsync(cancellationToken);
     }
 
@@ -268,7 +271,7 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         DateTime startDate, DateTime endDate, int? excludeId = null,
         CancellationToken cancellationToken = default)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var db = await _readOnlyDbFactory.CreateDbContextAsync(cancellationToken);
 
         // Overlap formula: A.StartDate <= B.EndDate AND A.EndDate >= B.StartDate
         var query = db.Holidays
@@ -331,7 +334,7 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         DateTime startDate, DateTime endDate,
         CancellationToken cancellationToken = default)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var db = await _readOnlyDbFactory.CreateDbContextAsync(cancellationToken);
         var weekSetting = await db.Settings
             .FirstOrDefaultAsync(s => s.Key == DomainConstants.SettingKeys.WorkingWeek, cancellationToken);
         var weekendDays = DomainConstants.WorkingWeek.GetWeekendDays(
@@ -354,7 +357,7 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
 
     public async Task<List<CalendarDay>> GetCalendarAsync(CancellationToken cancellationToken = default)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var db = await _readOnlyDbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Calendar.OrderBy(c => c.CalendarDate).ToListAsync(cancellationToken);
     }
 
@@ -368,7 +371,7 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         DateTime end,
         CancellationToken cancellationToken = default)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var db = await _readOnlyDbFactory.CreateDbContextAsync(cancellationToken);
 
         var adjustments = await db.Adjustments
             .Where(a => a.ResourceId == resourceId)

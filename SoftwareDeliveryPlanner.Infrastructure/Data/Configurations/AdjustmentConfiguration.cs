@@ -8,7 +8,7 @@ public sealed class AdjustmentConfiguration : IEntityTypeConfiguration<Adjustmen
 {
     public void Configure(EntityTypeBuilder<Adjustment> builder)
     {
-        builder.ToTable("Adjustments");
+        builder.ToTable("Adjustments", "resource");
 
         builder.HasKey(a => a.Id);
 

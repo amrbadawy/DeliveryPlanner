@@ -8,7 +8,7 @@ public sealed class HolidayConfiguration : IEntityTypeConfiguration<Holiday>
 {
     public void Configure(EntityTypeBuilder<Holiday> builder)
     {
-        builder.ToTable("Holidays");
+        builder.ToTable("Holidays", "resource");
 
         builder.HasKey(h => h.Id);
 

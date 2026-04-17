@@ -16,9 +16,9 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     private readonly PlannerDbContext _db;
     private readonly SchedulingEngine _engine;
 
-    public SchedulingEngineEdgeCaseTests(SqlServerContainerFixture fixture)
+    public SchedulingEngineEdgeCaseTests(SqlServerFixture fixture)
     {
-        var options = TestDatabaseHelper.CreateOptions(fixture);
+        var (options, _) = TestDatabaseHelper.CreateOptions(fixture);
         _db = new PlannerDbContext(options);
         _engine = new SchedulingEngine(_db, TimeProvider.System);
     }

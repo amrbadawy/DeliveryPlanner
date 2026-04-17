@@ -6,8 +6,4 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\SoftwareDeliveryPlanner.SharedKernel\SoftwareDeliveryPlanner.SharedKernel.csproj" />
-  </ItemGroup>
-
 </Project>

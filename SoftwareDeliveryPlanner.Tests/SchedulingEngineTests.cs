@@ -12,9 +12,9 @@ public class SchedulingEngineTests : IDisposable
     private readonly PlannerDbContext _db;
     private readonly SchedulingEngine _engine;
 
-    public SchedulingEngineTests(SqlServerContainerFixture fixture)
+    public SchedulingEngineTests(SqlServerFixture fixture)
     {
-        var options = TestDatabaseHelper.CreateOptions(fixture);
+        var (options, _) = TestDatabaseHelper.CreateOptions(fixture);
         _db = new PlannerDbContext(options);
         _engine = new SchedulingEngine(_db, TimeProvider.System);
     }
@@ -594,9 +594,9 @@ public class SchedulingEngineMonFriTests : IDisposable
     private readonly PlannerDbContext _db;
     private readonly SchedulingEngine _engine;
 
-    public SchedulingEngineMonFriTests(SqlServerContainerFixture fixture)
+    public SchedulingEngineMonFriTests(SqlServerFixture fixture)
     {
-        var options = TestDatabaseHelper.CreateOptions(fixture);
+        var (options, _) = TestDatabaseHelper.CreateOptions(fixture);
         _db = new PlannerDbContext(options);
 
         // Change working week to Mon-Fri

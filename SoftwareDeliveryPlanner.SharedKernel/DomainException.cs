@@ -1,4 +1,4 @@
-namespace SoftwareDeliveryPlanner.Domain.SharedKernel;
+namespace SoftwareDeliveryPlanner.SharedKernel;
 
 public sealed class DomainException : Exception
 {

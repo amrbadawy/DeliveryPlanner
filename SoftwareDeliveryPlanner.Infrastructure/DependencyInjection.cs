@@ -14,9 +14,17 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("PlannerDb")
             ?? throw new InvalidOperationException("Connection string 'PlannerDb' is not configured.");
 
+        var readOnlyConnectionString = configuration.GetConnectionString("PlannerDbReadOnly")
+            ?? connectionString; // Fallback to primary if read-only replica is not configured
+
         services.AddDbContextFactory<PlannerDbContext>(options =>
         {
             options.UseSqlServer(connectionString);
+        });
+
+        services.AddDbContextFactory<ReadOnlyPlannerDbContext>(options =>
+        {
+            options.UseSqlServer(readOnlyConnectionString);
         });
 
         services.AddScoped<IDatabaseMigrator, DatabaseMigrator>();

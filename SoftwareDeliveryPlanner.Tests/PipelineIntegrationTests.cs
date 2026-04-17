@@ -25,14 +25,14 @@ using SoftwareDeliveryPlanner.Tests.Infrastructure;
 namespace SoftwareDeliveryPlanner.Tests;
 
 // ============================================================
-// MediatR pipeline fixture: real DI container with SQL Server (Testcontainers)
+// MediatR pipeline fixture: real DI container with SQL Server
 // ============================================================
 
 public abstract class PipelineFixture : IAsyncDisposable
 {
     protected readonly IServiceProvider Services;
 
-    protected PipelineFixture(SqlServerContainerFixture fixture)
+    protected PipelineFixture(SqlServerFixture fixture)
     {
         var connectionString = fixture.CreateDatabaseConnectionString();
 
@@ -42,10 +42,14 @@ public abstract class PipelineFixture : IAsyncDisposable
         services.AddDbContextFactory<PlannerDbContext>(options =>
             options.UseSqlServer(connectionString));
 
+        services.AddDbContextFactory<ReadOnlyPlannerDbContext>(options =>
+            options.UseSqlServer(connectionString));
+
         // Application layer: MediatR + FluentValidation + ValidationBehavior
         services.AddApplication();
 
         // Infrastructure layer: orchestrator + focused interface forwarding
+        services.AddSingleton(TimeProvider.System);
         services.AddScoped<ISchedulingOrchestrator, SchedulingOrchestrator>();
         services.AddScoped<ISchedulerService>(sp => sp.GetRequiredService<ISchedulingOrchestrator>());
         services.AddScoped<ITaskOrchestrator>(sp => sp.GetRequiredService<ISchedulingOrchestrator>());
@@ -60,7 +64,7 @@ public abstract class PipelineFixture : IAsyncDisposable
         using var scope = Services.CreateScope();
         var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<PlannerDbContext>>();
         using var db = factory.CreateDbContext();
-        db.Database.Migrate();
+        db.Database.EnsureCreated();
         TestDatabaseHelper.SeedDefaultData(db);
     }
 
@@ -78,7 +82,7 @@ public abstract class PipelineFixture : IAsyncDisposable
 [Collection(DatabaseCollection.Name)]
 public class Pipeline_UpsertTaskTests : PipelineFixture
 {
-    public Pipeline_UpsertTaskTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public Pipeline_UpsertTaskTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task ValidNewTask_IsPersistedThroughPipeline()
@@ -152,7 +156,7 @@ public class Pipeline_UpsertTaskTests : PipelineFixture
 [Collection(DatabaseCollection.Name)]
 public class Pipeline_HolidayValidationTests : PipelineFixture
 {
-    public Pipeline_HolidayValidationTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public Pipeline_HolidayValidationTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task ValidHoliday_IsPersistedThroughPipeline()
@@ -213,7 +217,7 @@ public class Pipeline_HolidayValidationTests : PipelineFixture
 [Collection(DatabaseCollection.Name)]
 public class Pipeline_ResourceTests : PipelineFixture
 {
-    public Pipeline_ResourceTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public Pipeline_ResourceTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task ValidResource_IsPersistedThroughPipeline()
@@ -270,7 +274,7 @@ public class Pipeline_ResourceTests : PipelineFixture
 [Collection(DatabaseCollection.Name)]
 public class Pipeline_SchedulerTests : PipelineFixture
 {
-    public Pipeline_SchedulerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public Pipeline_SchedulerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task RunScheduler_ThroughPipeline_ReturnsSuccessMessage()
@@ -338,7 +342,7 @@ public class Pipeline_SchedulerTests : PipelineFixture
 [Collection(DatabaseCollection.Name)]
 public class Pipeline_CrossEntityTests : PipelineFixture
 {
-    public Pipeline_CrossEntityTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public Pipeline_CrossEntityTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task AddHoliday_ThenRunScheduler_HolidayAffectsCalendar()
@@ -447,7 +451,7 @@ public class Pipeline_CrossEntityTests : PipelineFixture
 [Collection(DatabaseCollection.Name)]
 public class Pipeline_TimelineTests : PipelineFixture
 {
-    public Pipeline_TimelineTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public Pipeline_TimelineTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task GetTimeline_ThroughPipeline_ReturnsDayByDayData()
@@ -477,7 +481,7 @@ public class Pipeline_TimelineTests : PipelineFixture
 [Collection(DatabaseCollection.Name)]
 public class Pipeline_TaskDependencyTests : PipelineFixture
 {
-    public Pipeline_TaskDependencyTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public Pipeline_TaskDependencyTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task TaskWithDependency_IsPersistedAndScheduledAfterPrerequisite()
@@ -540,7 +544,7 @@ public class Pipeline_TaskDependencyTests : PipelineFixture
 [Collection(DatabaseCollection.Name)]
 public class Pipeline_AdjustmentTests : PipelineFixture
 {
-    public Pipeline_AdjustmentTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public Pipeline_AdjustmentTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task ValidAdjustment_IsPersistedThroughPipeline()
@@ -622,7 +626,7 @@ public class Pipeline_AdjustmentTests : PipelineFixture
 [Collection(DatabaseCollection.Name)]
 public class Pipeline_DeleteCommandTests : PipelineFixture
 {
-    public Pipeline_DeleteCommandTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public Pipeline_DeleteCommandTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task DeleteResource_ThroughPipeline_RemovesResource()
@@ -720,7 +724,7 @@ public class Pipeline_DeleteCommandTests : PipelineFixture
 [Collection(DatabaseCollection.Name)]
 public class Pipeline_RoundTripTests : PipelineFixture
 {
-    public Pipeline_RoundTripTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public Pipeline_RoundTripTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task FullRoundTrip_CreateTaskAndResource_ScheduleAndVerifyKpis()

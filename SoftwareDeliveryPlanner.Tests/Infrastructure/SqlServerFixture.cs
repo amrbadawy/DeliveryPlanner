@@ -1,38 +1,30 @@
 using System.Collections.Concurrent;
 using Microsoft.Data.SqlClient;
-using Testcontainers.MsSql;
 
 namespace SoftwareDeliveryPlanner.Tests.Infrastructure;
 
 /// <summary>
-/// Shared xUnit collection fixture that provides a SQL Server connection
-/// for integration tests. Supports two modes:
-/// <list type="bullet">
-///   <item>
-///     <b>Local SQL Server</b> — set the <c>TEST_SQL_CONNECTION</c>
-///     environment variable to a valid connection string (e.g.
-///     <c>Server=.;Trusted_Connection=True;TrustServerCertificate=True;</c>).
-///     Each test class gets an isolated database with a unique name.
-///     All test databases are dropped automatically after the run.
-///   </item>
-///   <item>
-///     <b>Testcontainers (default)</b> — when the env var is not set,
-///     a Docker-based SQL Server 2022 container is started automatically.
-///   </item>
-/// </list>
+/// Shared xUnit collection fixture that provides isolated SQL Server
+/// databases for integration tests.
+/// <para>
+/// By default connects to the local default SQL Server instance
+/// (<c>Server=.;Trusted_Connection=True</c>). Override by setting the
+/// <c>TEST_SQL_CONNECTION</c> environment variable to a custom
+/// connection string.
+/// </para>
+/// <para>
+/// Each test class gets its own uniquely named database via
+/// <see cref="CreateDatabaseConnectionString"/>. All test databases
+/// are dropped automatically after the test run completes.
+/// </para>
 /// </summary>
-public class SqlServerContainerFixture : IAsyncLifetime
+public class SqlServerFixture : IAsyncLifetime
 {
     private const string EnvVarName = "TEST_SQL_CONNECTION";
+    private const string DefaultConnectionString = "Server=.;Trusted_Connection=True;TrustServerCertificate=True;";
 
-    private MsSqlContainer? _container;
     private string _baseConnectionString = string.Empty;
     private readonly ConcurrentBag<string> _createdDatabases = new();
-
-    /// <summary>
-    /// True when the fixture is using a local SQL Server instead of a container.
-    /// </summary>
-    public bool IsLocalServer { get; private set; }
 
     /// <summary>
     /// Base connection string (master / default catalog) for the SQL Server instance.
@@ -43,19 +35,16 @@ public class SqlServerContainerFixture : IAsyncLifetime
     /// Returns a connection string pointing to a new, uniquely named database
     /// on the SQL Server instance. Each test class should call this once in
     /// its constructor to get full isolation.
-    /// When running against a local server the database is pre-created with
-    /// small initial file sizes (4 MB data / 2 MB log, 1 MB growth) so that
-    /// 39+ concurrent test databases don't exhaust limited disk space.
+    /// The database is pre-created with small initial file sizes (4 MB data /
+    /// 2 MB log, 1 MB growth) so that many concurrent test databases don't
+    /// exhaust limited disk space.
     /// </summary>
     public string CreateDatabaseConnectionString(string? databaseName = null)
     {
         var dbName = databaseName ?? $"Test_{Guid.NewGuid():N}";
         _createdDatabases.Add(dbName);
 
-        if (IsLocalServer)
-        {
-            PreCreateSmallDatabase(dbName);
-        }
+        PreCreateSmallDatabase(dbName);
 
         var builder = new SqlConnectionStringBuilder(_baseConnectionString)
         {
@@ -113,9 +102,6 @@ public class SqlServerContainerFixture : IAsyncLifetime
 
     private static string GetDefaultDataDirectory(SqlConnection connection)
     {
-        // SERVERPROPERTY('InstanceDefaultDataPath') returns the default
-        // data directory for the SQL Server instance (e.g.
-        // C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\DATA\).
         using var cmd = new SqlCommand(
             "SELECT CAST(SERVERPROPERTY('InstanceDefaultDataPath') AS NVARCHAR(260))",
             connection);
@@ -126,39 +112,20 @@ public class SqlServerContainerFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        var localConnectionString = Environment.GetEnvironmentVariable(EnvVarName);
+        var envConnectionString = Environment.GetEnvironmentVariable(EnvVarName);
+        _baseConnectionString = !string.IsNullOrWhiteSpace(envConnectionString)
+            ? envConnectionString
+            : DefaultConnectionString;
 
-        if (!string.IsNullOrWhiteSpace(localConnectionString))
-        {
-            // Use the local SQL Server — no container needed.
-            IsLocalServer = true;
-            _baseConnectionString = localConnectionString;
-
-            // Clean up any stale Test_ databases left over from previous
-            // crashed or timed-out test runs that never reached DisposeAsync.
-            await DropStaleTestDatabasesAsync();
-        }
-        else
-        {
-            // Fall back to Testcontainers.
-            _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
-                .Build();
-
-            await _container.StartAsync();
-            _baseConnectionString = _container.GetConnectionString();
-        }
+        // Clean up any stale Test_ databases left over from previous
+        // crashed or timed-out test runs that never reached DisposeAsync.
+        await DropStaleTestDatabasesAsync();
     }
 
     public async Task DisposeAsync()
     {
-        if (_container is not null)
+        if (!_createdDatabases.IsEmpty)
         {
-            // Container mode: the container itself is destroyed, taking all DBs with it.
-            await _container.DisposeAsync();
-        }
-        else if (IsLocalServer && !_createdDatabases.IsEmpty)
-        {
-            // Local mode: clean up all test databases we created.
             await DropTestDatabasesAsync();
         }
     }

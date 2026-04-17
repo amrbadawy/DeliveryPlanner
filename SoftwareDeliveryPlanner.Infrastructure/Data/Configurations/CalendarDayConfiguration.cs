@@ -8,7 +8,7 @@ public sealed class CalendarDayConfiguration : IEntityTypeConfiguration<Calendar
 {
     public void Configure(EntityTypeBuilder<CalendarDay> builder)
     {
-        builder.ToTable("CalendarDays");
+        builder.ToTable("CalendarDays", "scheduling");
 
         builder.HasKey(c => c.Id);
 

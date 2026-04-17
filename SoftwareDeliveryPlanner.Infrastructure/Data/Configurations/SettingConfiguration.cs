@@ -8,7 +8,7 @@ public sealed class SettingConfiguration : IEntityTypeConfiguration<Setting>
 {
     public void Configure(EntityTypeBuilder<Setting> builder)
     {
-        builder.ToTable("Settings");
+        builder.ToTable("Settings", "scheduling");
 
         builder.HasKey(s => s.Id);
 

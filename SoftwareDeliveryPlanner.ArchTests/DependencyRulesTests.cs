@@ -87,6 +87,7 @@ public class DependencyRulesTests
     [InlineData("Domain")]
     [InlineData("Application")]
     [InlineData("Infrastructure")]
+    [InlineData("SharedKernel")]
     public void No_Enums_Allowed_In_Project(string layer)
     {
         var assembly = layer switch
@@ -94,6 +95,7 @@ public class DependencyRulesTests
             "Domain" => typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly,
             "Application" => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
             "Infrastructure" => typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly,
+            "SharedKernel" => typeof(SoftwareDeliveryPlanner.SharedKernel.AssemblyMarker).Assembly,
             _ => throw new ArgumentException($"Unknown layer: {layer}")
         };
 
@@ -354,7 +356,7 @@ public class DependencyRulesTests
     public void Domain_Exceptions_Must_Inherit_DomainException()
     {
         var assembly = typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly;
-        var domainExceptionType = typeof(SoftwareDeliveryPlanner.Domain.SharedKernel.DomainException);
+        var domainExceptionType = typeof(SoftwareDeliveryPlanner.SharedKernel.DomainException);
 
         var violations = assembly.GetTypes()
             .Where(t => t.IsClass && !t.IsAbstract)
@@ -378,6 +380,7 @@ public class DependencyRulesTests
     [InlineData("Domain")]
     [InlineData("Application")]
     [InlineData("Infrastructure")]
+    [InlineData("SharedKernel")]
     public void Interfaces_Must_Start_With_I(string layer)
     {
         var assembly = layer switch
@@ -385,6 +388,7 @@ public class DependencyRulesTests
             "Domain"         => typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly,
             "Application"    => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
             "Infrastructure" => typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly,
+            "SharedKernel"   => typeof(SoftwareDeliveryPlanner.SharedKernel.AssemblyMarker).Assembly,
             _                => throw new ArgumentException($"Unknown layer: {layer}")
         };
 
@@ -657,9 +661,10 @@ public class DependencyRulesTests
         const string dbContextFullName    = "Microsoft.EntityFrameworkCore.DbContext";
         const string entityConfigFullName = "Microsoft.EntityFrameworkCore.IEntityTypeConfiguration`1";
 
-        // Find the DbContext subclass in Infrastructure
+        // Find the primary (non-ReadOnly) DbContext subclass in Infrastructure
         var dbContextType = infraAssembly.GetTypes()
             .FirstOrDefault(t => t.IsClass && !t.IsAbstract
+                && !t.Name.Contains("ReadOnly")
                 && IsAssignableToName(t, dbContextFullName));
 
         Assert.NotNull(dbContextType);
@@ -791,13 +796,15 @@ public class DependencyRulesTests
     [Theory]
     [InlineData("Domain")]
     [InlineData("Application")]
+    [InlineData("SharedKernel")]
     public void No_Async_Void_Methods(string layer)
     {
         var assembly = layer switch
         {
-            "Domain"      => typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly,
-            "Application" => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
-            _             => throw new ArgumentException($"Unknown layer: {layer}")
+            "Domain"       => typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly,
+            "Application"  => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
+            "SharedKernel" => typeof(SoftwareDeliveryPlanner.SharedKernel.AssemblyMarker).Assembly,
+            _              => throw new ArgumentException($"Unknown layer: {layer}")
         };
 
         var violations = assembly.GetTypes()
@@ -859,13 +866,15 @@ public class DependencyRulesTests
     [Theory]
     [InlineData("Domain")]
     [InlineData("Application")]
+    [InlineData("SharedKernel")]
     public void No_IServiceProvider_Injection(string layer)
     {
         var assembly = layer switch
         {
-            "Domain"      => typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly,
-            "Application" => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
-            _             => throw new ArgumentException($"Unknown layer: {layer}")
+            "Domain"       => typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly,
+            "Application"  => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
+            "SharedKernel" => typeof(SoftwareDeliveryPlanner.SharedKernel.AssemblyMarker).Assembly,
+            _              => throw new ArgumentException($"Unknown layer: {layer}")
         };
 
         const string serviceProviderFullName = "System.IServiceProvider";
@@ -955,13 +964,15 @@ public class DependencyRulesTests
     [Theory]
     [InlineData("Domain")]
     [InlineData("Application")]
+    [InlineData("SharedKernel")]
     public void No_Mutable_Static_Fields(string layer)
     {
         var assembly = layer switch
         {
-            "Domain"      => typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly,
-            "Application" => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
-            _             => throw new ArgumentException($"Unknown layer: {layer}")
+            "Domain"       => typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly,
+            "Application"  => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
+            "SharedKernel" => typeof(SoftwareDeliveryPlanner.SharedKernel.AssemblyMarker).Assembly,
+            _              => throw new ArgumentException($"Unknown layer: {layer}")
         };
 
         var violations = assembly.GetTypes()
@@ -1109,14 +1120,16 @@ public class DependencyRulesTests
     [InlineData("Domain", "SoftwareDeliveryPlanner.Domain")]
     [InlineData("Application", "SoftwareDeliveryPlanner.Application")]
     [InlineData("Infrastructure", "SoftwareDeliveryPlanner.Infrastructure")]
+    [InlineData("SharedKernel", "SoftwareDeliveryPlanner.SharedKernel")]
     public void Types_In_Assembly_Must_Use_Layer_Namespace(string layer, string expectedNamespace)
     {
         var assembly = layer switch
         {
-            "Domain" => typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly,
-            "Application" => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
+            "Domain"         => typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly,
+            "Application"    => typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly,
             "Infrastructure" => typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly,
-            _ => throw new ArgumentException($"Unknown layer: {layer}")
+            "SharedKernel"   => typeof(SoftwareDeliveryPlanner.SharedKernel.AssemblyMarker).Assembly,
+            _                => throw new ArgumentException($"Unknown layer: {layer}")
         };
 
         var violatingTypes = assembly.GetTypes()
@@ -1157,7 +1170,7 @@ public class DependencyRulesTests
 
         if (!Directory.Exists(basePath))
         {
-            Assert.True(false, $"Directory not found for {layer}: {basePath}");
+            Assert.Fail($"Directory not found for {layer}: {basePath}");
             return;
         }
 
@@ -1183,6 +1196,185 @@ public class DependencyRulesTests
         Assert.True(violations.Count == 0,
             $"DateTime.Now/DateTime.UtcNow is forbidden in {layer}. Use injected TimeProvider instead. " +
             $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // SharedKernel Isolation Rules
+    // SharedKernel sits at the bottom of the dependency graph.
+    // It must not depend on any other solution layer —
+    // Domain, Application, Infrastructure, or Web.
+    // ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void SharedKernel_Does_Not_Depend_On_Domain()
+    {
+        var result = Types
+            .InAssembly(typeof(SoftwareDeliveryPlanner.SharedKernel.AssemblyMarker).Assembly)
+            .ShouldNot()
+            .HaveDependencyOn("SoftwareDeliveryPlanner.Domain")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, BuildFailureMessage(result.FailingTypeNames));
+    }
+
+    [Fact]
+    public void SharedKernel_Does_Not_Depend_On_Application()
+    {
+        var result = Types
+            .InAssembly(typeof(SoftwareDeliveryPlanner.SharedKernel.AssemblyMarker).Assembly)
+            .ShouldNot()
+            .HaveDependencyOn("SoftwareDeliveryPlanner.Application")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, BuildFailureMessage(result.FailingTypeNames));
+    }
+
+    [Fact]
+    public void SharedKernel_Does_Not_Depend_On_Infrastructure()
+    {
+        var result = Types
+            .InAssembly(typeof(SoftwareDeliveryPlanner.SharedKernel.AssemblyMarker).Assembly)
+            .ShouldNot()
+            .HaveDependencyOn("SoftwareDeliveryPlanner.Infrastructure")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, BuildFailureMessage(result.FailingTypeNames));
+    }
+
+    [Fact]
+    public void SharedKernel_Does_Not_Depend_On_Web()
+    {
+        var result = Types
+            .InAssembly(typeof(SoftwareDeliveryPlanner.SharedKernel.AssemblyMarker).Assembly)
+            .ShouldNot()
+            .HaveDependencyOn("SoftwareDeliveryPlanner.Web")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, BuildFailureMessage(result.FailingTypeNames));
+    }
+
+    [Fact]
+    public void SharedKernel_Must_Have_No_Third_Party_Dependencies()
+    {
+        var assembly = typeof(SoftwareDeliveryPlanner.SharedKernel.AssemblyMarker).Assembly;
+
+        var allowedPrefixes = new[]
+        {
+            "System",
+            "Microsoft",
+            "mscorlib",
+            "netstandard",
+            "SoftwareDeliveryPlanner",
+        };
+
+        var thirdPartyRefs = assembly.GetReferencedAssemblies()
+            .Where(a => !allowedPrefixes.Any(prefix =>
+                a.Name!.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+            .Select(a => a.FullName)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(thirdPartyRefs.Count == 0,
+            $"SharedKernel must not reference third-party assemblies. " +
+            $"Found:{Environment.NewLine}{string.Join(Environment.NewLine, thirdPartyRefs)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // ReadOnly DbContext Rules
+    // ReadOnly DbContext types must be internal, must override
+    // SaveChanges/SaveChangesAsync to prevent writes, and must
+    // expose the same DbSet<T> properties as the primary context.
+    // ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void ReadOnly_DbContexts_Must_Be_Internal()
+    {
+        var assembly = typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly;
+
+        var readOnlyContexts = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract)
+            .Where(t => t.Name.Contains("ReadOnly")
+                && IsAssignableToName(t, "Microsoft.EntityFrameworkCore.DbContext"))
+            .Where(t => t.IsPublic)
+            .Select(t => t.FullName ?? t.Name)
+            .ToList();
+
+        Assert.True(readOnlyContexts.Count == 0,
+            $"ReadOnly DbContext types must be internal. " +
+            $"Public: {string.Join(", ", readOnlyContexts)}");
+    }
+
+    [Fact]
+    public void ReadOnly_DbContexts_Must_Override_SaveChanges()
+    {
+        var assembly = typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly;
+
+        var readOnlyContexts = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract)
+            .Where(t => t.Name.Contains("ReadOnly")
+                && IsAssignableToName(t, "Microsoft.EntityFrameworkCore.DbContext"))
+            .ToList();
+
+        Assert.NotEmpty(readOnlyContexts);
+
+        foreach (var ctx in readOnlyContexts)
+        {
+            var saveChangesOverrides = ctx
+                .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+                .Where(m => m.Name == "SaveChanges" || m.Name == "SaveChangesAsync")
+                .ToList();
+
+            Assert.True(saveChangesOverrides.Count >= 2,
+                $"{ctx.Name} must override both SaveChanges and SaveChangesAsync to prevent writes. " +
+                $"Found {saveChangesOverrides.Count} override(s).");
+        }
+    }
+
+    [Fact]
+    public void ReadOnly_DbSets_Must_Match_Primary_DbContext()
+    {
+        var assembly = typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly;
+
+        const string dbSetFullName    = "Microsoft.EntityFrameworkCore.DbSet`1";
+        const string dbContextName    = "Microsoft.EntityFrameworkCore.DbContext";
+
+        var dbContextTypes = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract && IsAssignableToName(t, dbContextName))
+            .ToList();
+
+        var primaryContext = dbContextTypes
+            .FirstOrDefault(t => !t.Name.Contains("ReadOnly") && !t.Name.Contains("DesignTime"));
+        var readOnlyContexts = dbContextTypes
+            .Where(t => t.Name.Contains("ReadOnly"))
+            .ToList();
+
+        Assert.NotNull(primaryContext);
+        Assert.NotEmpty(readOnlyContexts);
+
+        var primaryDbSets = primaryContext!.GetProperties()
+            .Where(p => p.PropertyType.IsGenericType
+                && p.PropertyType.GetGenericTypeDefinition().FullName == dbSetFullName)
+            .Select(p => p.PropertyType.GetGenericArguments()[0])
+            .ToHashSet();
+
+        foreach (var roCtx in readOnlyContexts)
+        {
+            var roDbSets = roCtx.GetProperties()
+                .Where(p => p.PropertyType.IsGenericType
+                    && p.PropertyType.GetGenericTypeDefinition().FullName == dbSetFullName)
+                .Select(p => p.PropertyType.GetGenericArguments()[0])
+                .ToHashSet();
+
+            var missing = primaryDbSets
+                .Except(roDbSets)
+                .Select(t => t.Name)
+                .OrderBy(n => n)
+                .ToList();
+
+            Assert.True(missing.Count == 0,
+                $"{roCtx.Name} is missing DbSet<T> for: {string.Join(", ", missing)}. " +
+                $"Must match {primaryContext.Name}.");
+        }
     }
 
     // ─────────────────────────────────────────────────────────

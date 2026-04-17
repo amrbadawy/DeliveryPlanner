@@ -8,7 +8,7 @@ public sealed class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
 {
     public void Configure(EntityTypeBuilder<TaskItem> builder)
     {
-        builder.ToTable("TaskItems");
+        builder.ToTable("TaskItems", "task");
 
         builder.HasKey(t => t.Id);
 

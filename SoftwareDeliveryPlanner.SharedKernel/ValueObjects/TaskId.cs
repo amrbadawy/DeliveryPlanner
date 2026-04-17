@@ -1,4 +1,4 @@
-namespace SoftwareDeliveryPlanner.Domain.SharedKernel.ValueObjects;
+namespace SoftwareDeliveryPlanner.SharedKernel.ValueObjects;
 
 public readonly record struct TaskId
 {

@@ -7,16 +7,18 @@ namespace SoftwareDeliveryPlanner.Tests.Infrastructure;
 
 /// <summary>
 /// Provides helper methods for setting up test databases on the shared
-/// SQL Server container. Creates fresh databases and seeds default data.
+/// SQL Server instance. Creates fresh databases and seeds default data.
 /// </summary>
 internal static class TestDatabaseHelper
 {
     /// <summary>
     /// Creates DbContextOptions configured for an isolated SQL Server database.
-    /// Applies all migrations and optionally seeds default data.
+    /// Uses EnsureCreated to create the schema (including HasData seeds) and
+    /// optionally seeds additional default data. Returns both the options and
+    /// the connection string so callers can also create a ReadOnly factory.
     /// </summary>
-    internal static DbContextOptions<PlannerDbContext> CreateOptions(
-        SqlServerContainerFixture fixture,
+    internal static (DbContextOptions<PlannerDbContext> Options, string ConnectionString) CreateOptions(
+        SqlServerFixture fixture,
         bool seedData = true)
     {
         var connectionString = fixture.CreateDatabaseConnectionString();
@@ -26,14 +28,14 @@ internal static class TestDatabaseHelper
             .Options;
 
         using var db = new PlannerDbContext(options);
-        db.Database.Migrate();
+        db.Database.EnsureCreated();
 
         if (seedData)
         {
             SeedDefaultData(db);
         }
 
-        return options;
+        return (options, connectionString);
     }
 
     /// <summary>

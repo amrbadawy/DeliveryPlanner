@@ -31,12 +31,13 @@ public abstract class OrchestratorFixture : IAsyncDisposable
     private protected readonly IDbContextFactory<PlannerDbContext> Factory;
     private protected readonly ISchedulingOrchestrator Orchestrator;
 
-    protected OrchestratorFixture(SqlServerContainerFixture fixture)
+    protected OrchestratorFixture(SqlServerFixture fixture)
     {
-        var options = TestDatabaseHelper.CreateOptions(fixture);
+        var (options, connectionString) = TestDatabaseHelper.CreateOptions(fixture);
 
         Factory = new TestDbContextFactory(options);
-        Orchestrator = new SchedulingOrchestrator(Factory, TimeProvider.System);
+        var readOnlyFactory = new TestReadOnlyDbContextFactory(connectionString);
+        Orchestrator = new SchedulingOrchestrator(Factory, readOnlyFactory, TimeProvider.System);
     }
 
     public async ValueTask DisposeAsync() => await Task.CompletedTask;
@@ -49,7 +50,7 @@ public abstract class OrchestratorFixture : IAsyncDisposable
 [Collection(DatabaseCollection.Name)]
 public class GetTasksQueryHandlerTests : OrchestratorFixture
 {
-    public GetTasksQueryHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public GetTasksQueryHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_ReturnsAllTasks()
@@ -73,7 +74,7 @@ public class GetTasksQueryHandlerTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class GetTaskCountQueryHandlerTests : OrchestratorFixture
 {
-    public GetTaskCountQueryHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public GetTaskCountQueryHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_ReturnsCorrectCount()
@@ -109,7 +110,7 @@ public class GetTaskCountQueryHandlerTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class UpsertTaskCommandHandlerTests : OrchestratorFixture
 {
-    public UpsertTaskCommandHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public UpsertTaskCommandHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_NewTask_AddsTaskToDatabase()
@@ -223,7 +224,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class DeleteTaskCommandHandlerTests : OrchestratorFixture
 {
-    public DeleteTaskCommandHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public DeleteTaskCommandHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_ExistingTask_RemovesFromDatabase()
@@ -337,7 +338,7 @@ public class UpsertTaskCommandValidatorTests
 [Collection(DatabaseCollection.Name)]
 public class GetResourcesQueryHandlerTests : OrchestratorFixture
 {
-    public GetResourcesQueryHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public GetResourcesQueryHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_ReturnsAllResources()
@@ -352,7 +353,7 @@ public class GetResourcesQueryHandlerTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class GetResourceCountQueryHandlerTests : OrchestratorFixture
 {
-    public GetResourceCountQueryHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public GetResourceCountQueryHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_ReturnsCorrectCount()
@@ -370,7 +371,7 @@ public class GetResourceCountQueryHandlerTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class UpsertResourceCommandHandlerTests : OrchestratorFixture
 {
-    public UpsertResourceCommandHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public UpsertResourceCommandHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_NewResource_AddsToDatabase()
@@ -423,7 +424,7 @@ public class UpsertResourceCommandHandlerTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class DeleteResourceCommandHandlerTests : OrchestratorFixture
 {
-    public DeleteResourceCommandHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public DeleteResourceCommandHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_ExistingResource_RemovesFromDatabase()
@@ -515,7 +516,7 @@ public class UpsertResourceCommandValidatorTests
 [Collection(DatabaseCollection.Name)]
 public class GetAdjustmentsQueryHandlerTests : OrchestratorFixture
 {
-    public GetAdjustmentsQueryHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public GetAdjustmentsQueryHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_EmptyDb_ReturnsEmptyList()
@@ -553,7 +554,7 @@ public class GetAdjustmentsQueryHandlerTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class AddAdjustmentCommandHandlerTests : OrchestratorFixture
 {
-    public AddAdjustmentCommandHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public AddAdjustmentCommandHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_ValidCommand_AddsAdjustmentToDatabase()
@@ -599,7 +600,7 @@ public class AddAdjustmentCommandHandlerTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class DeleteAdjustmentCommandHandlerTests : OrchestratorFixture
 {
-    public DeleteAdjustmentCommandHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public DeleteAdjustmentCommandHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_ExistingAdjustment_RemovesFromDatabase()
@@ -702,7 +703,7 @@ public class AddAdjustmentCommandValidatorTests
 [Collection(DatabaseCollection.Name)]
 public class GetHolidaysQueryHandlerTests : OrchestratorFixture
 {
-    public GetHolidaysQueryHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public GetHolidaysQueryHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_ReturnsAllHolidays()
@@ -732,7 +733,7 @@ public class GetHolidaysQueryHandlerTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class UpsertHolidayCommandHandlerTests : OrchestratorFixture
 {
-    public UpsertHolidayCommandHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public UpsertHolidayCommandHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_NewHoliday_AddsToDatabase()
@@ -779,7 +780,7 @@ public class UpsertHolidayCommandHandlerTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class DeleteHolidayCommandHandlerTests : OrchestratorFixture
 {
-    public DeleteHolidayCommandHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public DeleteHolidayCommandHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_ExistingHoliday_RemovesFromDatabase()
@@ -810,7 +811,7 @@ public class DeleteHolidayCommandHandlerTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class UpsertHolidayCommandValidatorTests : OrchestratorFixture
 {
-    public UpsertHolidayCommandValidatorTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public UpsertHolidayCommandValidatorTests(SqlServerFixture fixture) : base(fixture) { }
 
     private static UpsertHolidayCommand Valid() => new(
         Id: 0,
@@ -955,7 +956,7 @@ public class UpsertHolidayCommandValidatorTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class GetCalendarQueryHandlerTests : OrchestratorFixture
 {
-    public GetCalendarQueryHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public GetCalendarQueryHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_AfterScheduler_ReturnsCalendarDays()
@@ -992,7 +993,7 @@ public class GetCalendarQueryHandlerTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class GetTimelineQueryHandlerTests : OrchestratorFixture
 {
-    public GetTimelineQueryHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public GetTimelineQueryHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_ValidResourceAndRange_ReturnsDays()
@@ -1078,7 +1079,7 @@ public class GetTimelineQueryHandlerTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class GetOutputPlanQueryHandlerTests : OrchestratorFixture
 {
-    public GetOutputPlanQueryHandlerTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public GetOutputPlanQueryHandlerTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_ReturnsOutputPlan()
@@ -1125,7 +1126,7 @@ public class GetOutputPlanQueryHandlerTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class UpsertHolidayCommandHandlerEdgeTests : OrchestratorFixture
 {
-    public UpsertHolidayCommandHandlerEdgeTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public UpsertHolidayCommandHandlerEdgeTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_NewHoliday_MultiDayRange_PersistsCorrectDates()
@@ -1222,7 +1223,7 @@ public class UpsertHolidayCommandHandlerEdgeTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class UpsertHolidayCommandValidatorEdgeTests : OrchestratorFixture
 {
-    public UpsertHolidayCommandValidatorEdgeTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public UpsertHolidayCommandValidatorEdgeTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task UpdateOverlapping_SelfExclude_PassesValidation()
@@ -1327,7 +1328,7 @@ public class UpsertHolidayCommandValidatorEdgeTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class GetTimelineQueryHandlerEdgeTests : OrchestratorFixture
 {
-    public GetTimelineQueryHandlerEdgeTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public GetTimelineQueryHandlerEdgeTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_Saturday_MarksCorrectly()
@@ -1392,7 +1393,7 @@ public class GetTimelineQueryHandlerEdgeTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class GetCalendarQueryHandlerEdgeTests : OrchestratorFixture
 {
-    public GetCalendarQueryHandlerEdgeTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public GetCalendarQueryHandlerEdgeTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task Handle_CalendarDays_IncludeHolidayNames()
@@ -1727,7 +1728,7 @@ public class AddAdjustmentCommandValidatorAdditionalTests
 [Collection(DatabaseCollection.Name)]
 public class UpsertHolidayCommandValidatorAdditionalTests : OrchestratorFixture
 {
-    public UpsertHolidayCommandValidatorAdditionalTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public UpsertHolidayCommandValidatorAdditionalTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task NullHolidayName_FailsValidation()
@@ -1790,7 +1791,7 @@ public class UpsertHolidayCommandValidatorAdditionalTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class HandlerCancellationTests : OrchestratorFixture
 {
-    public HandlerCancellationTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public HandlerCancellationTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task GetTasksHandler_CancelledToken_ThrowsOperationCancelled()
@@ -1907,7 +1908,7 @@ public class HandlerCancellationTests : OrchestratorFixture
 [Collection(DatabaseCollection.Name)]
 public class HandlerEdgeCaseTests : OrchestratorFixture
 {
-    public HandlerEdgeCaseTests(SqlServerContainerFixture fixture) : base(fixture) { }
+    public HandlerEdgeCaseTests(SqlServerFixture fixture) : base(fixture) { }
 
     [Fact]
     public async Task AddAdjustmentHandler_NullNotes_PersistsNull()

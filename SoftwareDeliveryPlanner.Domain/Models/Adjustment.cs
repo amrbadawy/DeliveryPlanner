@@ -1,6 +1,6 @@
 using SoftwareDeliveryPlanner.Domain;
-using SoftwareDeliveryPlanner.Domain.SharedKernel;
-using SoftwareDeliveryPlanner.Domain.SharedKernel.ValueObjects;
+using SoftwareDeliveryPlanner.SharedKernel;
+using SoftwareDeliveryPlanner.SharedKernel.ValueObjects;
 
 namespace SoftwareDeliveryPlanner.Domain.Models;
 

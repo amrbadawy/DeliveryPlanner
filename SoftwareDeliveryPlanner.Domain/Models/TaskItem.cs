@@ -1,7 +1,7 @@
 using SoftwareDeliveryPlanner.Domain;
-using SoftwareDeliveryPlanner.Domain.SharedKernel;
-using SoftwareDeliveryPlanner.Domain.SharedKernel.ValueObjects;
-using TaskIdVO = SoftwareDeliveryPlanner.Domain.SharedKernel.ValueObjects.TaskId;
+using SoftwareDeliveryPlanner.SharedKernel;
+using SoftwareDeliveryPlanner.SharedKernel.ValueObjects;
+using TaskIdVO = SoftwareDeliveryPlanner.SharedKernel.ValueObjects.TaskId;
 
 namespace SoftwareDeliveryPlanner.Domain.Models;
 
@@ -26,8 +26,8 @@ public class TaskItem
     public double? OverrideDev { get; set; }
     public string? DependsOnTaskIds { get; set; }
     public string? Comments { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = TimeProvider.System.GetLocalNow().DateTime;
+    public DateTime UpdatedAt { get; set; } = TimeProvider.System.GetLocalNow().DateTime;
 
     // ── Domain factory ────────────────────────────────────────────────────────
     /// <summary>

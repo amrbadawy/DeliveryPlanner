@@ -8,7 +8,7 @@ public sealed class AllocationConfiguration : IEntityTypeConfiguration<Allocatio
 {
     public void Configure(EntityTypeBuilder<Allocation> builder)
     {
-        builder.ToTable("Allocations");
+        builder.ToTable("Allocations", "scheduling");
 
         builder.HasKey(a => a.Id);
 
