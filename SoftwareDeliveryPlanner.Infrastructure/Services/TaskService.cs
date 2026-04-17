@@ -21,6 +21,12 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
         return await db.Tasks.OrderBy(t => t.SchedulingRank ?? 999).ToListAsync(cancellationToken);
     }
 
+    public async Task<TaskItem?> GetTaskByTaskIdAsync(string taskId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await ReadOnlyDbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Tasks.FirstOrDefaultAsync(t => t.TaskId == taskId, cancellationToken);
+    }
+
     public async Task<int> GetTaskCountAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await ReadOnlyDbFactory.CreateDbContextAsync(cancellationToken);

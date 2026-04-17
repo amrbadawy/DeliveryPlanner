@@ -47,7 +47,7 @@
                 text-align: center;
                 background: @GetDayColor(day.Status);
                 font-size: 12px;">
-                <div style="font-weight: bold;">@day.DateDisplay</div>
+                <div style="font-weight: bold;">@day.Date.ToString("MMM") @day.DateDisplay</div>
                 <div style="margin-top: 5px;">@day.StatusText</div>
             </div>
         }

@@ -5,6 +5,7 @@ namespace SoftwareDeliveryPlanner.Application.Abstractions;
 public interface ITaskOrchestrator
 {
     Task<List<TaskItem>> GetTasksAsync(CancellationToken cancellationToken = default);
+    Task<TaskItem?> GetTaskByTaskIdAsync(string taskId, CancellationToken cancellationToken = default);
     Task<int> GetTaskCountAsync(CancellationToken cancellationToken = default);
     Task UpsertTaskAsync(
         int id, string taskId, string serviceName, double devEstimation,
