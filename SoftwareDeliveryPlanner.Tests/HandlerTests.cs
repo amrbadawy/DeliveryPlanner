@@ -36,7 +36,13 @@ internal sealed class NullPublisher : IPublisher
 public abstract class OrchestratorFixture : IAsyncDisposable
 {
     private protected readonly IDbContextFactory<PlannerDbContext> Factory;
-    private protected readonly ISchedulingOrchestrator Orchestrator;
+    private protected readonly ISchedulingEngineFactory EngineFactory;
+    private protected readonly ITaskOrchestrator TaskOrchestrator;
+    private protected readonly IResourceOrchestrator ResourceOrchestrator;
+    private protected readonly IAdjustmentOrchestrator AdjustmentOrchestrator;
+    private protected readonly IHolidayOrchestrator HolidayOrchestrator;
+    private protected readonly ISchedulerService SchedulerService;
+    private protected readonly IPlanningQueryService PlanningQueryService;
 
     protected OrchestratorFixture(SqlServerFixture fixture)
     {
@@ -44,7 +50,15 @@ public abstract class OrchestratorFixture : IAsyncDisposable
 
         Factory = new TestDbContextFactory(options);
         var readOnlyFactory = new TestReadOnlyDbContextFactory(connectionString);
-        Orchestrator = new SchedulingOrchestrator(Factory, readOnlyFactory, TimeProvider.System, new NullPublisher());
+        EngineFactory = new SchedulingEngineFactory(Factory, TimeProvider.System);
+        var publisher = new NullPublisher();
+
+        TaskOrchestrator = new TaskService(Factory, readOnlyFactory, EngineFactory, publisher);
+        ResourceOrchestrator = new ResourceService(Factory, readOnlyFactory, EngineFactory, publisher);
+        AdjustmentOrchestrator = new AdjustmentService(Factory, readOnlyFactory, EngineFactory, publisher);
+        HolidayOrchestrator = new HolidayService(Factory, readOnlyFactory, EngineFactory, publisher);
+        SchedulerService = new SchedulerService(Factory, readOnlyFactory, EngineFactory, publisher);
+        PlanningQueryService = new PlanningQueryService(Factory, readOnlyFactory, EngineFactory, publisher);
     }
 
     public async ValueTask DisposeAsync() => await Task.CompletedTask;
@@ -62,7 +76,7 @@ public class GetTasksQueryHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_ReturnsAllTasks()
     {
-        var handler = new GetTasksQueryHandler(Orchestrator);
+        var handler = new GetTasksQueryHandler(TaskOrchestrator);
         var result = await handler.Handle(new GetTasksQuery(), CancellationToken.None);
         Assert.NotNull(result);
         Assert.True(result.Value.Count > 0);
@@ -71,7 +85,7 @@ public class GetTasksQueryHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_ReturnsTasksOrderedBySchedulingRank()
     {
-        var handler = new GetTasksQueryHandler(Orchestrator);
+        var handler = new GetTasksQueryHandler(TaskOrchestrator);
         var result = await handler.Handle(new GetTasksQuery(), CancellationToken.None);
         // All tasks from default data should come back (13 seeded)
         Assert.Equal(13, result.Value.Count);
@@ -86,7 +100,7 @@ public class GetTaskCountQueryHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_ReturnsCorrectCount()
     {
-        var handler = new GetTaskCountQueryHandler(Orchestrator);
+        var handler = new GetTaskCountQueryHandler(TaskOrchestrator);
         var count = await handler.Handle(new GetTaskCountQuery(), CancellationToken.None);
         Assert.Equal(13, count.Value);
     }
@@ -98,7 +112,7 @@ public class GetTaskCountQueryHandlerTests : OrchestratorFixture
         db.Tasks.Add(TaskItem.Create("TST-99", "Extra", 1, 1, 5));
         await db.SaveChangesAsync();
 
-        var handler = new GetTaskCountQueryHandler(Orchestrator);
+        var handler = new GetTaskCountQueryHandler(TaskOrchestrator);
         var count = await handler.Handle(new GetTaskCountQuery(), CancellationToken.None);
         Assert.Equal(14, count.Value);
     }
@@ -116,7 +130,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_NewTask_AddsTaskToDatabase()
     {
-        var handler = new UpsertTaskCommandHandler(Orchestrator);
+        var handler = new UpsertTaskCommandHandler(TaskOrchestrator);
         var command = new UpsertTaskCommand(
             Id: 0,
             TaskId: "NEW-01",
@@ -141,7 +155,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
         var existing = await db.Tasks.FirstAsync();
         var originalName = existing.ServiceName;
 
-        var handler = new UpsertTaskCommandHandler(Orchestrator);
+        var handler = new UpsertTaskCommandHandler(TaskOrchestrator);
         var command = new UpsertTaskCommand(
             Id: existing.Id,
             TaskId: existing.TaskId,
@@ -164,7 +178,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
     public async Task Handle_NewTask_WithStrictDate_PersistsStrictDate()
     {
         var strictDate = new DateTime(2026, 12, 31);
-        var handler = new UpsertTaskCommandHandler(Orchestrator);
+        var handler = new UpsertTaskCommandHandler(TaskOrchestrator);
         await handler.Handle(new UpsertTaskCommand(
             Id: 0,
             TaskId: "STR-01",
@@ -184,7 +198,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_NewTask_WithDependsOnTaskIds_PersistsDependencies()
     {
-        var handler = new UpsertTaskCommandHandler(Orchestrator);
+        var handler = new UpsertTaskCommandHandler(TaskOrchestrator);
         await handler.Handle(new UpsertTaskCommand(
             Id: 0,
             TaskId: "DEP-01",
@@ -204,7 +218,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_NewTask_WithNullDependsOnTaskIds_PersistsNull()
     {
-        var handler = new UpsertTaskCommandHandler(Orchestrator);
+        var handler = new UpsertTaskCommandHandler(TaskOrchestrator);
         await handler.Handle(new UpsertTaskCommand(
             Id: 0,
             TaskId: "NDP-01",
@@ -234,7 +248,7 @@ public class DeleteTaskCommandHandlerTests : OrchestratorFixture
         var task = await db.Tasks.FirstAsync();
         var taskId = task.Id;
 
-        var handler = new DeleteTaskCommandHandler(Orchestrator);
+        var handler = new DeleteTaskCommandHandler(TaskOrchestrator);
         await handler.Handle(new DeleteTaskCommand(taskId), CancellationToken.None);
 
         await using var verifyDb = await Factory.CreateDbContextAsync();
@@ -244,7 +258,7 @@ public class DeleteTaskCommandHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_NonExistentTask_DoesNotThrow()
     {
-        var handler = new DeleteTaskCommandHandler(Orchestrator);
+        var handler = new DeleteTaskCommandHandler(TaskOrchestrator);
         // Should not throw even if task doesn't exist
         await handler.Handle(new DeleteTaskCommand(99999), CancellationToken.None);
     }
@@ -344,7 +358,7 @@ public class GetResourcesQueryHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_ReturnsAllResources()
     {
-        var handler = new GetResourcesQueryHandler(Orchestrator);
+        var handler = new GetResourcesQueryHandler(ResourceOrchestrator);
         var result = await handler.Handle(new GetResourcesQuery(), CancellationToken.None);
         Assert.NotNull(result);
         Assert.Equal(5, result.Value.Count); // 5 seeded
@@ -359,7 +373,7 @@ public class GetResourceCountQueryHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_ReturnsCorrectCount()
     {
-        var handler = new GetResourceCountQueryHandler(Orchestrator);
+        var handler = new GetResourceCountQueryHandler(ResourceOrchestrator);
         var count = await handler.Handle(new GetResourceCountQuery(), CancellationToken.None);
         Assert.Equal(5, count.Value);
     }
@@ -377,7 +391,7 @@ public class UpsertResourceCommandHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_NewResource_AddsToDatabase()
     {
-        var handler = new UpsertResourceCommandHandler(Orchestrator);
+        var handler = new UpsertResourceCommandHandler(ResourceOrchestrator);
         await handler.Handle(new UpsertResourceCommand(
             Id: 0,
             ResourceId: "DEV-099",
@@ -401,7 +415,7 @@ public class UpsertResourceCommandHandlerTests : OrchestratorFixture
         await using var db = await Factory.CreateDbContextAsync();
         var existing = await db.Resources.FirstAsync();
 
-        var handler = new UpsertResourceCommandHandler(Orchestrator);
+        var handler = new UpsertResourceCommandHandler(ResourceOrchestrator);
         await handler.Handle(new UpsertResourceCommand(
             Id: existing.Id,
             ResourceId: existing.ResourceId,
@@ -434,7 +448,7 @@ public class DeleteResourceCommandHandlerTests : OrchestratorFixture
         var resource = await db.Resources.FirstAsync();
         var resourceId = resource.Id;
 
-        var handler = new DeleteResourceCommandHandler(Orchestrator);
+        var handler = new DeleteResourceCommandHandler(ResourceOrchestrator);
         await handler.Handle(new DeleteResourceCommand(resourceId), CancellationToken.None);
 
         await using var verifyDb = await Factory.CreateDbContextAsync();
@@ -444,7 +458,7 @@ public class DeleteResourceCommandHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_NonExistentResource_DoesNotThrow()
     {
-        var handler = new DeleteResourceCommandHandler(Orchestrator);
+        var handler = new DeleteResourceCommandHandler(ResourceOrchestrator);
         await handler.Handle(new DeleteResourceCommand(99999), CancellationToken.None);
     }
 }
@@ -522,7 +536,7 @@ public class GetAdjustmentsQueryHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_EmptyDb_ReturnsEmptyList()
     {
-        var handler = new GetAdjustmentsQueryHandler(Orchestrator);
+        var handler = new GetAdjustmentsQueryHandler(AdjustmentOrchestrator);
         var result = await handler.Handle(new GetAdjustmentsQuery(), CancellationToken.None);
         Assert.NotNull(result);
         Assert.Empty(result.Value);
@@ -535,7 +549,7 @@ public class GetAdjustmentsQueryHandlerTests : OrchestratorFixture
         db.Adjustments.Add(Adjustment.Create("DEV-001", "Vacation", 0, DateTime.Today, DateTime.Today.AddDays(3)));
         await db.SaveChangesAsync();
 
-        var handler = new GetAdjustmentsQueryHandler(Orchestrator);
+        var handler = new GetAdjustmentsQueryHandler(AdjustmentOrchestrator);
         var result = await handler.Handle(new GetAdjustmentsQuery(), CancellationToken.None);
         Assert.Single(result.Value);
     }
@@ -553,7 +567,7 @@ public class AddAdjustmentCommandHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_ValidCommand_AddsAdjustmentToDatabase()
     {
-        var handler = new AddAdjustmentCommandHandler(Orchestrator);
+        var handler = new AddAdjustmentCommandHandler(AdjustmentOrchestrator);
         await handler.Handle(new AddAdjustmentCommand(
             ResourceId: "DEV-001",
             AdjType: "Vacation",
@@ -571,7 +585,7 @@ public class AddAdjustmentCommandHandlerTests : OrchestratorFixture
     {
         var start = new DateTime(2026, 7, 1);
         var end = new DateTime(2026, 7, 7);
-        var handler = new AddAdjustmentCommandHandler(Orchestrator);
+        var handler = new AddAdjustmentCommandHandler(AdjustmentOrchestrator);
 
         await handler.Handle(new AddAdjustmentCommand(
             ResourceId: "DEV-002",
@@ -606,7 +620,7 @@ public class DeleteAdjustmentCommandHandlerTests : OrchestratorFixture
         await using var db2 = await Factory.CreateDbContextAsync();
         var adj = await db2.Adjustments.FirstAsync();
 
-        var handler = new DeleteAdjustmentCommandHandler(Orchestrator);
+        var handler = new DeleteAdjustmentCommandHandler(AdjustmentOrchestrator);
         await handler.Handle(new DeleteAdjustmentCommand(adj.Id), CancellationToken.None);
 
         await using var verifyDb = await Factory.CreateDbContextAsync();
@@ -616,7 +630,7 @@ public class DeleteAdjustmentCommandHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_NonExistentAdjustment_DoesNotThrow()
     {
-        var handler = new DeleteAdjustmentCommandHandler(Orchestrator);
+        var handler = new DeleteAdjustmentCommandHandler(AdjustmentOrchestrator);
         await handler.Handle(new DeleteAdjustmentCommand(99999), CancellationToken.None);
     }
 }
@@ -695,7 +709,7 @@ public class GetHolidaysQueryHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_ReturnsAllHolidays()
     {
-        var handler = new GetHolidaysQueryHandler(Orchestrator);
+        var handler = new GetHolidaysQueryHandler(HolidayOrchestrator);
         var result = await handler.Handle(new GetHolidaysQuery(), CancellationToken.None);
         Assert.NotNull(result);
         Assert.Equal(7, result.Value.Count); // 7 seeded (consolidated)
@@ -704,7 +718,7 @@ public class GetHolidaysQueryHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_ReturnsHolidaysOrderedByDate()
     {
-        var handler = new GetHolidaysQueryHandler(Orchestrator);
+        var handler = new GetHolidaysQueryHandler(HolidayOrchestrator);
         var result = await handler.Handle(new GetHolidaysQuery(), CancellationToken.None);
         for (int i = 1; i < result.Value.Count; i++)
         {
@@ -725,7 +739,7 @@ public class UpsertHolidayCommandHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_NewHoliday_AddsToDatabase()
     {
-        var handler = new UpsertHolidayCommandHandler(Orchestrator);
+        var handler = new UpsertHolidayCommandHandler(HolidayOrchestrator);
         var date = new DateTime(2026, 12, 25);
 
         await handler.Handle(new UpsertHolidayCommand(
@@ -747,7 +761,7 @@ public class UpsertHolidayCommandHandlerTests : OrchestratorFixture
         await using var db = await Factory.CreateDbContextAsync();
         var existing = await db.Holidays.FirstAsync();
 
-        var handler = new UpsertHolidayCommandHandler(Orchestrator);
+        var handler = new UpsertHolidayCommandHandler(HolidayOrchestrator);
         await handler.Handle(new UpsertHolidayCommand(
             Id: existing.Id,
             HolidayName: "Updated Holiday",
@@ -776,7 +790,7 @@ public class DeleteHolidayCommandHandlerTests : OrchestratorFixture
         var holiday = await db.Holidays.FirstAsync();
         var holidayId = holiday.Id;
 
-        var handler = new DeleteHolidayCommandHandler(Orchestrator);
+        var handler = new DeleteHolidayCommandHandler(HolidayOrchestrator);
         await handler.Handle(new DeleteHolidayCommand(holidayId), CancellationToken.None);
 
         await using var verifyDb = await Factory.CreateDbContextAsync();
@@ -786,7 +800,7 @@ public class DeleteHolidayCommandHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_NonExistentHoliday_DoesNotThrow()
     {
-        var handler = new DeleteHolidayCommandHandler(Orchestrator);
+        var handler = new DeleteHolidayCommandHandler(HolidayOrchestrator);
         await handler.Handle(new DeleteHolidayCommand(99999), CancellationToken.None);
     }
 }
@@ -812,7 +826,7 @@ public class UpsertHolidayCommandValidatorTests : OrchestratorFixture
     [Fact]
     public async Task Valid_Command_PassesValidation()
     {
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         var result = await validator.ValidateAsync(Valid());
         Assert.True(result.IsValid);
     }
@@ -822,7 +836,7 @@ public class UpsertHolidayCommandValidatorTests : OrchestratorFixture
     [InlineData("  ")]
     public async Task EmptyHolidayName_FailsValidation(string name)
     {
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         var result = await validator.ValidateAsync(Valid() with { HolidayName = name });
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertHolidayCommand.HolidayName));
@@ -831,7 +845,7 @@ public class UpsertHolidayCommandValidatorTests : OrchestratorFixture
     [Fact]
     public async Task StartDateAfterEndDate_FailsValidation()
     {
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         var result = await validator.ValidateAsync(Valid() with
         {
             StartDate = new DateTime(2026, 11, 20),
@@ -849,7 +863,7 @@ public class UpsertHolidayCommandValidatorTests : OrchestratorFixture
         db.Holidays.Add(Holiday.Create("Existing Holiday", new DateTime(2026, 12, 1), new DateTime(2026, 12, 5)));
         await db.SaveChangesAsync();
 
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         // Try to add a holiday that overlaps: Dec 3–7
         var result = await validator.ValidateAsync(Valid() with
         {
@@ -868,7 +882,7 @@ public class UpsertHolidayCommandValidatorTests : OrchestratorFixture
         db.Holidays.Add(Holiday.Create("Existing Holiday", new DateTime(2026, 12, 1), new DateTime(2026, 12, 5)));
         await db.SaveChangesAsync();
 
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         // Adjacent: Dec 6–8 (no overlap)
         var result = await validator.ValidateAsync(Valid() with
         {
@@ -886,7 +900,7 @@ public class UpsertHolidayCommandValidatorTests : OrchestratorFixture
         db.Holidays.Add(Holiday.Create("Existing Holiday", new DateTime(2026, 12, 1), new DateTime(2026, 12, 5)));
         await db.SaveChangesAsync();
 
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         // Partial overlap: Nov 28–Dec 2
         var result = await validator.ValidateAsync(Valid() with
         {
@@ -905,7 +919,7 @@ public class UpsertHolidayCommandValidatorTests : OrchestratorFixture
         db.Holidays.Add(Holiday.Create("Existing Holiday", new DateTime(2026, 12, 1), new DateTime(2026, 12, 5)));
         await db.SaveChangesAsync();
 
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         // Exact same dates
         var result = await validator.ValidateAsync(Valid() with
         {
@@ -924,7 +938,7 @@ public class UpsertHolidayCommandValidatorTests : OrchestratorFixture
         db.Holidays.Add(Holiday.Create("Existing Holiday", new DateTime(2026, 12, 1), new DateTime(2026, 12, 5)));
         await db.SaveChangesAsync();
 
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         // Contained within existing: Dec 2–4
         var result = await validator.ValidateAsync(Valid() with
         {
@@ -949,9 +963,9 @@ public class GetCalendarQueryHandlerTests : OrchestratorFixture
     public async Task Handle_AfterScheduler_ReturnsCalendarDays()
     {
         // Run scheduler first to populate calendar
-        await Orchestrator.RunSchedulerAsync();
+        await SchedulerService.RunSchedulerAsync();
 
-        var handler = new GetCalendarQueryHandler(Orchestrator);
+        var handler = new GetCalendarQueryHandler(PlanningQueryService);
         var result = await handler.Handle(new GetCalendarQuery(), CancellationToken.None);
 
         Assert.NotNull(result);
@@ -961,9 +975,9 @@ public class GetCalendarQueryHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_ReturnsCalendarOrderedByDate()
     {
-        await Orchestrator.RunSchedulerAsync();
+        await SchedulerService.RunSchedulerAsync();
 
-        var handler = new GetCalendarQueryHandler(Orchestrator);
+        var handler = new GetCalendarQueryHandler(PlanningQueryService);
         var result = await handler.Handle(new GetCalendarQuery(), CancellationToken.None);
 
         for (int i = 1; i < result.Value.Count; i++)
@@ -985,7 +999,7 @@ public class GetTimelineQueryHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_ValidResourceAndRange_ReturnsDays()
     {
-        var handler = new GetTimelineQueryHandler(Orchestrator);
+        var handler = new GetTimelineQueryHandler(PlanningQueryService);
         var start = new DateTime(2026, 5, 1);
         var end = new DateTime(2026, 5, 7);
 
@@ -1000,7 +1014,7 @@ public class GetTimelineQueryHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_SingleDay_ReturnsOneDayDto()
     {
-        var handler = new GetTimelineQueryHandler(Orchestrator);
+        var handler = new GetTimelineQueryHandler(PlanningQueryService);
         var date = new DateTime(2026, 5, 4); // Monday
 
         var result = await handler.Handle(
@@ -1014,7 +1028,7 @@ public class GetTimelineQueryHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_Weekend_MarksCorrectly()
     {
-        var handler = new GetTimelineQueryHandler(Orchestrator);
+        var handler = new GetTimelineQueryHandler(PlanningQueryService);
         // 2026-05-01 is a Friday (day 5 = weekend in Sun-Thu week)
         var friday = new DateTime(2026, 5, 1);
 
@@ -1024,13 +1038,13 @@ public class GetTimelineQueryHandlerTests : OrchestratorFixture
 
         Assert.Single(result.Value.Days);
         Assert.Equal("Friday", result.Value.Days[0].StatusText);
-        Assert.Equal("#f8f9fa", result.Value.Days[0].BackgroundColor);
+        Assert.Equal(TimelineDayStatus.Weekend, result.Value.Days[0].Status);
     }
 
     [Fact]
     public async Task Handle_Holiday_MarksCorrectly()
     {
-        var handler = new GetTimelineQueryHandler(Orchestrator);
+        var handler = new GetTimelineQueryHandler(PlanningQueryService);
         // 2026-09-23 is اليوم الوطني (National Day) - seeded
         var nationalDay = new DateTime(2026, 9, 23);
 
@@ -1039,13 +1053,13 @@ public class GetTimelineQueryHandlerTests : OrchestratorFixture
             CancellationToken.None);
 
         Assert.Single(result.Value.Days);
-        Assert.Equal("#fff3cd", result.Value.Days[0].BackgroundColor);
+        Assert.Equal(TimelineDayStatus.Holiday, result.Value.Days[0].Status);
     }
 
     [Fact]
     public async Task Handle_UnknownResource_ReturnsFreeDays()
     {
-        var handler = new GetTimelineQueryHandler(Orchestrator);
+        var handler = new GetTimelineQueryHandler(PlanningQueryService);
         var start = new DateTime(2026, 5, 3); // Sunday — working day
         var end = new DateTime(2026, 5, 3);
 
@@ -1071,7 +1085,7 @@ public class GetOutputPlanQueryHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_ReturnsOutputPlan()
     {
-        var handler = new GetOutputPlanQueryHandler(Orchestrator);
+        var handler = new GetOutputPlanQueryHandler(PlanningQueryService);
         var result = await handler.Handle(new GetOutputPlanQuery(), CancellationToken.None);
 
         Assert.NotNull(result);
@@ -1080,9 +1094,9 @@ public class GetOutputPlanQueryHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_AfterScheduler_ReturnsNonEmptyPlan()
     {
-        await Orchestrator.RunSchedulerAsync();
+        await SchedulerService.RunSchedulerAsync();
 
-        var handler = new GetOutputPlanQueryHandler(Orchestrator);
+        var handler = new GetOutputPlanQueryHandler(PlanningQueryService);
         var result = await handler.Handle(new GetOutputPlanQuery(), CancellationToken.None);
 
         Assert.True(result.Value.Count > 0);
@@ -1091,9 +1105,9 @@ public class GetOutputPlanQueryHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_EachRow_ContainsExpectedKeys()
     {
-        await Orchestrator.RunSchedulerAsync();
+        await SchedulerService.RunSchedulerAsync();
 
-        var handler = new GetOutputPlanQueryHandler(Orchestrator);
+        var handler = new GetOutputPlanQueryHandler(PlanningQueryService);
         var result = await handler.Handle(new GetOutputPlanQuery(), CancellationToken.None);
 
         foreach (var row in result.Value)
@@ -1118,7 +1132,7 @@ public class UpsertHolidayCommandHandlerEdgeTests : OrchestratorFixture
     [Fact]
     public async Task Handle_NewHoliday_MultiDayRange_PersistsCorrectDates()
     {
-        var handler = new UpsertHolidayCommandHandler(Orchestrator);
+        var handler = new UpsertHolidayCommandHandler(HolidayOrchestrator);
         var start = new DateTime(2026, 12, 24);
         var end = new DateTime(2026, 12, 26);
 
@@ -1140,7 +1154,7 @@ public class UpsertHolidayCommandHandlerEdgeTests : OrchestratorFixture
     [Fact]
     public async Task Handle_NewHoliday_WithNotes_PersistsNotes()
     {
-        var handler = new UpsertHolidayCommandHandler(Orchestrator);
+        var handler = new UpsertHolidayCommandHandler(HolidayOrchestrator);
         var date = new DateTime(2026, 12, 25);
 
         await handler.Handle(new UpsertHolidayCommand(
@@ -1166,7 +1180,7 @@ public class UpsertHolidayCommandHandlerEdgeTests : OrchestratorFixture
         var newStart = new DateTime(2027, 1, 10);
         var newEnd = new DateTime(2027, 1, 12);
 
-        var handler = new UpsertHolidayCommandHandler(Orchestrator);
+        var handler = new UpsertHolidayCommandHandler(HolidayOrchestrator);
         await handler.Handle(new UpsertHolidayCommand(
             Id: existing.Id,
             HolidayName: existing.HolidayName,
@@ -1185,7 +1199,7 @@ public class UpsertHolidayCommandHandlerEdgeTests : OrchestratorFixture
     [Fact]
     public async Task Handle_NewHoliday_UsesCreateFactory_TrimsName()
     {
-        var handler = new UpsertHolidayCommandHandler(Orchestrator);
+        var handler = new UpsertHolidayCommandHandler(HolidayOrchestrator);
         var date = new DateTime(2026, 12, 25);
 
         await handler.Handle(new UpsertHolidayCommand(
@@ -1219,7 +1233,7 @@ public class UpsertHolidayCommandValidatorEdgeTests : OrchestratorFixture
         await using var db = await Factory.CreateDbContextAsync();
         var existing = await db.Holidays.FirstAsync();
 
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         // Update with the same dates — should exclude self from overlap check
         var result = await validator.ValidateAsync(new UpsertHolidayCommand(
             Id: existing.Id,
@@ -1236,7 +1250,7 @@ public class UpsertHolidayCommandValidatorEdgeTests : OrchestratorFixture
     [Fact]
     public async Task NewHoliday_NoOverlap_PassesValidation()
     {
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         // Pick a date range that doesn't overlap any seeded holiday
         var result = await validator.ValidateAsync(new UpsertHolidayCommand(
             Id: 0,
@@ -1258,7 +1272,7 @@ public class UpsertHolidayCommandValidatorEdgeTests : OrchestratorFixture
         db.Holidays.Add(Holiday.Create("Mid Dec", new DateTime(2026, 12, 10), new DateTime(2026, 12, 12)));
         await db.SaveChangesAsync();
 
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         // New holiday that fully envelops the existing one: Dec 8–14
         var result = await validator.ValidateAsync(new UpsertHolidayCommand(
             Id: 0,
@@ -1276,7 +1290,7 @@ public class UpsertHolidayCommandValidatorEdgeTests : OrchestratorFixture
     [Fact]
     public async Task StartDateEqualsEndDate_PassesValidation()
     {
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         // Single-day holiday on a free date
         var result = await validator.ValidateAsync(new UpsertHolidayCommand(
             Id: 0,
@@ -1293,7 +1307,7 @@ public class UpsertHolidayCommandValidatorEdgeTests : OrchestratorFixture
     [Fact]
     public async Task EmptyHolidayName_ReturnsCorrectErrorMessage()
     {
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         var result = await validator.ValidateAsync(new UpsertHolidayCommand(
             Id: 0,
             HolidayName: "",
@@ -1320,7 +1334,7 @@ public class GetTimelineQueryHandlerEdgeTests : OrchestratorFixture
     [Fact]
     public async Task Handle_Saturday_MarksCorrectly()
     {
-        var handler = new GetTimelineQueryHandler(Orchestrator);
+        var handler = new GetTimelineQueryHandler(PlanningQueryService);
         // 2026-05-02 is a Saturday
         var saturday = new DateTime(2026, 5, 2);
 
@@ -1330,13 +1344,13 @@ public class GetTimelineQueryHandlerEdgeTests : OrchestratorFixture
 
         Assert.Single(result.Value.Days);
         Assert.Equal("Saturday", result.Value.Days[0].StatusText);
-        Assert.Equal("#f8f9fa", result.Value.Days[0].BackgroundColor);
+        Assert.Equal(TimelineDayStatus.Weekend, result.Value.Days[0].Status);
     }
 
     [Fact]
     public async Task Handle_MultiDayRange_ReturnsCorrectCount()
     {
-        var handler = new GetTimelineQueryHandler(Orchestrator);
+        var handler = new GetTimelineQueryHandler(PlanningQueryService);
         var start = new DateTime(2026, 5, 1);
         var end = new DateTime(2026, 5, 14);
 
@@ -1355,14 +1369,14 @@ public class GetTimelineQueryHandlerEdgeTests : OrchestratorFixture
         db.Adjustments.Add(Adjustment.Create("DEV-001", "Training", 50, new DateTime(2026, 8, 10), new DateTime(2026, 8, 12)));
         await db.SaveChangesAsync();
 
-        var handler = new GetTimelineQueryHandler(Orchestrator);
+        var handler = new GetTimelineQueryHandler(PlanningQueryService);
         var result = await handler.Handle(
             new GetTimelineQuery("DEV-001", new DateTime(2026, 8, 10), new DateTime(2026, 8, 10)),
             CancellationToken.None);
 
         Assert.Single(result.Value.Days);
         Assert.Equal("Training", result.Value.Days[0].StatusText);
-        Assert.Equal("#cce5ff", result.Value.Days[0].BackgroundColor);
+        Assert.Equal(TimelineDayStatus.Adjustment, result.Value.Days[0].Status);
     }
 }
 
@@ -1378,9 +1392,9 @@ public class GetCalendarQueryHandlerEdgeTests : OrchestratorFixture
     [Fact]
     public async Task Handle_CalendarDays_IncludeHolidayNames()
     {
-        await Orchestrator.RunSchedulerAsync();
+        await SchedulerService.RunSchedulerAsync();
 
-        var handler = new GetCalendarQueryHandler(Orchestrator);
+        var handler = new GetCalendarQueryHandler(PlanningQueryService);
         var result = await handler.Handle(new GetCalendarQuery(), CancellationToken.None);
 
         // National Day is seeded on 2026-09-23
@@ -1394,9 +1408,9 @@ public class GetCalendarQueryHandlerEdgeTests : OrchestratorFixture
     [Fact]
     public async Task Handle_WeekendDays_AreNotWorkingDays()
     {
-        await Orchestrator.RunSchedulerAsync();
+        await SchedulerService.RunSchedulerAsync();
 
-        var handler = new GetCalendarQueryHandler(Orchestrator);
+        var handler = new GetCalendarQueryHandler(PlanningQueryService);
         var result = await handler.Handle(new GetCalendarQuery(), CancellationToken.None);
 
         // Check that all Fridays and Saturdays in the calendar are non-working
@@ -1713,7 +1727,7 @@ public class UpsertHolidayCommandValidatorAdditionalTests : OrchestratorFixture
     [Fact]
     public async Task NullHolidayName_FailsValidation()
     {
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         var result = await validator.ValidateAsync(new UpsertHolidayCommand(
             Id: 0, HolidayName: null!, StartDate: new DateTime(2026, 11, 15),
             EndDate: new DateTime(2026, 11, 15), HolidayType: "National",
@@ -1725,7 +1739,7 @@ public class UpsertHolidayCommandValidatorAdditionalTests : OrchestratorFixture
     [Fact]
     public async Task MultipleFailures_BothNameAndDateErrors()
     {
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         var result = await validator.ValidateAsync(new UpsertHolidayCommand(
             Id: 0, HolidayName: "", StartDate: new DateTime(2026, 11, 20),
             EndDate: new DateTime(2026, 11, 15), HolidayType: "National",
@@ -1743,7 +1757,7 @@ public class UpsertHolidayCommandValidatorAdditionalTests : OrchestratorFixture
         db.Holidays.Add(Holiday.Create("Existing", new DateTime(2026, 12, 20), new DateTime(2026, 12, 25)));
         await db.SaveChangesAsync();
 
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         var result = await validator.ValidateAsync(new UpsertHolidayCommand(
             Id: 0, HolidayName: "Overlap Test",
             StartDate: new DateTime(2026, 12, 22),
@@ -1755,7 +1769,7 @@ public class UpsertHolidayCommandValidatorAdditionalTests : OrchestratorFixture
     [Fact]
     public async Task UnconstrainedFields_HolidayType_AcceptsAnyValue()
     {
-        var validator = new UpsertHolidayCommandValidator(Orchestrator);
+        var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         var result = await validator.ValidateAsync(new UpsertHolidayCommand(
             Id: 0, HolidayName: "Test", StartDate: new DateTime(2026, 11, 15),
             EndDate: new DateTime(2026, 11, 15), HolidayType: "",
@@ -1776,7 +1790,7 @@ public class HandlerCancellationTests : OrchestratorFixture
     [Fact]
     public async Task GetTasksHandler_CancelledToken_ThrowsOperationCancelled()
     {
-        var handler = new GetTasksQueryHandler(Orchestrator);
+        var handler = new GetTasksQueryHandler(TaskOrchestrator);
         var cts = new CancellationTokenSource();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
@@ -1786,7 +1800,7 @@ public class HandlerCancellationTests : OrchestratorFixture
     [Fact]
     public async Task GetHolidaysHandler_CancelledToken_ThrowsOperationCancelled()
     {
-        var handler = new GetHolidaysQueryHandler(Orchestrator);
+        var handler = new GetHolidaysQueryHandler(HolidayOrchestrator);
         var cts = new CancellationTokenSource();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
@@ -1796,7 +1810,7 @@ public class HandlerCancellationTests : OrchestratorFixture
     [Fact]
     public async Task GetResourcesHandler_CancelledToken_ThrowsOperationCancelled()
     {
-        var handler = new GetResourcesQueryHandler(Orchestrator);
+        var handler = new GetResourcesQueryHandler(ResourceOrchestrator);
         var cts = new CancellationTokenSource();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
@@ -1806,7 +1820,7 @@ public class HandlerCancellationTests : OrchestratorFixture
     [Fact]
     public async Task GetAdjustmentsHandler_CancelledToken_ThrowsOperationCancelled()
     {
-        var handler = new GetAdjustmentsQueryHandler(Orchestrator);
+        var handler = new GetAdjustmentsQueryHandler(AdjustmentOrchestrator);
         var cts = new CancellationTokenSource();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
@@ -1816,8 +1830,8 @@ public class HandlerCancellationTests : OrchestratorFixture
     [Fact]
     public async Task GetCalendarHandler_CancelledToken_ThrowsOperationCancelled()
     {
-        await Orchestrator.RunSchedulerAsync();
-        var handler = new GetCalendarQueryHandler(Orchestrator);
+        await SchedulerService.RunSchedulerAsync();
+        var handler = new GetCalendarQueryHandler(PlanningQueryService);
         var cts = new CancellationTokenSource();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
@@ -1827,7 +1841,7 @@ public class HandlerCancellationTests : OrchestratorFixture
     [Fact]
     public async Task GetOutputPlanHandler_CancelledToken_ThrowsOperationCancelled()
     {
-        var handler = new GetOutputPlanQueryHandler(Orchestrator);
+        var handler = new GetOutputPlanQueryHandler(PlanningQueryService);
         var cts = new CancellationTokenSource();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
@@ -1837,7 +1851,7 @@ public class HandlerCancellationTests : OrchestratorFixture
     [Fact]
     public async Task GetTimelineHandler_CancelledToken_ThrowsOperationCancelled()
     {
-        var handler = new GetTimelineQueryHandler(Orchestrator);
+        var handler = new GetTimelineQueryHandler(PlanningQueryService);
         var cts = new CancellationTokenSource();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
@@ -1847,7 +1861,7 @@ public class HandlerCancellationTests : OrchestratorFixture
     [Fact]
     public async Task DeleteTaskHandler_CancelledToken_ThrowsOperationCancelled()
     {
-        var handler = new DeleteTaskCommandHandler(Orchestrator);
+        var handler = new DeleteTaskCommandHandler(TaskOrchestrator);
         var cts = new CancellationTokenSource();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
@@ -1857,7 +1871,7 @@ public class HandlerCancellationTests : OrchestratorFixture
     [Fact]
     public async Task DeleteResourceHandler_CancelledToken_ThrowsOperationCancelled()
     {
-        var handler = new DeleteResourceCommandHandler(Orchestrator);
+        var handler = new DeleteResourceCommandHandler(ResourceOrchestrator);
         var cts = new CancellationTokenSource();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
@@ -1867,7 +1881,7 @@ public class HandlerCancellationTests : OrchestratorFixture
     [Fact]
     public async Task DeleteHolidayHandler_CancelledToken_ThrowsOperationCancelled()
     {
-        var handler = new DeleteHolidayCommandHandler(Orchestrator);
+        var handler = new DeleteHolidayCommandHandler(HolidayOrchestrator);
         var cts = new CancellationTokenSource();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
@@ -1877,7 +1891,7 @@ public class HandlerCancellationTests : OrchestratorFixture
     [Fact]
     public async Task DeleteAdjustmentHandler_CancelledToken_ThrowsOperationCancelled()
     {
-        var handler = new DeleteAdjustmentCommandHandler(Orchestrator);
+        var handler = new DeleteAdjustmentCommandHandler(AdjustmentOrchestrator);
         var cts = new CancellationTokenSource();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
@@ -1893,7 +1907,7 @@ public class HandlerEdgeCaseTests : OrchestratorFixture
     [Fact]
     public async Task AddAdjustmentHandler_NullNotes_PersistsNull()
     {
-        var handler = new AddAdjustmentCommandHandler(Orchestrator);
+        var handler = new AddAdjustmentCommandHandler(AdjustmentOrchestrator);
         await handler.Handle(new AddAdjustmentCommand(
             ResourceId: "DEV-001", AdjType: "Vacation",
             AvailabilityPct: 0, AdjStart: DateTime.Today,
@@ -1907,13 +1921,13 @@ public class HandlerEdgeCaseTests : OrchestratorFixture
     [Fact]
     public async Task GetTaskCountHandler_AfterDelete_CountDecreases()
     {
-        var countHandler = new GetTaskCountQueryHandler(Orchestrator);
+        var countHandler = new GetTaskCountQueryHandler(TaskOrchestrator);
         var initialCount = await countHandler.Handle(new GetTaskCountQuery(), CancellationToken.None);
 
         await using var db = await Factory.CreateDbContextAsync();
         var firstTask = await db.Tasks.FirstAsync();
 
-        var deleteHandler = new DeleteTaskCommandHandler(Orchestrator);
+        var deleteHandler = new DeleteTaskCommandHandler(TaskOrchestrator);
         await deleteHandler.Handle(new DeleteTaskCommand(firstTask.Id), CancellationToken.None);
 
         var newCount = await countHandler.Handle(new GetTaskCountQuery(), CancellationToken.None);
@@ -1923,7 +1937,7 @@ public class HandlerEdgeCaseTests : OrchestratorFixture
     [Fact]
     public async Task RunSchedulerHandler_ReturnsSuccessMessage()
     {
-        var handler = new RunSchedulerCommandHandler(Orchestrator);
+        var handler = new RunSchedulerCommandHandler(SchedulerService);
         var result = await handler.Handle(new RunSchedulerCommand(), CancellationToken.None);
         Assert.Contains("successfully scheduled", result.Value, StringComparison.OrdinalIgnoreCase);
     }
@@ -1931,7 +1945,7 @@ public class HandlerEdgeCaseTests : OrchestratorFixture
     [Fact]
     public async Task GetDashboardKpisHandler_ReturnsNonNullDto()
     {
-        var handler = new GetDashboardKpisQueryHandler(Orchestrator);
+        var handler = new GetDashboardKpisQueryHandler(SchedulerService);
         var result = await handler.Handle(new GetDashboardKpisQuery(), CancellationToken.None);
         Assert.NotNull(result);
         Assert.True(result.Value.TotalServices > 0);
@@ -1941,8 +1955,8 @@ public class HandlerEdgeCaseTests : OrchestratorFixture
     [Fact]
     public async Task GetDashboardKpisHandler_AfterScheduler_TotalEstimationIsPositive()
     {
-        await Orchestrator.RunSchedulerAsync();
-        var handler = new GetDashboardKpisQueryHandler(Orchestrator);
+        await SchedulerService.RunSchedulerAsync();
+        var handler = new GetDashboardKpisQueryHandler(SchedulerService);
         var result = await handler.Handle(new GetDashboardKpisQuery(), CancellationToken.None);
         Assert.True(result.Value.TotalEstimation > 0);
     }

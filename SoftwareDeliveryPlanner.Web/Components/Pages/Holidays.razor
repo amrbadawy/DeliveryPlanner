@@ -8,7 +8,6 @@
 @using SoftwareDeliveryPlanner.Domain.Models
 @using SoftwareDeliveryPlanner.Domain
 @inject IMediator Mediator
-@inject ISchedulingOrchestrator Orchestrator
 
 <PageTitle>Holidays</PageTitle>
 
@@ -557,7 +556,8 @@ else
 
     private async Task DoCopyToYear()
     {
-        var copied = await Orchestrator.CopyHolidaysToYearAsync(copyFromYear, copyToYear);
+        var result = await Mediator.Send(new CopyHolidaysToYearCommand(copyFromYear, copyToYear));
+        var copied = result.Value;
         showCopyModal = false;
         await LoadHolidays();
         toastMessage = copied > 0

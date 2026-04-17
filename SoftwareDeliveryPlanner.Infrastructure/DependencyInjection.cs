@@ -29,16 +29,18 @@ public static class DependencyInjection
 
         services.AddScoped<IDatabaseMigrator, DatabaseMigrator>();
         services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
-        services.AddScoped<ISchedulingOrchestrator, SchedulingOrchestrator>();
         services.AddSingleton(TimeProvider.System);
 
-        // Forward focused interfaces to the composite orchestrator instance
-        services.AddScoped<ISchedulerService>(sp => sp.GetRequiredService<ISchedulingOrchestrator>());
-        services.AddScoped<ITaskOrchestrator>(sp => sp.GetRequiredService<ISchedulingOrchestrator>());
-        services.AddScoped<IResourceOrchestrator>(sp => sp.GetRequiredService<ISchedulingOrchestrator>());
-        services.AddScoped<IAdjustmentOrchestrator>(sp => sp.GetRequiredService<ISchedulingOrchestrator>());
-        services.AddScoped<IHolidayOrchestrator>(sp => sp.GetRequiredService<ISchedulingOrchestrator>());
-        services.AddScoped<IPlanningQueryService>(sp => sp.GetRequiredService<ISchedulingOrchestrator>());
+        // Scheduling engine factory — creates engine instances with their own DbContext
+        services.AddSingleton<ISchedulingEngineFactory, SchedulingEngineFactory>();
+
+        // Focused service registrations — one class per interface
+        services.AddScoped<ITaskOrchestrator, TaskService>();
+        services.AddScoped<IResourceOrchestrator, ResourceService>();
+        services.AddScoped<IAdjustmentOrchestrator, AdjustmentService>();
+        services.AddScoped<IHolidayOrchestrator, HolidayService>();
+        services.AddScoped<ISchedulerService, SchedulerService>();
+        services.AddScoped<IPlanningQueryService, PlanningQueryService>();
 
         return services;
     }

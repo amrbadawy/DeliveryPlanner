@@ -5,20 +5,22 @@ using SoftwareDeliveryPlanner.Domain.Models;
 
 namespace SoftwareDeliveryPlanner.Infrastructure.Services;
 
-internal class SchedulingEngine
+internal class SchedulingEngine : ISchedulingEngine
 {
     private readonly PlannerDbContext _db;
     private readonly TimeProvider _timeProvider;
     private readonly int _atRiskThreshold;
     private readonly HashSet<DayOfWeek> _weekendDays;
+    private readonly bool _ownsContext;
 
     // In-memory holiday cache — loaded once per RunScheduler call to avoid 1460+ DB queries.
     private List<Holiday>? _holidayCache;
 
-    public SchedulingEngine(PlannerDbContext db, TimeProvider timeProvider)
+    public SchedulingEngine(PlannerDbContext db, TimeProvider timeProvider, bool ownsContext = false)
     {
         _db = db;
         _timeProvider = timeProvider;
+        _ownsContext = ownsContext;
         var setting = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.AtRiskThreshold);
         _atRiskThreshold = int.TryParse(setting?.Value, out var t) ? t : 5;
 
@@ -394,5 +396,11 @@ internal class SchedulingEngine
         }
 
         return output;
+    }
+
+    public void Dispose()
+    {
+        if (_ownsContext)
+            _db.Dispose();
     }
 }

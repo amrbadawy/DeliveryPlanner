@@ -45,7 +45,7 @@
                 border-radius: 5px;
                 padding: 5px;
                 text-align: center;
-                background: @day.BackgroundColor;
+                background: @GetDayColor(day.Status);
                 font-size: 12px;">
                 <div style="font-weight: bold;">@day.DateDisplay</div>
                 <div style="margin-top: 5px;">@day.StatusText</div>
@@ -96,4 +96,14 @@
         var data = result.Value;
         timelineDays = data.Days;
     }
+
+    private static string GetDayColor(TimelineDayStatus status) => status switch
+    {
+        TimelineDayStatus.Weekend => "#f8f9fa",
+        TimelineDayStatus.Holiday => "#fff3cd",
+        TimelineDayStatus.Adjustment => "#cce5ff",
+        TimelineDayStatus.Working => "#d1ecf1",
+        TimelineDayStatus.Free => "#d4edda",
+        _ => "#ffffff"
+    };
 }

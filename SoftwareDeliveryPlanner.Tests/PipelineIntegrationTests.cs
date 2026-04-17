@@ -49,15 +49,15 @@ public abstract class PipelineFixture : IAsyncDisposable
         // Application layer: MediatR + FluentValidation + ValidationBehavior
         services.AddApplication();
 
-        // Infrastructure layer: orchestrator + focused interface forwarding
+        // Infrastructure layer: focused services + engine factory
         services.AddSingleton(TimeProvider.System);
-        services.AddScoped<ISchedulingOrchestrator, SchedulingOrchestrator>();
-        services.AddScoped<ISchedulerService>(sp => sp.GetRequiredService<ISchedulingOrchestrator>());
-        services.AddScoped<ITaskOrchestrator>(sp => sp.GetRequiredService<ISchedulingOrchestrator>());
-        services.AddScoped<IResourceOrchestrator>(sp => sp.GetRequiredService<ISchedulingOrchestrator>());
-        services.AddScoped<IAdjustmentOrchestrator>(sp => sp.GetRequiredService<ISchedulingOrchestrator>());
-        services.AddScoped<IHolidayOrchestrator>(sp => sp.GetRequiredService<ISchedulingOrchestrator>());
-        services.AddScoped<IPlanningQueryService>(sp => sp.GetRequiredService<ISchedulingOrchestrator>());
+        services.AddScoped<ISchedulingEngineFactory, SchedulingEngineFactory>();
+        services.AddScoped<ITaskOrchestrator, TaskService>();
+        services.AddScoped<IResourceOrchestrator, ResourceService>();
+        services.AddScoped<IAdjustmentOrchestrator, AdjustmentService>();
+        services.AddScoped<IHolidayOrchestrator, HolidayService>();
+        services.AddScoped<ISchedulerService, SchedulerService>();
+        services.AddScoped<IPlanningQueryService, PlanningQueryService>();
 
         Services = services.BuildServiceProvider();
 

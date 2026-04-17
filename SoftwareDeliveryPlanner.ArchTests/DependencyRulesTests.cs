@@ -83,6 +83,14 @@ public class DependencyRulesTests
     // Architecture Rule: No enums — use LookupValue entities
     // ─────────────────────────────────────────────────────────
 
+    // DTO-associated semantic enums that are explicitly permitted.
+    // These represent presentation/contract concepts in DTOs, not
+    // domain-level lookup data that belongs in a LookupValue table.
+    private static readonly HashSet<string> AllowedDtoEnums = new(StringComparer.Ordinal)
+    {
+        "SoftwareDeliveryPlanner.Application.Abstractions.TimelineDayStatus",
+    };
+
     [Theory]
     [InlineData("Domain")]
     [InlineData("Application")]
@@ -101,6 +109,7 @@ public class DependencyRulesTests
 
         var enums = assembly.GetTypes()
             .Where(t => t.IsEnum && t.IsPublic)
+            .Where(t => !AllowedDtoEnums.Contains(t.FullName ?? t.Name))
             .Select(t => t.FullName ?? t.Name)
             .OrderBy(n => n)
             .ToList();
@@ -1655,6 +1664,197 @@ public class DependencyRulesTests
         Assert.True(violations.Count == 0,
             $"All aggregate roots must have a static Create() factory method. " +
             $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Phase 2C: God Class Decomposition Architecture Rules
+    // ─────────────────────────────────────────────────────────
+
+    // ── God Class Elimination ────────────────────────────────
+
+    [Fact]
+    public void Composite_ISchedulingOrchestrator_Must_Not_Exist()
+    {
+        var appAssembly = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+
+        var composite = appAssembly.GetTypes()
+            .FirstOrDefault(t => t.IsInterface && t.Name == "ISchedulingOrchestrator");
+
+        Assert.Null(composite);
+    }
+
+    [Fact]
+    public void Composite_SchedulingOrchestrator_Must_Not_Exist()
+    {
+        var infraAssembly = typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly;
+
+        var composite = infraAssembly.GetTypes()
+            .FirstOrDefault(t => t.IsClass && t.Name == "SchedulingOrchestrator");
+
+        Assert.Null(composite);
+    }
+
+    // ── Focused Service Rules ────────────────────────────────
+
+    [Theory]
+    [InlineData("TaskService")]
+    [InlineData("ResourceService")]
+    [InlineData("AdjustmentService")]
+    [InlineData("HolidayService")]
+    [InlineData("SchedulerService")]
+    [InlineData("PlanningQueryService")]
+    public void Focused_Services_Must_Be_Internal_And_Sealed(string serviceName)
+    {
+        var infraAssembly = typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly;
+
+        var serviceType = infraAssembly.GetTypes()
+            .FirstOrDefault(t => t.Name == serviceName && t.IsClass);
+
+        Assert.NotNull(serviceType);
+        Assert.False(serviceType!.IsPublic,
+            $"{serviceName} must be internal (not public).");
+        Assert.True(serviceType.IsSealed,
+            $"{serviceName} must be sealed.");
+    }
+
+    [Theory]
+    [InlineData("TaskService")]
+    [InlineData("ResourceService")]
+    [InlineData("AdjustmentService")]
+    [InlineData("HolidayService")]
+    [InlineData("SchedulerService")]
+    [InlineData("PlanningQueryService")]
+    public void Focused_Services_Must_Inherit_ServiceBase(string serviceName)
+    {
+        var infraAssembly = typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly;
+
+        var serviceType = infraAssembly.GetTypes()
+            .First(t => t.Name == serviceName && t.IsClass);
+
+        var serviceBaseType = infraAssembly.GetTypes()
+            .First(t => t.Name == "ServiceBase" && t.IsClass && t.IsAbstract);
+
+        Assert.True(serviceBaseType.IsAssignableFrom(serviceType),
+            $"{serviceName} must inherit from ServiceBase.");
+    }
+
+    [Fact]
+    public void ServiceBase_Must_Be_Internal_Abstract()
+    {
+        var infraAssembly = typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly;
+
+        var serviceBaseType = infraAssembly.GetTypes()
+            .FirstOrDefault(t => t.Name == "ServiceBase" && t.IsClass);
+
+        Assert.NotNull(serviceBaseType);
+        Assert.False(serviceBaseType!.IsPublic,
+            "ServiceBase must be internal (not public).");
+        Assert.True(serviceBaseType.IsAbstract,
+            "ServiceBase must be abstract.");
+    }
+
+    [Theory]
+    [InlineData("TaskService", "ITaskOrchestrator")]
+    [InlineData("ResourceService", "IResourceOrchestrator")]
+    [InlineData("AdjustmentService", "IAdjustmentOrchestrator")]
+    [InlineData("HolidayService", "IHolidayOrchestrator")]
+    [InlineData("SchedulerService", "ISchedulerService")]
+    [InlineData("PlanningQueryService", "IPlanningQueryService")]
+    public void Focused_Services_Must_Implement_Correct_Application_Interface(
+        string serviceName, string interfaceName)
+    {
+        var infraAssembly = typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly;
+        var appAssembly   = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+
+        var serviceType = infraAssembly.GetTypes()
+            .First(t => t.Name == serviceName && t.IsClass);
+
+        var expectedInterface = appAssembly.GetTypes()
+            .First(t => t.IsInterface && t.Name == interfaceName);
+
+        Assert.True(expectedInterface.IsAssignableFrom(serviceType),
+            $"{serviceName} must implement {interfaceName}.");
+    }
+
+    [Theory]
+    [InlineData("TaskService")]
+    [InlineData("ResourceService")]
+    [InlineData("AdjustmentService")]
+    [InlineData("HolidayService")]
+    [InlineData("SchedulerService")]
+    [InlineData("PlanningQueryService")]
+    public void Focused_Services_Must_Implement_Exactly_One_Application_Interface(string serviceName)
+    {
+        var infraAssembly = typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly;
+        var appAssembly   = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+
+        var appInterfaces = appAssembly.GetTypes()
+            .Where(t => t.IsInterface)
+            .ToHashSet();
+
+        var serviceType = infraAssembly.GetTypes()
+            .First(t => t.Name == serviceName && t.IsClass);
+
+        var implementedAppInterfaces = serviceType.GetInterfaces()
+            .Where(i => appInterfaces.Contains(i))
+            .ToList();
+
+        Assert.True(implementedAppInterfaces.Count == 1,
+            $"{serviceName} must implement exactly one Application interface. " +
+            $"Found {implementedAppInterfaces.Count}: {string.Join(", ", implementedAppInterfaces.Select(i => i.Name))}");
+    }
+
+    // ── SchedulingEngine Abstraction Rules ───────────────────
+
+    [Fact]
+    public void SchedulingEngineFactory_Must_Be_Internal_Sealed()
+    {
+        var infraAssembly = typeof(SoftwareDeliveryPlanner.Infrastructure.AssemblyMarker).Assembly;
+
+        var factoryType = infraAssembly.GetTypes()
+            .FirstOrDefault(t => t.Name == "SchedulingEngineFactory" && t.IsClass);
+
+        Assert.NotNull(factoryType);
+        Assert.False(factoryType!.IsPublic,
+            "SchedulingEngineFactory must be internal (not public).");
+        Assert.True(factoryType.IsSealed,
+            "SchedulingEngineFactory must be sealed.");
+    }
+
+    [Fact]
+    public void ISchedulingEngine_Must_Extend_IDisposable()
+    {
+        var appAssembly = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+
+        var engineInterface = appAssembly.GetTypes()
+            .FirstOrDefault(t => t.IsInterface && t.Name == "ISchedulingEngine");
+
+        Assert.NotNull(engineInterface);
+        Assert.True(typeof(IDisposable).IsAssignableFrom(engineInterface),
+            "ISchedulingEngine must extend IDisposable to ensure callers dispose engine instances.");
+    }
+
+    // ── DTO Enum Allow-List Guard ────────────────────────────
+
+    [Fact]
+    public void AllowedDtoEnums_Must_Reference_Existing_Types()
+    {
+        // Guard against stale entries in the allow-list. If an allowed enum
+        // is renamed or deleted, this test will catch it.
+        var appAssembly = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+        var allTypes = appAssembly.GetTypes()
+            .Where(t => t.IsEnum)
+            .Select(t => t.FullName ?? t.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var stale = AllowedDtoEnums
+            .Where(name => !allTypes.Contains(name))
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(stale.Count == 0,
+            $"AllowedDtoEnums contains stale entries that no longer exist in the Application assembly. " +
+            $"Remove:{Environment.NewLine}{string.Join(Environment.NewLine, stale)}");
     }
 
     // ─────────────────────────────────────────────────────────
