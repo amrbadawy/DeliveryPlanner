@@ -60,7 +60,8 @@
 
     private async Task LoadCalendar()
     {
-        calendar = await Mediator.Send(new GetCalendarQuery());
+        var result = await Mediator.Send(new GetCalendarQuery());
+        calendar = result.Value;
     }
 
     private async Task RefreshData()

@@ -129,11 +129,19 @@
     private bool showModal = false;
     private bool showDeleteConfirm = false;
     private Adjustment? editingAdjustment;
-    private Adjustment adjustmentForm = new();
+    private AdjustmentFormModel adjustmentForm = new();
     private DateTime startDateValue;
     private DateTime endDateValue;
     private string modalError = string.Empty;
     private ToastNotification toast = default!;
+
+    private class AdjustmentFormModel
+    {
+        public string ResourceId { get; set; } = string.Empty;
+        public string AdjType { get; set; } = string.Empty;
+        public double AvailabilityPct { get; set; }
+        public string? Notes { get; set; }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -142,13 +150,15 @@
 
     private async Task LoadData()
     {
-        adjustments = await Mediator.Send(new GetAdjustmentsQuery());
-        resources = await Mediator.Send(new GetResourcesQuery());
+        var adjResult = await Mediator.Send(new GetAdjustmentsQuery());
+        adjustments = adjResult.Value;
+        var resResult = await Mediator.Send(new GetResourcesQuery());
+        resources = resResult.Value;
     }
 
     private void ShowAddModal()
     {
-        adjustmentForm = new Adjustment
+        adjustmentForm = new AdjustmentFormModel
         {
             AdjType = DomainConstants.AdjustmentType.Vacation,
             AvailabilityPct = 0,
@@ -179,7 +189,7 @@
                 AdjEnd: endDateValue,
                 Notes: adjustmentForm.Notes);
 
-            await Mediator.Send(command);
+            var result = await Mediator.Send(command);
             await LoadData();
             CloseModal();
             toast.Show("Adjustment added successfully.");
@@ -194,7 +204,7 @@
     {
         if (editingAdjustment != null)
         {
-            await Mediator.Send(new DeleteAdjustmentCommand(editingAdjustment.Id));
+            var result = await Mediator.Send(new DeleteAdjustmentCommand(editingAdjustment.Id));
             toast.Show("Adjustment deleted.");
         }
         showDeleteConfirm = false;
@@ -216,7 +226,7 @@
 
     private async Task RefreshData()
     {
-        await Mediator.Send(new RunSchedulerCommand());
+        var result = await Mediator.Send(new RunSchedulerCommand());
         await LoadData();
         toast.Show("Schedule refreshed.");
     }

@@ -1,33 +1,34 @@
 using SoftwareDeliveryPlanner.Domain;
+using SoftwareDeliveryPlanner.Domain.Events;
 using SoftwareDeliveryPlanner.SharedKernel;
 using SoftwareDeliveryPlanner.SharedKernel.ValueObjects;
 using TaskIdVO = SoftwareDeliveryPlanner.SharedKernel.ValueObjects.TaskId;
 
 namespace SoftwareDeliveryPlanner.Domain.Models;
 
-public class TaskItem
+public class TaskItem : AggregateRoot
 {
-    public int Id { get; set; }
-    public string TaskId { get; set; } = string.Empty;
-    public string ServiceName { get; set; } = string.Empty;
-    public double DevEstimation { get; set; }
-    public double MaxDev { get; set; } = 1.0;
-    public DateTime? StrictDate { get; set; }
-    public int Priority { get; set; } = 5;
-    public int? SchedulingRank { get; set; }
-    public double? AssignedDev { get; set; }
-    public string? AssignedResourceId { get; set; }
-    public DateTime? PlannedStart { get; set; }
-    public DateTime? PlannedFinish { get; set; }
-    public int? Duration { get; set; }
-    public string Status { get; set; } = DomainConstants.TaskStatus.NotStarted;
-    public string DeliveryRisk { get; set; } = DomainConstants.DeliveryRisk.OnTrack;
-    public DateTime? OverrideStart { get; set; }
-    public double? OverrideDev { get; set; }
-    public string? DependsOnTaskIds { get; set; }
-    public string? Comments { get; set; }
-    public DateTime CreatedAt { get; set; } = TimeProvider.System.GetLocalNow().DateTime;
-    public DateTime UpdatedAt { get; set; } = TimeProvider.System.GetLocalNow().DateTime;
+    public int Id { get; private set; }
+    public string TaskId { get; private set; } = string.Empty;
+    public string ServiceName { get; private set; } = string.Empty;
+    public double DevEstimation { get; private set; }
+    public double MaxDev { get; private set; } = 1.0;
+    public DateTime? StrictDate { get; private set; }
+    public int Priority { get; private set; } = 5;
+    public int? SchedulingRank { get; private set; }
+    public double? AssignedDev { get; private set; }
+    public string? AssignedResourceId { get; private set; }
+    public DateTime? PlannedStart { get; private set; }
+    public DateTime? PlannedFinish { get; private set; }
+    public int? Duration { get; private set; }
+    public string Status { get; private set; } = DomainConstants.TaskStatus.NotStarted;
+    public string DeliveryRisk { get; private set; } = DomainConstants.DeliveryRisk.OnTrack;
+    public DateTime? OverrideStart { get; private set; }
+    public double? OverrideDev { get; private set; }
+    public string? DependsOnTaskIds { get; private set; }
+    public string? Comments { get; private set; }
+    public DateTime CreatedAt { get; private set; } = TimeProvider.System.GetLocalNow().DateTime;
+    public DateTime UpdatedAt { get; private set; } = TimeProvider.System.GetLocalNow().DateTime;
 
     // ── Domain factory ────────────────────────────────────────────────────────
     /// <summary>
@@ -41,7 +42,9 @@ public class TaskItem
         double maxDev,
         int priority,
         DateTime? strictDate = null,
-        string? dependsOnTaskIds = null)
+        string? dependsOnTaskIds = null,
+        DateTime? overrideStart = null,
+        double? overrideDev = null)
     {
         if (!TaskIdVO.TryCreate(taskId, out _))
             throw new DomainException($"Invalid Task ID '{taskId}'. Expected format: AAA-000.");
@@ -49,8 +52,8 @@ public class TaskItem
         if (string.IsNullOrWhiteSpace(serviceName))
             throw new DomainException("Service name must not be empty.");
 
-        if (devEstimation <= 0)
-            throw new DomainException("Dev estimation must be greater than zero.");
+        if (devEstimation < 0)
+            throw new DomainException("Dev estimation must not be negative.");
 
         if (maxDev <= 0)
             throw new DomainException("Max developers must be greater than zero.");
@@ -58,7 +61,7 @@ public class TaskItem
         if (priority < 1 || priority > 10)
             throw new DomainException("Priority must be between 1 and 10.");
 
-        return new TaskItem
+        var task = new TaskItem
         {
             TaskId = taskId.Trim().ToUpperInvariant(),
             ServiceName = serviceName.Trim(),
@@ -66,7 +69,80 @@ public class TaskItem
             MaxDev = maxDev,
             Priority = priority,
             StrictDate = strictDate,
-            DependsOnTaskIds = string.IsNullOrWhiteSpace(dependsOnTaskIds) ? null : dependsOnTaskIds.Trim()
+            DependsOnTaskIds = string.IsNullOrWhiteSpace(dependsOnTaskIds) ? null : dependsOnTaskIds.Trim(),
+            OverrideStart = overrideStart,
+            OverrideDev = overrideDev
         };
+
+        task.RaiseDomainEvent(new TaskCreatedEvent(task.TaskId, task.ServiceName));
+        return task;
+    }
+
+    // ── Domain mutation ───────────────────────────────────────────────────────
+    /// <summary>
+    /// Updates user-editable properties and raises <see cref="TaskUpdatedEvent"/>.
+    /// </summary>
+    public void Update(
+        string serviceName,
+        double devEstimation,
+        double maxDev,
+        int priority,
+        DateTime? strictDate = null,
+        string? dependsOnTaskIds = null)
+    {
+        if (string.IsNullOrWhiteSpace(serviceName))
+            throw new DomainException("Service name must not be empty.");
+
+        if (devEstimation < 0)
+            throw new DomainException("Dev estimation must not be negative.");
+
+        if (maxDev <= 0)
+            throw new DomainException("Max developers must be greater than zero.");
+
+        if (priority < 1 || priority > 10)
+            throw new DomainException("Priority must be between 1 and 10.");
+
+        ServiceName = serviceName.Trim();
+        DevEstimation = devEstimation;
+        MaxDev = maxDev;
+        Priority = priority;
+        StrictDate = strictDate;
+        DependsOnTaskIds = string.IsNullOrWhiteSpace(dependsOnTaskIds) ? null : dependsOnTaskIds.Trim();
+        UpdatedAt = TimeProvider.System.GetLocalNow().DateTime;
+
+        RaiseDomainEvent(new TaskUpdatedEvent(TaskId));
+    }
+
+    // ── Scheduling engine methods ─────────────────────────────────────────────
+    /// <summary>
+    /// Applies the scheduling rank computed by the scheduling engine.
+    /// </summary>
+    public void ApplySchedulingRank(int rank)
+    {
+        SchedulingRank = rank;
+    }
+
+    /// <summary>
+    /// Applies scheduling results computed by the scheduling engine.
+    /// Called after the allocation pass to set planned dates, assignment, and status.
+    /// Parameters are nullable because tasks with no allocations have no planned dates.
+    /// </summary>
+    public void ApplySchedulingResult(
+        double assignedDev,
+        DateTime? plannedStart,
+        DateTime? plannedFinish,
+        int duration,
+        string status,
+        string deliveryRisk,
+        string? assignedResourceId = null)
+    {
+        AssignedDev = assignedDev;
+        PlannedStart = plannedStart;
+        PlannedFinish = plannedFinish;
+        Duration = duration;
+        Status = status;
+        DeliveryRisk = deliveryRisk;
+        AssignedResourceId = assignedResourceId;
+        UpdatedAt = TimeProvider.System.GetLocalNow().DateTime;
     }
 }

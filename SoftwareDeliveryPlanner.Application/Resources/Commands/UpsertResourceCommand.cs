@@ -1,4 +1,5 @@
 using MediatR;
+using SoftwareDeliveryPlanner.SharedKernel;
 
 namespace SoftwareDeliveryPlanner.Application.Resources.Commands;
 
@@ -13,6 +14,6 @@ public sealed record UpsertResourceCommand(
     DateTime StartDate,
     string Active,
     string? Notes,
-    bool IsNew) : IRequest<Unit>;
+    bool IsNew) : IRequest<Result>;
 
-public sealed record DeleteResourceCommand(int Id) : IRequest<Unit>;
+public sealed record DeleteResourceCommand(int Id) : IRequest<Result>;

@@ -48,43 +48,43 @@ internal sealed class DatabaseSeeder : IDatabaseSeeder
     private static void SeedResources(PlannerDbContext db)
     {
         db.Resources.AddRange(
-            new TeamMember { ResourceId = "DEV-001", ResourceName = "Developer 1", Role = DomainConstants.ResourceRole.Developer, Team = DomainConstants.DefaultTeam, StartDate = new DateTime(2026, 4, 12), Notes = "Initial team" },
-            new TeamMember { ResourceId = "DEV-002", ResourceName = "Developer 2", Role = DomainConstants.ResourceRole.Developer, Team = DomainConstants.DefaultTeam, StartDate = new DateTime(2026, 4, 12), Notes = "Initial team" },
-            new TeamMember { ResourceId = "DEV-003", ResourceName = "Developer 3", Role = DomainConstants.ResourceRole.Developer, Team = DomainConstants.DefaultTeam, StartDate = new DateTime(2026, 4, 12), Notes = "Initial team" },
-            new TeamMember { ResourceId = "DEV-004", ResourceName = "Developer 4", Role = DomainConstants.ResourceRole.Developer, Team = DomainConstants.DefaultTeam, StartDate = new DateTime(2026, 6, 1), Notes = "Phase 2" },
-            new TeamMember { ResourceId = "DEV-005", ResourceName = "Developer 5", Role = DomainConstants.ResourceRole.Developer, Team = DomainConstants.DefaultTeam, StartDate = new DateTime(2026, 6, 1), Notes = "Phase 2" }
+            TeamMember.Create("DEV-001", "Developer 1", DomainConstants.ResourceRole.Developer, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 4, 12), notes: "Initial team"),
+            TeamMember.Create("DEV-002", "Developer 2", DomainConstants.ResourceRole.Developer, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 4, 12), notes: "Initial team"),
+            TeamMember.Create("DEV-003", "Developer 3", DomainConstants.ResourceRole.Developer, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 4, 12), notes: "Initial team"),
+            TeamMember.Create("DEV-004", "Developer 4", DomainConstants.ResourceRole.Developer, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 6, 1), notes: "Phase 2"),
+            TeamMember.Create("DEV-005", "Developer 5", DomainConstants.ResourceRole.Developer, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 6, 1), notes: "Phase 2")
         );
     }
 
     private static void SeedHolidays(PlannerDbContext db)
     {
         db.Holidays.AddRange(
-            new Holiday { HolidayName = "عيد رأس السنة الميلادية", StartDate = new DateTime(2026, 1, 1), EndDate = new DateTime(2026, 1, 1), HolidayType = DomainConstants.HolidayType.National },
-            new Holiday { HolidayName = "يوم التأسيس السعودي", StartDate = new DateTime(2026, 2, 22), EndDate = new DateTime(2026, 2, 22), HolidayType = DomainConstants.HolidayType.National },
-            new Holiday { HolidayName = "عيد الفطر المبارك", StartDate = new DateTime(2026, 3, 30), EndDate = new DateTime(2026, 4, 2), HolidayType = DomainConstants.HolidayType.Religious },
-            new Holiday { HolidayName = "يوم عرفات وعيد الأضحى المبارك", StartDate = new DateTime(2026, 5, 27), EndDate = new DateTime(2026, 5, 30), HolidayType = DomainConstants.HolidayType.Religious },
-            new Holiday { HolidayName = "يوم عاشوراء", StartDate = new DateTime(2026, 9, 17), EndDate = new DateTime(2026, 9, 17), HolidayType = DomainConstants.HolidayType.Religious },
-            new Holiday { HolidayName = "اليوم الوطني", StartDate = new DateTime(2026, 9, 23), EndDate = new DateTime(2026, 9, 23), HolidayType = DomainConstants.HolidayType.National },
-            new Holiday { HolidayName = "يوم العلم", StartDate = new DateTime(2026, 3, 11), EndDate = new DateTime(2026, 3, 11), HolidayType = DomainConstants.HolidayType.National }
+            Holiday.Create("عيد رأس السنة الميلادية", new DateTime(2026, 1, 1), DomainConstants.HolidayType.National),
+            Holiday.Create("يوم التأسيس السعودي", new DateTime(2026, 2, 22), DomainConstants.HolidayType.National),
+            Holiday.Create("عيد الفطر المبارك", new DateTime(2026, 3, 30), new DateTime(2026, 4, 2), DomainConstants.HolidayType.Religious),
+            Holiday.Create("يوم عرفات وعيد الأضحى المبارك", new DateTime(2026, 5, 27), new DateTime(2026, 5, 30), DomainConstants.HolidayType.Religious),
+            Holiday.Create("يوم عاشوراء", new DateTime(2026, 9, 17), DomainConstants.HolidayType.Religious),
+            Holiday.Create("اليوم الوطني", new DateTime(2026, 9, 23), DomainConstants.HolidayType.National),
+            Holiday.Create("يوم العلم", new DateTime(2026, 3, 11), DomainConstants.HolidayType.National)
         );
     }
 
     private static void SeedTasks(PlannerDbContext db)
     {
         db.Tasks.AddRange(
-            new TaskItem { TaskId = "SVC-001", ServiceName = "ادارة المحتوى اخبار والحملات التوعوية", DevEstimation = 53, MaxDev = 3.5, Priority = 5 },
-            new TaskItem { TaskId = "SVC-002", ServiceName = "التكامل مع منصة تحميل المرحلة الثانية", DevEstimation = 18, MaxDev = 2.0, StrictDate = new DateTime(2026, 7, 23), Priority = 5 },
-            new TaskItem { TaskId = "SVC-003", ServiceName = "اضافه / حذف موظف على جهة بعد اصدار الترخيص", DevEstimation = 40, MaxDev = 3.5, Priority = 5 },
-            new TaskItem { TaskId = "SVC-004", ServiceName = "التكامل مع نظام الموارد البشرية للملف الشخصي", DevEstimation = 27, MaxDev = 2.5, Priority = 5 },
-            new TaskItem { TaskId = "SVC-005", ServiceName = "طلب تغيير تعديل حقول تقرير الكشف والتسرب", DevEstimation = 5, MaxDev = 2.0, Priority = 5 },
-            new TaskItem { TaskId = "SVC-006", ServiceName = "تعديل التراخيص الاضافية", DevEstimation = 10, MaxDev = 2.0, Priority = 5 },
-            new TaskItem { TaskId = "SVC-007", ServiceName = "لوحات التحكم والرقابة", DevEstimation = 20, MaxDev = 2.5, Priority = 5 },
-            new TaskItem { TaskId = "SVC-008", ServiceName = "خدمة تنفيذ الاصلاحات", DevEstimation = 92, MaxDev = 4.5, Priority = 5 },
-            new TaskItem { TaskId = "SVC-009", ServiceName = "تجديد الترخيص منصة نما", DevEstimation = 12, MaxDev = 2.0, Priority = 5 },
-            new TaskItem { TaskId = "SVC-010", ServiceName = "ادارة المستخدمين", DevEstimation = 22, MaxDev = 2.5, Priority = 5 },
-            new TaskItem { TaskId = "SVC-011", ServiceName = "الغاء الترخيص", DevEstimation = 37, MaxDev = 3.0, Priority = 5 },
-            new TaskItem { TaskId = "SVC-012", ServiceName = "اتمتة الانذارات على الجهات المعتمدة", DevEstimation = 15, MaxDev = 2.0, Priority = 5 },
-            new TaskItem { TaskId = "SVC-013", ServiceName = "التكامل مع المؤسسة العامة للري", DevEstimation = 29, MaxDev = 3.0, Priority = 5 }
+            TaskItem.Create("SVC-001", "ادارة المحتوى اخبار والحملات التوعوية", 53, 3.5, 5),
+            TaskItem.Create("SVC-002", "التكامل مع منصة تحميل المرحلة الثانية", 18, 2.0, 5, strictDate: new DateTime(2026, 7, 23)),
+            TaskItem.Create("SVC-003", "اضافه / حذف موظف على جهة بعد اصدار الترخيص", 40, 3.5, 5),
+            TaskItem.Create("SVC-004", "التكامل مع نظام الموارد البشرية للملف الشخصي", 27, 2.5, 5),
+            TaskItem.Create("SVC-005", "طلب تغيير تعديل حقول تقرير الكشف والتسرب", 5, 2.0, 5),
+            TaskItem.Create("SVC-006", "تعديل التراخيص الاضافية", 10, 2.0, 5),
+            TaskItem.Create("SVC-007", "لوحات التحكم والرقابة", 20, 2.5, 5),
+            TaskItem.Create("SVC-008", "خدمة تنفيذ الاصلاحات", 92, 4.5, 5),
+            TaskItem.Create("SVC-009", "تجديد الترخيص منصة نما", 12, 2.0, 5),
+            TaskItem.Create("SVC-010", "ادارة المستخدمين", 22, 2.5, 5),
+            TaskItem.Create("SVC-011", "الغاء الترخيص", 37, 3.0, 5),
+            TaskItem.Create("SVC-012", "اتمتة الانذارات على الجهات المعتمدة", 15, 2.0, 5),
+            TaskItem.Create("SVC-013", "التكامل مع المؤسسة العامة للري", 29, 3.0, 5)
         );
     }
 }

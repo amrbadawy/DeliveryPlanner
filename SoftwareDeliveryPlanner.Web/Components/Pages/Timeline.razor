@@ -73,7 +73,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        resources = await Mediator.Send(new GetResourcesQuery());
+        var result = await Mediator.Send(new GetResourcesQuery());
+        resources = result.Value;
         if (resources.Any())
         {
             selectedResourceId = resources.First().ResourceId;
@@ -91,7 +92,8 @@
     {
         if (string.IsNullOrEmpty(selectedResourceId)) return;
 
-        var data = await Mediator.Send(new GetTimelineQuery(selectedResourceId, startDate, endDate));
+        var result = await Mediator.Send(new GetTimelineQuery(selectedResourceId, startDate, endDate));
+        var data = result.Value;
         timelineDays = data.Days;
     }
 }

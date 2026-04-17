@@ -190,7 +190,7 @@
     private bool showModal = false;
     private bool showDeleteConfirm = false;
     private TaskItem? editingTask;
-    private TaskItem taskForm = new();
+    private TaskFormModel taskForm = new();
     private DateTime? strictDateValue;
     private string modalError = string.Empty;
     private ToastNotification toast = default!;
@@ -202,6 +202,18 @@
     private string riskFilter = string.Empty;
     private string sortColumn = string.Empty;
     private bool sortAscending = true;
+
+    private class TaskFormModel
+    {
+        public int Id { get; set; }
+        public string TaskId { get; set; } = string.Empty;
+        public string ServiceName { get; set; } = string.Empty;
+        public double DevEstimation { get; set; }
+        public double MaxDev { get; set; } = 1.0;
+        public int Priority { get; set; } = 5;
+        public DateTime? StrictDate { get; set; }
+        public string? DependsOnTaskIds { get; set; }
+    }
 
     private IEnumerable<TaskItem> FilteredTasks
     {
@@ -280,13 +292,15 @@
 
     private async Task LoadTasks()
     {
-        tasks = await Mediator.Send(new GetTasksQuery());
+        var result = await Mediator.Send(new GetTasksQuery());
+        tasks = result.Value;
     }
 
     private async Task ShowAddModal()
     {
-        var count = await Mediator.Send(new GetTaskCountQuery());
-        taskForm = new TaskItem
+        var countResult = await Mediator.Send(new GetTaskCountQuery());
+        var count = countResult.Value;
+        taskForm = new TaskFormModel
         {
             TaskId = $"SVC-{(count + 1):D3}",
             Priority = 5,
@@ -302,7 +316,7 @@
     private void EditTask(TaskItem task)
     {
         editingTask = task;
-        taskForm = new TaskItem
+        taskForm = new TaskFormModel
         {
             Id = task.Id,
             TaskId = task.TaskId,
@@ -343,7 +357,7 @@
                 DependsOnTaskIds: selectedDependencies.Any() ? string.Join(",", selectedDependencies) : null,
                 IsNew: editingTask == null);
 
-            await Mediator.Send(command);
+            var result = await Mediator.Send(command);
             await LoadTasks();
             CloseModal();
             toast.Show(editingTask == null ? "Service added successfully." : "Service updated successfully.");
@@ -358,7 +372,7 @@
     {
         if (editingTask != null)
         {
-            await Mediator.Send(new DeleteTaskCommand(editingTask.Id));
+            var result = await Mediator.Send(new DeleteTaskCommand(editingTask.Id));
             toast.Show($"Service \"{editingTask.ServiceName}\" deleted.");
         }
         showDeleteConfirm = false;
@@ -381,7 +395,7 @@
 
     private async Task RefreshData()
     {
-        await Mediator.Send(new RunSchedulerCommand());
+        var result = await Mediator.Send(new RunSchedulerCommand());
         await LoadTasks();
         toast.Show("Schedule refreshed.");
     }

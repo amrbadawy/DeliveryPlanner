@@ -1,5 +1,5 @@
 using MediatR;
-using SoftwareDeliveryPlanner.Domain.Models;
+using SoftwareDeliveryPlanner.SharedKernel;
 
 namespace SoftwareDeliveryPlanner.Application.Tasks.Commands;
 
@@ -12,6 +12,6 @@ public sealed record UpsertTaskCommand(
     int Priority,
     DateTime? StrictDate,
     string? DependsOnTaskIds,
-    bool IsNew) : IRequest<Unit>;
+    bool IsNew) : IRequest<Result>;
 
-public sealed record DeleteTaskCommand(int Id) : IRequest<Unit>;
+public sealed record DeleteTaskCommand(int Id) : IRequest<Result>;

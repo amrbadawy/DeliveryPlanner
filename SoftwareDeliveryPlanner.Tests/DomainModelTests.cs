@@ -85,10 +85,9 @@ public class TaskItemDomainTests
     }
 
     [Theory]
-    [InlineData(0)]
     [InlineData(-1)]
     [InlineData(-0.001)]
-    public void Create_ZeroOrNegativeEstimation_ThrowsDomainException(double est)
+    public void Create_NegativeEstimation_ThrowsDomainException(double est)
     {
         Assert.Throws<DomainException>(() => TaskItem.Create("SVC-001", "Service", est, 1, 5));
     }
@@ -223,7 +222,7 @@ public class TeamMemberDomainTests
     [Fact]
     public void Create_WithNotes_SetsNotes()
     {
-        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, DateTime.Today, "Yes", "Note here");
+        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, DateTime.Today, active: "Yes", notes: "Note here");
         Assert.Equal("Note here", member.Notes);
     }
 
@@ -249,12 +248,10 @@ public class TeamMemberDomainTests
     }
 
     [Fact]
-    public void Create_WithEndDate_SetsEndDate()
+    public void Create_EndDate_DefaultsToNull()
     {
         var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, DateTime.Today);
-        var endDate = new DateTime(2026, 12, 31);
-        member.EndDate = endDate;
-        Assert.Equal(endDate, member.EndDate);
+        Assert.Null(member.EndDate);
     }
 }
 
@@ -814,7 +811,7 @@ public class TeamMemberDomainAdditionalTests
     public void Create_ArbitraryActive_Accepted()
     {
         // Active parameter has no validation — accepts any string
-        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, DateTime.Today, "Maybe");
+        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, DateTime.Today, active: "Maybe");
         Assert.Equal("Maybe", member.Active);
     }
 
@@ -927,13 +924,6 @@ public class AdjustmentDomainAdditionalTests
         {
             // Ideal behavior
         }
-    }
-
-    [Fact]
-    public void Create_NavigationProperty_ResourceIsNullByDefault()
-    {
-        var adj = Adjustment.Create("DEV-001", "Vacation", 0, DateTime.Today, DateTime.Today.AddDays(3));
-        Assert.Null(adj.Resource);
     }
 
     [Fact]

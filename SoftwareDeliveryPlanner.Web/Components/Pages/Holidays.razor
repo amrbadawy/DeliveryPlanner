@@ -427,7 +427,8 @@ else
 
     private async Task LoadHolidays()
     {
-        holidays = await Mediator.Send(new GetHolidaysQuery());
+        var result = await Mediator.Send(new GetHolidaysQuery());
+        holidays = result.Value;
         ComputeKpis();
     }
 
@@ -497,7 +498,7 @@ else
                 Notes: formNotes,
                 IsNew: editingHoliday == null);
 
-            await Mediator.Send(command);
+            var result = await Mediator.Send(command);
             await LoadHolidays();
             CloseModal();
             toastMessage = editingHoliday == null ? "Holiday added successfully." : "Holiday updated successfully.";
@@ -525,7 +526,7 @@ else
     {
         if (editingHoliday != null)
         {
-            await Mediator.Send(new DeleteHolidayCommand(editingHoliday.Id));
+            var result = await Mediator.Send(new DeleteHolidayCommand(editingHoliday.Id));
             toastMessage = $"Holiday \"{editingHoliday.HolidayName}\" deleted.";
         }
         showDeleteConfirm = false;
@@ -568,7 +569,7 @@ else
 
     private async Task RefreshData()
     {
-        await Mediator.Send(new RunSchedulerCommand());
+        var result = await Mediator.Send(new RunSchedulerCommand());
         await LoadHolidays();
         toastMessage = "Schedule refreshed.";
     }

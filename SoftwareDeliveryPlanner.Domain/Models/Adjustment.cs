@@ -6,23 +6,21 @@ namespace SoftwareDeliveryPlanner.Domain.Models;
 
 public class Adjustment
 {
-    public int Id { get; set; }
-    public string ResourceId { get; set; } = string.Empty;
-    public DateTime AdjStart { get; set; }
-    public DateTime AdjEnd { get; set; }
-    public double AvailabilityPct { get; set; }
-    public string AdjType { get; set; } = DomainConstants.AdjustmentType.Other;
-    public string? Notes { get; set; }
-
-    // Navigation property
-    public TeamMember? Resource { get; set; }
+    public int Id { get; private set; }
+    public string ResourceId { get; private set; } = string.Empty;
+    public DateTime AdjStart { get; private set; }
+    public DateTime AdjEnd { get; private set; }
+    public double AvailabilityPct { get; private set; }
+    public string AdjType { get; private set; } = DomainConstants.AdjustmentType.Other;
+    public string? Notes { get; private set; }
 
     // ── Domain factory ────────────────────────────────────────────────────────
     /// <summary>
     /// Creates and validates a new <see cref="Adjustment"/> using domain invariants.
+    /// Called internally by <see cref="TeamMember.AddAdjustment"/>.
     /// Raises <see cref="DomainException"/> on any violation.
     /// </summary>
-    public static Adjustment Create(
+    internal static Adjustment Create(
         string resourceId,
         string adjType,
         double availabilityPct,

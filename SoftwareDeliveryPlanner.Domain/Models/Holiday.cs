@@ -1,16 +1,17 @@
 using SoftwareDeliveryPlanner.Domain;
+using SoftwareDeliveryPlanner.Domain.Events;
 using SoftwareDeliveryPlanner.SharedKernel;
 
 namespace SoftwareDeliveryPlanner.Domain.Models;
 
-public class Holiday
+public class Holiday : AggregateRoot
 {
-    public int Id { get; set; }
-    public string HolidayName { get; set; } = string.Empty;
-    public DateTime StartDate { get; set; }
-    public DateTime EndDate { get; set; }
-    public string HolidayType { get; set; } = DomainConstants.HolidayType.National;
-    public string? Notes { get; set; }
+    public int Id { get; private set; }
+    public string HolidayName { get; private set; } = string.Empty;
+    public DateTime StartDate { get; private set; }
+    public DateTime EndDate { get; private set; }
+    public string HolidayType { get; private set; } = DomainConstants.HolidayType.National;
+    public string? Notes { get; private set; }
 
     /// <summary>Number of calendar days spanned (inclusive).</summary>
     public int DurationDays => (EndDate.Date - StartDate.Date).Days + 1;
@@ -33,7 +34,7 @@ public class Holiday
         if (startDate.Date > endDate.Date)
             throw new DomainException("Start date must be on or before end date.");
 
-        return new Holiday
+        var holiday = new Holiday
         {
             HolidayName = holidayName.Trim(),
             StartDate = startDate.Date,
@@ -41,6 +42,9 @@ public class Holiday
             HolidayType = holidayType,
             Notes = notes
         };
+
+        holiday.RaiseDomainEvent(new HolidayCreatedEvent(holiday.HolidayName, holiday.StartDate));
+        return holiday;
     }
 
     /// <summary>Single-day convenience overload.</summary>
@@ -50,4 +54,30 @@ public class Holiday
         string holidayType = DomainConstants.HolidayType.National,
         string? notes = null)
         => Create(holidayName, date, date, holidayType, notes);
+
+    // ── Domain mutation ───────────────────────────────────────────────────────
+    /// <summary>
+    /// Updates user-editable properties and raises <see cref="HolidayUpdatedEvent"/>.
+    /// </summary>
+    public void Update(
+        string holidayName,
+        DateTime startDate,
+        DateTime endDate,
+        string holidayType,
+        string? notes = null)
+    {
+        if (string.IsNullOrWhiteSpace(holidayName))
+            throw new DomainException("Holiday name must not be empty.");
+
+        if (startDate.Date > endDate.Date)
+            throw new DomainException("Start date must be on or before end date.");
+
+        HolidayName = holidayName.Trim();
+        StartDate = startDate.Date;
+        EndDate = endDate.Date;
+        HolidayType = holidayType;
+        Notes = notes;
+
+        RaiseDomainEvent(new HolidayUpdatedEvent(Id));
+    }
 }

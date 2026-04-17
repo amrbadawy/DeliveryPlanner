@@ -72,7 +72,8 @@
 
     private async Task LoadOutput()
     {
-        output = await Mediator.Send(new GetOutputPlanQuery());
+        var result = await Mediator.Send(new GetOutputPlanQuery());
+        output = result.Value;
     }
 
     private string GetStatusColor(string? status)
@@ -138,7 +139,7 @@
 
     private async Task RefreshData()
     {
-        await Mediator.Send(new RunSchedulerCommand());
+        var result = await Mediator.Send(new RunSchedulerCommand());
         await LoadOutput();
     }
 }

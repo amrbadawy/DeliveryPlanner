@@ -179,7 +179,7 @@
     private bool showModal = false;
     private bool showDeleteConfirm = false;
     private TeamMember? editingResource;
-    private TeamMember resourceForm = new();
+    private ResourceFormModel resourceForm = new();
     private DateTime startDateValue;
     private string modalError = string.Empty;
     private ToastNotification toast = default!;
@@ -190,6 +190,20 @@
     private string activeFilter = string.Empty;
     private string sortColumn = string.Empty;
     private bool sortAscending = true;
+
+    private class ResourceFormModel
+    {
+        public int Id { get; set; }
+        public string ResourceId { get; set; } = string.Empty;
+        public string ResourceName { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+        public string Team { get; set; } = string.Empty;
+        public double AvailabilityPct { get; set; } = 100;
+        public double DailyCapacity { get; set; } = 1;
+        public DateTime StartDate { get; set; }
+        public string Active { get; set; } = "Yes";
+        public string? Notes { get; set; }
+    }
 
     private IEnumerable<TeamMember> FilteredResources
     {
@@ -268,13 +282,15 @@
 
     private async Task LoadResources()
     {
-        resources = await Mediator.Send(new GetResourcesQuery());
+        var result = await Mediator.Send(new GetResourcesQuery());
+        resources = result.Value;
     }
 
     private async Task ShowAddModal()
     {
-        var count = await Mediator.Send(new GetResourceCountQuery());
-        resourceForm = new TeamMember
+        var countResult = await Mediator.Send(new GetResourceCountQuery());
+        var count = countResult.Value;
+        resourceForm = new ResourceFormModel
         {
             ResourceId = $"DEV-{(count + 1):D3}",
             Role = DomainConstants.ResourceRole.Developer,
@@ -293,7 +309,7 @@
     private void EditResource(TeamMember r)
     {
         editingResource = r;
-        resourceForm = new TeamMember
+        resourceForm = new ResourceFormModel
         {
             Id = r.Id,
             ResourceId = r.ResourceId,
@@ -335,7 +351,7 @@
                 Notes: resourceForm.Notes,
                 IsNew: editingResource == null);
 
-            await Mediator.Send(command);
+            var result = await Mediator.Send(command);
             await LoadResources();
             CloseModal();
             toast.Show(editingResource == null ? "Resource added successfully." : "Resource updated successfully.");
@@ -350,7 +366,7 @@
     {
         if (editingResource != null)
         {
-            await Mediator.Send(new DeleteResourceCommand(editingResource.Id));
+            var result = await Mediator.Send(new DeleteResourceCommand(editingResource.Id));
             toast.Show($"Resource \"{editingResource.ResourceName}\" deleted.");
         }
         showDeleteConfirm = false;
@@ -373,7 +389,7 @@
 
     private async Task RefreshData()
     {
-        await Mediator.Send(new RunSchedulerCommand());
+        var result = await Mediator.Send(new RunSchedulerCommand());
         await LoadResources();
         toast.Show("Schedule refreshed.");
     }

@@ -105,7 +105,8 @@
 
     private async Task LoadKPIs()
     {
-        var kpis = await Mediator.Send(new GetDashboardKpisQuery());
+        var result = await Mediator.Send(new GetDashboardKpisQuery());
+        var kpis = result.Value;
         totalServices = kpis.TotalServices;
         totalEstimation = kpis.TotalEstimation;
         activeResources = kpis.ActiveResources;
@@ -119,7 +120,8 @@
 
     private async Task RunScheduler()
     {
-        schedulerResult = await Mediator.Send(new RunSchedulerCommand());
+        var result = await Mediator.Send(new RunSchedulerCommand());
+        schedulerResult = result.Value;
         await LoadKPIs();
     }
 }

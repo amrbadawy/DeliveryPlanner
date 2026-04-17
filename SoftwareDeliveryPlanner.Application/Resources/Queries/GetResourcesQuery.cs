@@ -1,8 +1,9 @@
 using MediatR;
 using SoftwareDeliveryPlanner.Domain.Models;
+using SoftwareDeliveryPlanner.SharedKernel;
 
 namespace SoftwareDeliveryPlanner.Application.Resources.Queries;
 
-public sealed record GetResourcesQuery : IRequest<List<TeamMember>>;
+public sealed record GetResourcesQuery : IRequest<Result<List<TeamMember>>>;
 
-public sealed record GetResourceCountQuery : IRequest<int>;
+public sealed record GetResourceCountQuery : IRequest<Result<int>>;

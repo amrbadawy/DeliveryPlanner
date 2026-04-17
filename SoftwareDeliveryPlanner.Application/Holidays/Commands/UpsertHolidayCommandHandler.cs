@@ -1,42 +1,37 @@
 using MediatR;
 using SoftwareDeliveryPlanner.Application.Abstractions;
-using SoftwareDeliveryPlanner.Domain.Models;
+using SoftwareDeliveryPlanner.SharedKernel;
 
 namespace SoftwareDeliveryPlanner.Application.Holidays.Commands;
 
-internal sealed class UpsertHolidayCommandHandler : IRequestHandler<UpsertHolidayCommand, Unit>
+internal sealed class UpsertHolidayCommandHandler : IRequestHandler<UpsertHolidayCommand, Result>
 {
     private readonly IHolidayOrchestrator _orchestrator;
 
     public UpsertHolidayCommandHandler(IHolidayOrchestrator orchestrator)
         => _orchestrator = orchestrator;
 
-    public async Task<Unit> Handle(UpsertHolidayCommand request, CancellationToken cancellationToken)
+    public async Task<Result> Handle(UpsertHolidayCommand request, CancellationToken cancellationToken)
     {
-        var holiday = Holiday.Create(
-            request.HolidayName,
-            request.StartDate,
-            request.EndDate,
-            request.HolidayType,
-            request.Notes);
+        await _orchestrator.UpsertHolidayAsync(
+            request.Id, request.HolidayName, request.StartDate,
+            request.EndDate, request.HolidayType, request.Notes,
+            request.IsNew, cancellationToken);
 
-        holiday.Id = request.Id;
-
-        await _orchestrator.UpsertHolidayAsync(holiday, request.IsNew, cancellationToken);
-        return Unit.Value;
+        return Result.Success();
     }
 }
 
-internal sealed class DeleteHolidayCommandHandler : IRequestHandler<DeleteHolidayCommand, Unit>
+internal sealed class DeleteHolidayCommandHandler : IRequestHandler<DeleteHolidayCommand, Result>
 {
     private readonly IHolidayOrchestrator _orchestrator;
 
     public DeleteHolidayCommandHandler(IHolidayOrchestrator orchestrator)
         => _orchestrator = orchestrator;
 
-    public async Task<Unit> Handle(DeleteHolidayCommand request, CancellationToken cancellationToken)
+    public async Task<Result> Handle(DeleteHolidayCommand request, CancellationToken cancellationToken)
     {
         await _orchestrator.DeleteHolidayAsync(request.Id, cancellationToken);
-        return Unit.Value;
+        return Result.Success();
     }
 }

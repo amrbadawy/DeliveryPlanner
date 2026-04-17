@@ -1,4 +1,5 @@
 using MediatR;
+using SoftwareDeliveryPlanner.SharedKernel;
 
 namespace SoftwareDeliveryPlanner.Application.Holidays.Commands;
 
@@ -9,6 +10,6 @@ public sealed record UpsertHolidayCommand(
     DateTime EndDate,
     string HolidayType,
     string? Notes,
-    bool IsNew) : IRequest<Unit>;
+    bool IsNew) : IRequest<Result>;
 
-public sealed record DeleteHolidayCommand(int Id) : IRequest<Unit>;
+public sealed record DeleteHolidayCommand(int Id) : IRequest<Result>;

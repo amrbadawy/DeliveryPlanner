@@ -267,7 +267,8 @@ else
 
     private async Task LoadData()
     {
-        var allTasks = await Mediator.Send(new GetTasksQuery());
+        var result = await Mediator.Send(new GetTasksQuery());
+        var allTasks = result.Value;
 
         // Only show tasks with a planned start and finish
         scheduledTasks = allTasks
@@ -300,7 +301,7 @@ else
 
     private async Task RefreshData()
     {
-        await Mediator.Send(new RunSchedulerCommand());
+        var result = await Mediator.Send(new RunSchedulerCommand());
         await LoadData();
     }
 

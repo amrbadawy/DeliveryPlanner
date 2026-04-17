@@ -1378,6 +1378,286 @@ public class DependencyRulesTests
     }
 
     // ─────────────────────────────────────────────────────────
+    // Phase 2B: Rich Domain Model Architecture Rules
+    // ─────────────────────────────────────────────────────────
+
+    // ── Aggregate Root Rules ─────────────────────────────────
+
+    [Fact]
+    public void Aggregate_Roots_Must_Inherit_AggregateRoot()
+    {
+        var domainAssembly = typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly;
+        var aggregateRootType = typeof(SoftwareDeliveryPlanner.SharedKernel.AggregateRoot);
+
+        // These domain entities are defined as aggregate roots by design
+        var expectedAggregateRoots = new[] { "TaskItem", "TeamMember", "Holiday" };
+
+        var domainModels = domainAssembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract && t.Namespace != null
+                && t.Namespace.Contains("Models"))
+            .ToDictionary(t => t.Name);
+
+        var violations = new List<string>();
+        foreach (var name in expectedAggregateRoots)
+        {
+            if (!domainModels.TryGetValue(name, out var type))
+            {
+                violations.Add($"{name} not found in Domain.Models");
+                continue;
+            }
+            if (!aggregateRootType.IsAssignableFrom(type))
+            {
+                violations.Add($"{name} does not inherit AggregateRoot");
+            }
+        }
+
+        Assert.True(violations.Count == 0,
+            $"Aggregate roots must inherit SharedKernel.AggregateRoot. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    [Fact]
+    public void Non_Aggregate_Entities_Must_Not_Inherit_AggregateRoot()
+    {
+        var domainAssembly = typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly;
+        var aggregateRootType = typeof(SoftwareDeliveryPlanner.SharedKernel.AggregateRoot);
+
+        // These entities are NOT aggregate roots — they are value/child/infrastructure entities
+        var nonAggregateNames = new HashSet<string> { "CalendarDay", "Allocation", "Setting", "LookupValue", "Adjustment" };
+
+        var violations = domainAssembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract && t.Namespace != null
+                && t.Namespace.Contains("Models"))
+            .Where(t => nonAggregateNames.Contains(t.Name))
+            .Where(t => aggregateRootType.IsAssignableFrom(t))
+            .Select(t => t.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"Non-aggregate entities must NOT inherit AggregateRoot. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ── Private Setter Rules ─────────────────────────────────
+
+    [Theory]
+    [InlineData("TaskItem")]
+    [InlineData("TeamMember")]
+    [InlineData("Holiday")]
+    [InlineData("Adjustment")]
+    public void Domain_Entities_Must_Not_Have_Public_Setters(string entityName)
+    {
+        var domainAssembly = typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly;
+
+        var entityType = domainAssembly.GetTypes()
+            .FirstOrDefault(t => t.Name == entityName && t.Namespace != null
+                && t.Namespace.Contains("Models"));
+
+        Assert.NotNull(entityType);
+
+        // Navigation/collection properties managed by EF are excluded
+        var publicSetters = entityType!.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.SetMethod != null && p.SetMethod.IsPublic)
+            .Where(p => p.DeclaringType == entityType) // only declared, not inherited
+            .Select(p => $"{entityName}.{p.Name}")
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(publicSetters.Count == 0,
+            $"Aggregate roots and child entities must use private setters for encapsulation. " +
+            $"Public setters found:{Environment.NewLine}{string.Join(Environment.NewLine, publicSetters)}");
+    }
+
+    [Theory]
+    [InlineData("CalendarDay")]
+    [InlineData("Allocation")]
+    [InlineData("Setting")]
+    [InlineData("LookupValue")]
+    public void Infrastructure_Entities_May_Have_Public_Setters(string entityName)
+    {
+        // Negative test: these non-aggregate entities are allowed to have public setters
+        var domainAssembly = typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly;
+
+        var entityType = domainAssembly.GetTypes()
+            .FirstOrDefault(t => t.Name == entityName && t.Namespace != null
+                && t.Namespace.Contains("Models"));
+
+        Assert.NotNull(entityType);
+
+        var publicSetters = entityType!.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.SetMethod != null && p.SetMethod.IsPublic)
+            .Where(p => p.DeclaringType == entityType)
+            .ToList();
+
+        // These entities should have public setters (infrastructure/scheduler-managed)
+        Assert.True(publicSetters.Count > 0,
+            $"{entityName} is a non-aggregate entity and should have public setters. " +
+            $"If it now has private setters, it may need to be reclassified as an aggregate root.");
+    }
+
+    // ── Handler Result Pattern Rules ─────────────────────────
+
+    [Fact]
+    public void Handlers_Must_Return_Result_Type()
+    {
+        var assembly = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+        var resultType = typeof(SoftwareDeliveryPlanner.SharedKernel.Result);
+        var resultGenericType = typeof(SoftwareDeliveryPlanner.SharedKernel.Result<>);
+
+        var handlerTypes = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract)
+            .Where(t => t.GetInterfaces().Any(i =>
+                i.IsGenericType && i.GetGenericTypeDefinition() == typeof(MediatR.IRequestHandler<,>)))
+            .ToList();
+
+        Assert.NotEmpty(handlerTypes);
+
+        var violations = new List<string>();
+        foreach (var handler in handlerTypes)
+        {
+            var iface = handler.GetInterfaces().First(i =>
+                i.IsGenericType && i.GetGenericTypeDefinition() == typeof(MediatR.IRequestHandler<,>));
+            var returnType = iface.GetGenericArguments()[1];
+
+            // Must be Result or Result<T>
+            var isResult = returnType == resultType;
+            var isResultT = returnType.IsGenericType
+                && returnType.GetGenericTypeDefinition() == resultGenericType;
+
+            if (!isResult && !isResultT)
+            {
+                violations.Add($"{handler.Name} returns {returnType.Name} instead of Result/Result<T>");
+            }
+        }
+
+        Assert.True(violations.Count == 0,
+            $"All handlers must return Result or Result<T>. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ── Domain Event Rules ───────────────────────────────────
+
+    [Fact]
+    public void Domain_Events_Must_Be_Sealed_Records()
+    {
+        var domainAssembly = typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly;
+        var domainEventType = typeof(SoftwareDeliveryPlanner.SharedKernel.DomainEvent);
+
+        var eventTypes = domainAssembly.GetTypes()
+            .Where(t => t.Name.EndsWith("Event") && !t.IsAbstract)
+            .Where(t => domainEventType.IsAssignableFrom(t))
+            .ToList();
+
+        Assert.NotEmpty(eventTypes);
+
+        var violations = new List<string>();
+        foreach (var type in eventTypes)
+        {
+            if (!type.IsSealed)
+                violations.Add($"{type.Name} is not sealed");
+            if (type.GetMethod("<Clone>$") == null)
+                violations.Add($"{type.Name} is not a record type");
+        }
+
+        Assert.True(violations.Count == 0,
+            $"All domain events must be 'sealed record' types. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    [Fact]
+    public void Domain_Events_Must_Inherit_DomainEvent()
+    {
+        var domainAssembly = typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly;
+        var domainEventType = typeof(SoftwareDeliveryPlanner.SharedKernel.DomainEvent);
+        var iDomainEventType = typeof(SoftwareDeliveryPlanner.SharedKernel.IDomainEvent);
+
+        // Find all types in the Events namespace
+        var eventTypes = domainAssembly.GetTypes()
+            .Where(t => t.Namespace != null && t.Namespace.Contains("Events"))
+            .Where(t => !t.IsAbstract && t.IsClass)
+            .ToList();
+
+        Assert.NotEmpty(eventTypes);
+
+        var violations = eventTypes
+            .Where(t => !domainEventType.IsAssignableFrom(t))
+            .Select(t => t.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"All types in Domain.Events namespace must inherit SharedKernel.DomainEvent. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    [Fact]
+    public void Domain_Events_Must_Have_OccurredOn_Property()
+    {
+        var domainAssembly = typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly;
+        var domainEventType = typeof(SoftwareDeliveryPlanner.SharedKernel.DomainEvent);
+
+        var eventTypes = domainAssembly.GetTypes()
+            .Where(t => domainEventType.IsAssignableFrom(t) && !t.IsAbstract)
+            .ToList();
+
+        Assert.NotEmpty(eventTypes);
+
+        var violations = eventTypes
+            .Where(t => t.GetProperty("OccurredOn") == null)
+            .Select(t => t.Name)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"All domain events must have an OccurredOn property (inherited from DomainEvent). " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    [Fact]
+    public void Aggregate_Roots_Must_Expose_DomainEvents_Collection()
+    {
+        var domainAssembly = typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly;
+        var aggregateRootType = typeof(SoftwareDeliveryPlanner.SharedKernel.AggregateRoot);
+
+        var aggregateRoots = domainAssembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract && aggregateRootType.IsAssignableFrom(t))
+            .ToList();
+
+        Assert.NotEmpty(aggregateRoots);
+
+        var violations = aggregateRoots
+            .Where(t => t.GetProperty("DomainEvents") == null)
+            .Select(t => t.Name)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"All aggregate roots must expose a DomainEvents collection (inherited from AggregateRoot). " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    [Fact]
+    public void Aggregate_Roots_Must_Have_Static_Create_Factory_Method()
+    {
+        var domainAssembly = typeof(SoftwareDeliveryPlanner.Domain.AssemblyMarker).Assembly;
+        var aggregateRootType = typeof(SoftwareDeliveryPlanner.SharedKernel.AggregateRoot);
+
+        var aggregateRoots = domainAssembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract && aggregateRootType.IsAssignableFrom(t))
+            .ToList();
+
+        Assert.NotEmpty(aggregateRoots);
+
+        var violations = aggregateRoots
+            .Where(t => !t.GetMethods(BindingFlags.Public | BindingFlags.Static).Any(m => m.Name == "Create"))
+            .Select(t => t.Name)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"All aggregate roots must have a static Create() factory method. " +
+            $"Violations:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    // ─────────────────────────────────────────────────────────
     // Helpers
     // ─────────────────────────────────────────────────────────
 

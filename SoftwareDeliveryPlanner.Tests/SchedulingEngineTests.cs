@@ -302,8 +302,8 @@ public class SchedulingEngineTests : IDisposable
     [Fact]
     public void CalculateSchedulingRank_StrictDateTask_HigherPriority()
     {
-        var task1 = new TaskItem { TaskId = "T1", StrictDate = new DateTime(2026, 6, 1), Priority = 5 };
-        var task2 = new TaskItem { TaskId = "T2", StrictDate = new DateTime(2026, 6, 1), Priority = 3 };
+        var task1 = TaskItem.Create("TST-01", "Test", 1, 1, 5, strictDate: new DateTime(2026, 6, 1));
+        var task2 = TaskItem.Create("TST-02", "Test", 1, 1, 3, strictDate: new DateTime(2026, 6, 1));
 
         var rank1 = GetPrivateRank(task1);
         var rank2 = GetPrivateRank(task2);
@@ -314,8 +314,8 @@ public class SchedulingEngineTests : IDisposable
     [Fact]
     public void CalculateSchedulingRank_StrictDate_EarlierDateHigherPriority()
     {
-        var task1 = new TaskItem { TaskId = "T1", StrictDate = new DateTime(2026, 5, 1), Priority = 5 };
-        var task2 = new TaskItem { TaskId = "T2", StrictDate = new DateTime(2026, 6, 1), Priority = 5 };
+        var task1 = TaskItem.Create("TST-01", "Test", 1, 1, 5, strictDate: new DateTime(2026, 5, 1));
+        var task2 = TaskItem.Create("TST-02", "Test", 1, 1, 5, strictDate: new DateTime(2026, 6, 1));
 
         var rank1 = GetPrivateRank(task1);
         var rank2 = GetPrivateRank(task2);
@@ -326,8 +326,8 @@ public class SchedulingEngineTests : IDisposable
     [Fact]
     public void CalculateSchedulingRank_NoStrictDate_LowerPriorityThanStrict()
     {
-        var taskWithStrict = new TaskItem { TaskId = "T1", StrictDate = new DateTime(2026, 6, 1), Priority = 5 };
-        var taskWithoutStrict = new TaskItem { TaskId = "T2", StrictDate = null, Priority = 5 };
+        var taskWithStrict = TaskItem.Create("TST-01", "Test", 1, 1, 5, strictDate: new DateTime(2026, 6, 1));
+        var taskWithoutStrict = TaskItem.Create("TST-02", "Test", 1, 1, 5);
 
         var rankWithStrict = GetPrivateRank(taskWithStrict);
         var rankWithoutStrict = GetPrivateRank(taskWithoutStrict);
@@ -363,20 +363,13 @@ public class SchedulingEngineTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(new TaskItem
-        {
-            TaskId = "T-TEST-001",
-            ServiceName = "Test Service",
-            DevEstimation = 5,
-            MaxDev = 1,
-            Priority = 5
-        });
+        _db.Tasks.Add(TaskItem.Create("TST-001", "Test Service", 5, 1, 5));
         _db.SaveChanges();
 
         var result = _engine.RunScheduler();
 
         Assert.Contains("successfully scheduled", result, StringComparison.OrdinalIgnoreCase);
-        var allocations = _db.Allocations.Where(a => a.TaskId == "T-TEST-001").ToList();
+        var allocations = _db.Allocations.Where(a => a.TaskId == "TST-001").ToList();
         Assert.True(allocations.Count > 0);
     }
 
@@ -387,14 +380,14 @@ public class SchedulingEngineTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(new TaskItem { TaskId = "T-LOW", ServiceName = "Low Priority", DevEstimation = 3, Priority = 10 });
-        _db.Tasks.Add(new TaskItem { TaskId = "T-HIGH", ServiceName = "High Priority", DevEstimation = 3, Priority = 1 });
+        _db.Tasks.Add(TaskItem.Create("TL-001", "Low Priority", 3, 1, 10));
+        _db.Tasks.Add(TaskItem.Create("TH-001", "High Priority", 3, 1, 1));
         _db.SaveChanges();
 
         _engine.RunScheduler();
 
-        var lowTask = _db.Tasks.First(t => t.TaskId == "T-LOW");
-        var highTask = _db.Tasks.First(t => t.TaskId == "T-HIGH");
+        var lowTask = _db.Tasks.First(t => t.TaskId == "TL-001");
+        var highTask = _db.Tasks.First(t => t.TaskId == "TH-001");
 
         Assert.True(highTask.PlannedStart <= lowTask.PlannedStart);
     }
@@ -408,19 +401,12 @@ public class SchedulingEngineTests : IDisposable
 
         var futureDate = DateTime.Today.AddDays(60);
 
-        _db.Tasks.Add(new TaskItem
-        {
-            TaskId = "T-STRICT",
-            ServiceName = "Strict Deadline",
-            DevEstimation = 10,
-            StrictDate = futureDate,
-            Priority = 5
-        });
+        _db.Tasks.Add(TaskItem.Create("TS-001", "Strict Deadline", 10, 1, 5, strictDate: futureDate));
         _db.SaveChanges();
 
         _engine.RunScheduler();
 
-        var task = _db.Tasks.First(t => t.TaskId == "T-STRICT");
+        var task = _db.Tasks.First(t => t.TaskId == "TS-001");
         Assert.NotNull(task.PlannedFinish);
     }
 
@@ -431,18 +417,12 @@ public class SchedulingEngineTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(new TaskItem
-        {
-            TaskId = "T-DATES",
-            ServiceName = "Date Test",
-            DevEstimation = 5,
-            Priority = 5
-        });
+        _db.Tasks.Add(TaskItem.Create("TD-001", "Date Test", 5, 1, 5));
         _db.SaveChanges();
 
         _engine.RunScheduler();
 
-        var task = _db.Tasks.First(t => t.TaskId == "T-DATES");
+        var task = _db.Tasks.First(t => t.TaskId == "TD-001");
         Assert.NotNull(task.PlannedStart);
         Assert.NotNull(task.PlannedFinish);
         Assert.True(task.Duration > 0);
@@ -466,19 +446,12 @@ public class SchedulingEngineTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(new TaskItem
-        {
-            TaskId = "T-SMALL",
-            ServiceName = "Small Task",
-            DevEstimation = 1,
-            MaxDev = 1,
-            Priority = 5
-        });
+        _db.Tasks.Add(TaskItem.Create("SM-001", "Small Task", 1, 1, 5));
         _db.SaveChanges();
 
         _engine.RunScheduler();
 
-        var task = _db.Tasks.First(t => t.TaskId == "T-SMALL");
+        var task = _db.Tasks.First(t => t.TaskId == "SM-001");
         Assert.Equal("Completed", task.Status);
     }
 
@@ -656,13 +629,7 @@ public class SchedulingEngineMonFriTests : IDisposable
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.SaveChanges();
 
-        _db.Tasks.Add(new TaskItem
-        {
-            TaskId = "MF-001",
-            ServiceName = "Mon-Fri Test",
-            DevEstimation = 3,
-            Priority = 5
-        });
+        _db.Tasks.Add(TaskItem.Create("MF-001", "Mon-Fri Test", 3, 1, 5));
         _db.SaveChanges();
 
         _engine.RunScheduler();

@@ -20,6 +20,7 @@ using SoftwareDeliveryPlanner.Application.Timeline.Queries;
 using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.Infrastructure.Services;
+using SoftwareDeliveryPlanner.SharedKernel;
 using SoftwareDeliveryPlanner.Tests.Infrastructure;
 
 namespace SoftwareDeliveryPlanner.Tests;
@@ -103,7 +104,7 @@ public class Pipeline_UpsertTaskTests : PipelineFixture
 
         await mediator.Send(command);
 
-        var tasks = await mediator.Send(new GetTasksQuery());
+        var tasks = (await mediator.Send(new GetTasksQuery())).Value;
         Assert.Contains(tasks, t => t.TaskId == "SVC-100" && t.ServiceName == "Pipeline Test Service");
     }
 
@@ -175,7 +176,7 @@ public class Pipeline_HolidayValidationTests : PipelineFixture
 
         await mediator.Send(command);
 
-        var holidays = await mediator.Send(new GetHolidaysQuery());
+        var holidays = (await mediator.Send(new GetHolidaysQuery())).Value;
         Assert.Contains(holidays, h => h.HolidayName == "Pipeline Holiday");
     }
 
@@ -240,7 +241,7 @@ public class Pipeline_ResourceTests : PipelineFixture
 
         await mediator.Send(command);
 
-        var resources = await mediator.Send(new GetResourcesQuery());
+        var resources = (await mediator.Send(new GetResourcesQuery())).Value;
         Assert.Contains(resources, r => r.ResourceId == "DEV-100");
     }
 
@@ -282,7 +283,7 @@ public class Pipeline_SchedulerTests : PipelineFixture
         using var scope = Services.CreateScope();
         var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
-        var result = await mediator.Send(new RunSchedulerCommand());
+        var result = (await mediator.Send(new RunSchedulerCommand())).Value;
         Assert.Contains("Successfully scheduled", result);
     }
 
@@ -295,7 +296,7 @@ public class Pipeline_SchedulerTests : PipelineFixture
         // Run scheduler first to populate data
         await mediator.Send(new RunSchedulerCommand());
 
-        var kpis = await mediator.Send(new GetDashboardKpisQuery());
+        var kpis = (await mediator.Send(new GetDashboardKpisQuery())).Value;
         Assert.NotNull(kpis);
         Assert.True(kpis.TotalServices > 0);
         Assert.True(kpis.ActiveResources > 0);
@@ -310,7 +311,7 @@ public class Pipeline_SchedulerTests : PipelineFixture
 
         await mediator.Send(new RunSchedulerCommand());
 
-        var calendar = await mediator.Send(new GetCalendarQuery());
+        var calendar = (await mediator.Send(new GetCalendarQuery())).Value;
         Assert.NotNull(calendar);
         Assert.True(calendar.Count > 0);
 
@@ -329,7 +330,7 @@ public class Pipeline_SchedulerTests : PipelineFixture
 
         await mediator.Send(new RunSchedulerCommand());
 
-        var outputPlan = await mediator.Send(new GetOutputPlanQuery());
+        var outputPlan = (await mediator.Send(new GetOutputPlanQuery())).Value;
         Assert.NotNull(outputPlan);
         Assert.Equal(13, outputPlan.Count); // 13 seeded tasks
     }
@@ -362,7 +363,7 @@ public class Pipeline_CrossEntityTests : PipelineFixture
 
         await mediator.Send(new RunSchedulerCommand());
 
-        var calendar = await mediator.Send(new GetCalendarQuery());
+        var calendar = (await mediator.Send(new GetCalendarQuery())).Value;
         var holidayDay = calendar.FirstOrDefault(d => d.CalendarDate.Date == new DateTime(2027, 6, 1));
 
         // The day should exist and be marked as a holiday + non-working
@@ -379,7 +380,7 @@ public class Pipeline_CrossEntityTests : PipelineFixture
 
         // Run scheduler to get baseline
         await mediator.Send(new RunSchedulerCommand());
-        var beforeKpis = await mediator.Send(new GetDashboardKpisQuery());
+        var beforeKpis = (await mediator.Send(new GetDashboardKpisQuery())).Value;
 
         // Add a vacation adjustment for a resource
         await mediator.Send(new AddAdjustmentCommand(
@@ -391,7 +392,7 @@ public class Pipeline_CrossEntityTests : PipelineFixture
             Notes: "Month-long vacation"));
 
         // Re-run scheduler — schedule should change
-        var afterResult = await mediator.Send(new RunSchedulerCommand());
+        var afterResult = (await mediator.Send(new RunSchedulerCommand())).Value;
         Assert.Contains("Successfully scheduled", afterResult);
     }
 
@@ -401,16 +402,16 @@ public class Pipeline_CrossEntityTests : PipelineFixture
         using var scope = Services.CreateScope();
         var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
-        var tasksBefore = await mediator.Send(new GetTasksQuery());
+        var tasksBefore = (await mediator.Send(new GetTasksQuery())).Value;
         var firstTask = tasksBefore.First();
 
         await mediator.Send(new DeleteTaskCommand(firstTask.Id));
 
-        var tasksAfter = await mediator.Send(new GetTasksQuery());
+        var tasksAfter = (await mediator.Send(new GetTasksQuery())).Value;
         Assert.Equal(tasksBefore.Count - 1, tasksAfter.Count);
 
         // Scheduler still works with fewer tasks
-        var result = await mediator.Send(new RunSchedulerCommand());
+        var result = (await mediator.Send(new RunSchedulerCommand())).Value;
         Assert.Contains("Successfully scheduled", result);
     }
 
@@ -421,7 +422,7 @@ public class Pipeline_CrossEntityTests : PipelineFixture
         var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
         // Get existing task
-        var tasks = await mediator.Send(new GetTasksQuery());
+        var tasks = (await mediator.Send(new GetTasksQuery())).Value;
         var existing = tasks.First();
 
         // Update it through the pipeline
@@ -438,7 +439,7 @@ public class Pipeline_CrossEntityTests : PipelineFixture
 
         await mediator.Send(command);
 
-        var updated = (await mediator.Send(new GetTasksQuery())).First(t => t.TaskId == existing.TaskId);
+        var updated = (await mediator.Send(new GetTasksQuery())).Value.First(t => t.TaskId == existing.TaskId);
         Assert.Equal("Updated Service Name", updated.ServiceName);
         Assert.Equal(existing.DevEstimation + 5, updated.DevEstimation);
     }
@@ -461,13 +462,13 @@ public class Pipeline_TimelineTests : PipelineFixture
 
         await mediator.Send(new RunSchedulerCommand());
 
-        var resources = await mediator.Send(new GetResourcesQuery());
+        var resources = (await mediator.Send(new GetResourcesQuery())).Value;
         var firstResource = resources.First();
 
-        var timeline = await mediator.Send(new GetTimelineQuery(
+        var timeline = (await mediator.Send(new GetTimelineQuery(
             firstResource.ResourceId,
             new DateTime(2026, 5, 1),
-            new DateTime(2026, 5, 31)));
+            new DateTime(2026, 5, 31)))).Value;
 
         Assert.NotNull(timeline);
         Assert.Equal(31, timeline.Days.Count); // 31 days in May
@@ -490,7 +491,7 @@ public class Pipeline_TaskDependencyTests : PipelineFixture
         var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
         // Delete existing tasks so we have a clean slate
-        var existingTasks = await mediator.Send(new GetTasksQuery());
+        var existingTasks = (await mediator.Send(new GetTasksQuery())).Value;
         foreach (var t in existingTasks)
             await mediator.Send(new DeleteTaskCommand(t.Id));
 
@@ -519,14 +520,14 @@ public class Pipeline_TaskDependencyTests : PipelineFixture
             IsNew: true));
 
         // Verify the dependency is persisted
-        var tasks = await mediator.Send(new GetTasksQuery());
+        var tasks = (await mediator.Send(new GetTasksQuery())).Value;
         var dependent = tasks.First(t => t.TaskId == "DEP-001");
         Assert.Equal("PRE-001", dependent.DependsOnTaskIds);
 
         // Run scheduler and verify ordering
         await mediator.Send(new RunSchedulerCommand());
 
-        var updatedTasks = await mediator.Send(new GetTasksQuery());
+        var updatedTasks = (await mediator.Send(new GetTasksQuery())).Value;
         var prereq = updatedTasks.First(t => t.TaskId == "PRE-001");
         var dep = updatedTasks.First(t => t.TaskId == "DEP-001");
 
@@ -562,7 +563,7 @@ public class Pipeline_AdjustmentTests : PipelineFixture
 
         await mediator.Send(command);
 
-        var adjustments = await mediator.Send(new GetAdjustmentsQuery());
+        var adjustments = (await mediator.Send(new GetAdjustmentsQuery())).Value;
         Assert.Contains(adjustments, a =>
             a.ResourceId == "DEV-001" && a.Notes == "Pipeline test adjustment");
     }
@@ -634,12 +635,12 @@ public class Pipeline_DeleteCommandTests : PipelineFixture
         using var scope = Services.CreateScope();
         var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
-        var resources = await mediator.Send(new GetResourcesQuery());
+        var resources = (await mediator.Send(new GetResourcesQuery())).Value;
         var first = resources.First();
 
         await mediator.Send(new DeleteResourceCommand(first.Id));
 
-        var after = await mediator.Send(new GetResourcesQuery());
+        var after = (await mediator.Send(new GetResourcesQuery())).Value;
         Assert.DoesNotContain(after, r => r.Id == first.Id);
     }
 
@@ -649,12 +650,12 @@ public class Pipeline_DeleteCommandTests : PipelineFixture
         using var scope = Services.CreateScope();
         var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
-        var holidays = await mediator.Send(new GetHolidaysQuery());
+        var holidays = (await mediator.Send(new GetHolidaysQuery())).Value;
         var first = holidays.First();
 
         await mediator.Send(new DeleteHolidayCommand(first.Id));
 
-        var after = await mediator.Send(new GetHolidaysQuery());
+        var after = (await mediator.Send(new GetHolidaysQuery())).Value;
         Assert.DoesNotContain(after, h => h.Id == first.Id);
     }
 
@@ -673,12 +674,12 @@ public class Pipeline_DeleteCommandTests : PipelineFixture
             AdjEnd: new DateTime(2027, 5, 5),
             Notes: "To be deleted"));
 
-        var adjustments = await mediator.Send(new GetAdjustmentsQuery());
+        var adjustments = (await mediator.Send(new GetAdjustmentsQuery())).Value;
         var toDelete = adjustments.First(a => a.Notes == "To be deleted");
 
         await mediator.Send(new DeleteAdjustmentCommand(toDelete.Id));
 
-        var after = await mediator.Send(new GetAdjustmentsQuery());
+        var after = (await mediator.Send(new GetAdjustmentsQuery())).Value;
         Assert.DoesNotContain(after, a => a.Id == toDelete.Id);
     }
 
@@ -745,15 +746,15 @@ public class Pipeline_RoundTripTests : PipelineFixture
             IsNew: true));
 
         // Run scheduler
-        var result = await mediator.Send(new RunSchedulerCommand());
+        var result = (await mediator.Send(new RunSchedulerCommand())).Value;
         Assert.Contains("Successfully scheduled", result);
 
         // Get KPIs
-        var kpis = await mediator.Send(new GetDashboardKpisQuery());
+        var kpis = (await mediator.Send(new GetDashboardKpisQuery())).Value;
         Assert.True(kpis.TotalServices > 0);
 
         // Get output plan and verify our task is in it
-        var plan = await mediator.Send(new GetOutputPlanQuery());
+        var plan = (await mediator.Send(new GetOutputPlanQuery())).Value;
         Assert.Contains(plan, p => p.TaskId == "RT-001");
     }
 
@@ -764,7 +765,7 @@ public class Pipeline_RoundTripTests : PipelineFixture
         var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
         // Get existing task
-        var tasks = await mediator.Send(new GetTasksQuery());
+        var tasks = (await mediator.Send(new GetTasksQuery())).Value;
         var existing = tasks.First();
 
         // Update its estimation
@@ -783,7 +784,7 @@ public class Pipeline_RoundTripTests : PipelineFixture
         await mediator.Send(new RunSchedulerCommand());
 
         // Verify updated estimation persisted
-        var updated = (await mediator.Send(new GetTasksQuery())).First(t => t.Id == existing.Id);
+        var updated = (await mediator.Send(new GetTasksQuery())).Value.First(t => t.Id == existing.Id);
         Assert.Equal(existing.DevEstimation + 100, updated.DevEstimation);
     }
 }

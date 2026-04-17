@@ -1,8 +1,11 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using SoftwareDeliveryPlanner.Application.Abstractions;
 using SoftwareDeliveryPlanner.Infrastructure.Data;
+using SoftwareDeliveryPlanner.Infrastructure.Extensions;
 using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.Domain.Models;
+using SoftwareDeliveryPlanner.SharedKernel;
 
 namespace SoftwareDeliveryPlanner.Infrastructure.Services;
 
@@ -11,15 +14,18 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
     private readonly IDbContextFactory<PlannerDbContext> _dbFactory;
     private readonly IDbContextFactory<ReadOnlyPlannerDbContext> _readOnlyDbFactory;
     private readonly TimeProvider _timeProvider;
+    private readonly IPublisher _publisher;
 
     public SchedulingOrchestrator(
         IDbContextFactory<PlannerDbContext> dbFactory,
         IDbContextFactory<ReadOnlyPlannerDbContext> readOnlyDbFactory,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IPublisher publisher)
     {
         _dbFactory = dbFactory;
         _readOnlyDbFactory = readOnlyDbFactory;
         _timeProvider = timeProvider;
+        _publisher = publisher;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -74,33 +80,27 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         return await db.Tasks.CountAsync(cancellationToken);
     }
 
-    public async Task UpsertTaskAsync(TaskItem task, bool isNew, CancellationToken cancellationToken = default)
+    public async Task UpsertTaskAsync(
+        int id, string taskId, string serviceName, double devEstimation,
+        double maxDev, int priority, DateTime? strictDate,
+        string? dependsOnTaskIds, bool isNew,
+        CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        var now = _timeProvider.GetLocalNow().LocalDateTime;
 
         if (isNew)
         {
-            task.CreatedAt = now;
-            task.UpdatedAt = now;
+            var task = TaskItem.Create(taskId, serviceName, devEstimation, maxDev, priority, strictDate, dependsOnTaskIds);
             db.Tasks.Add(task);
         }
         else
         {
-            var existing = await db.Tasks.FirstOrDefaultAsync(t => t.Id == task.Id, cancellationToken);
-            if (existing != null)
-            {
-                existing.ServiceName = task.ServiceName;
-                existing.DevEstimation = task.DevEstimation;
-                existing.MaxDev = task.MaxDev;
-                existing.Priority = task.Priority;
-                existing.StrictDate = task.StrictDate;
-                existing.DependsOnTaskIds = task.DependsOnTaskIds;
-                existing.UpdatedAt = now;
-            }
+            var existing = await db.Tasks.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+            existing?.Update(serviceName, devEstimation, maxDev, priority, strictDate, dependsOnTaskIds);
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        await db.DispatchDomainEventsAsync(_publisher, cancellationToken);
 
         await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
         new SchedulingEngine(schedulerDb, _timeProvider).RunScheduler();
@@ -136,33 +136,27 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         return await db.Resources.CountAsync(cancellationToken);
     }
 
-    public async Task UpsertResourceAsync(TeamMember resource, bool isNew, CancellationToken cancellationToken = default)
+    public async Task UpsertResourceAsync(
+        int id, string resourceId, string resourceName, string role,
+        string team, double availabilityPct, double dailyCapacity,
+        DateTime startDate, string active, string? notes, bool isNew,
+        CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        var now = _timeProvider.GetLocalNow().LocalDateTime;
 
         if (isNew)
         {
-            resource.CreatedAt = now;
+            var resource = TeamMember.Create(resourceId, resourceName, role, team, availabilityPct, dailyCapacity, startDate, active: active, notes: notes);
             db.Resources.Add(resource);
         }
         else
         {
-            var existing = await db.Resources.FirstOrDefaultAsync(r => r.Id == resource.Id, cancellationToken);
-            if (existing != null)
-            {
-                existing.ResourceName = resource.ResourceName;
-                existing.Role = resource.Role;
-                existing.Team = resource.Team;
-                existing.AvailabilityPct = resource.AvailabilityPct;
-                existing.DailyCapacity = resource.DailyCapacity;
-                existing.StartDate = resource.StartDate;
-                existing.Active = resource.Active;
-                existing.Notes = resource.Notes;
-            }
+            var existing = await db.Resources.FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+            existing?.Update(resourceName, role, team, availabilityPct, dailyCapacity, startDate, active, notes);
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        await db.DispatchDomainEventsAsync(_publisher, cancellationToken);
 
         await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
         new SchedulingEngine(schedulerDb, _timeProvider).RunScheduler();
@@ -192,11 +186,22 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         return await db.Adjustments.ToListAsync(cancellationToken);
     }
 
-    public async Task AddAdjustmentAsync(Adjustment adjustment, CancellationToken cancellationToken = default)
+    public async Task AddAdjustmentAsync(
+        string resourceId, string adjType, double availabilityPct,
+        DateTime adjStart, DateTime adjEnd, string? notes,
+        CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        db.Adjustments.Add(adjustment);
+
+        var teamMember = await db.Resources
+            .Include(r => r.Adjustments)
+            .FirstOrDefaultAsync(r => r.ResourceId == resourceId, cancellationToken)
+            ?? throw new DomainException($"Resource '{resourceId}' not found.");
+
+        teamMember.AddAdjustment(adjType, availabilityPct, adjStart, adjEnd, notes);
+
         await db.SaveChangesAsync(cancellationToken);
+        await db.DispatchDomainEventsAsync(_publisher, cancellationToken);
 
         await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
         new SchedulingEngine(schedulerDb, _timeProvider).RunScheduler();
@@ -208,8 +213,14 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         var adjustment = await db.Adjustments.FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
         if (adjustment != null)
         {
+            var teamMember = await db.Resources
+                .Include(r => r.Adjustments)
+                .FirstOrDefaultAsync(r => r.ResourceId == adjustment.ResourceId, cancellationToken);
+
+            teamMember?.RemoveAdjustment(id);
             db.Adjustments.Remove(adjustment);
             await db.SaveChangesAsync(cancellationToken);
+            await db.DispatchDomainEventsAsync(_publisher, cancellationToken);
         }
 
         await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
@@ -226,28 +237,26 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         return await db.Holidays.OrderBy(h => h.StartDate).ToListAsync(cancellationToken);
     }
 
-    public async Task UpsertHolidayAsync(Holiday holiday, bool isNew, CancellationToken cancellationToken = default)
+    public async Task UpsertHolidayAsync(
+        int id, string holidayName, DateTime startDate, DateTime endDate,
+        string holidayType, string? notes, bool isNew,
+        CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
         if (isNew)
         {
+            var holiday = Holiday.Create(holidayName, startDate, endDate, holidayType, notes);
             db.Holidays.Add(holiday);
         }
         else
         {
-            var existing = await db.Holidays.FirstOrDefaultAsync(h => h.Id == holiday.Id, cancellationToken);
-            if (existing != null)
-            {
-                existing.HolidayName = holiday.HolidayName;
-                existing.StartDate = holiday.StartDate;
-                existing.EndDate = holiday.EndDate;
-                existing.HolidayType = holiday.HolidayType;
-                existing.Notes = holiday.Notes;
-            }
+            var existing = await db.Holidays.FirstOrDefaultAsync(h => h.Id == id, cancellationToken);
+            existing?.Update(holidayName, startDate, endDate, holidayType, notes);
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        await db.DispatchDomainEventsAsync(_publisher, cancellationToken);
 
         await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
         new SchedulingEngine(schedulerDb, _timeProvider).RunScheduler();
@@ -273,7 +282,6 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
     {
         await using var db = await _readOnlyDbFactory.CreateDbContextAsync(cancellationToken);
 
-        // Overlap formula: A.StartDate <= B.EndDate AND A.EndDate >= B.StartDate
         var query = db.Holidays
             .Where(h => h.StartDate.Date <= endDate.Date && h.EndDate.Date >= startDate.Date);
 
@@ -301,20 +309,13 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
             var newStart = src.StartDate.AddYears(yearDelta);
             var newEnd = src.EndDate.AddYears(yearDelta);
 
-            // Check no overlap in target year
             var overlaps = await db.Holidays
                 .AnyAsync(h => h.StartDate.Date <= newEnd.Date && h.EndDate.Date >= newStart.Date, cancellationToken);
 
             if (!overlaps)
             {
-                db.Holidays.Add(new Holiday
-                {
-                    HolidayName = src.HolidayName,
-                    StartDate = newStart,
-                    EndDate = newEnd,
-                    HolidayType = src.HolidayType,
-                    Notes = src.Notes
-                });
+                var holiday = Holiday.Create(src.HolidayName, newStart, newEnd, src.HolidayType, src.Notes);
+                db.Holidays.Add(holiday);
                 copied++;
             }
         }
@@ -322,6 +323,7 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         if (copied > 0)
         {
             await db.SaveChangesAsync(cancellationToken);
+            await db.DispatchDomainEventsAsync(_publisher, cancellationToken);
 
             await using var schedulerDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
             new SchedulingEngine(schedulerDb, _timeProvider).RunScheduler();
@@ -394,7 +396,6 @@ internal sealed class SchedulingOrchestrator : ISchedulingOrchestrator
         {
             var dayOfWeek = (int)current.DayOfWeek;
             var isWeekend = dayOfWeek == 5 || dayOfWeek == 6;
-            // Date range holiday check: any holiday whose range covers this date
             var isHoliday = holidays.Any(h => h.StartDate.Date <= current.Date && h.EndDate.Date >= current.Date);
             var adjustment = adjustments.FirstOrDefault(
                 a => a.AdjStart.Date <= current.Date && a.AdjEnd.Date >= current.Date);

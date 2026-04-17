@@ -1,17 +1,18 @@
 using MediatR;
 using SoftwareDeliveryPlanner.Application.Abstractions;
+using SoftwareDeliveryPlanner.SharedKernel;
 
 namespace SoftwareDeliveryPlanner.Application.Output.Queries;
 
-public sealed record GetOutputPlanQuery : IRequest<List<OutputPlanRowDto>>;
+public sealed record GetOutputPlanQuery : IRequest<Result<List<OutputPlanRowDto>>>;
 
-internal sealed class GetOutputPlanQueryHandler : IRequestHandler<GetOutputPlanQuery, List<OutputPlanRowDto>>
+internal sealed class GetOutputPlanQueryHandler : IRequestHandler<GetOutputPlanQuery, Result<List<OutputPlanRowDto>>>
 {
     private readonly IPlanningQueryService _orchestrator;
 
     public GetOutputPlanQueryHandler(IPlanningQueryService orchestrator)
         => _orchestrator = orchestrator;
 
-    public Task<List<OutputPlanRowDto>> Handle(GetOutputPlanQuery request, CancellationToken cancellationToken)
-        => _orchestrator.GetOutputPlanAsync(cancellationToken);
+    public async Task<Result<List<OutputPlanRowDto>>> Handle(GetOutputPlanQuery request, CancellationToken cancellationToken)
+        => await _orchestrator.GetOutputPlanAsync(cancellationToken);
 }

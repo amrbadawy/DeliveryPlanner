@@ -147,7 +147,7 @@ internal class SchedulingEngine
         // Calculate scheduling ranks
         foreach (var task in tasks)
         {
-            task.SchedulingRank = CalculateSchedulingRank(task);
+            task.ApplySchedulingRank(CalculateSchedulingRank(task));
         }
         tasks = tasks.OrderBy(t => t.SchedulingRank).ToList();
 
@@ -278,7 +278,6 @@ internal class SchedulingEngine
         _db.Allocations.AddRange(allocations);
 
         // Update tasks
-        var now = _timeProvider.GetLocalNow().LocalDateTime;
         foreach (var task in tasks)
         {
             var taskId = task.TaskId;
@@ -302,13 +301,13 @@ internal class SchedulingEngine
 
             string risk = CalculateRisk(plannedFinish, task.StrictDate);
 
-            task.AssignedDev = peakDev;
-            task.PlannedStart = plannedStart;
-            task.PlannedFinish = plannedFinish;
-            task.Duration = duration;
-            task.Status = status;
-            task.DeliveryRisk = risk;
-            task.UpdatedAt = now;
+            task.ApplySchedulingResult(
+                assignedDev: peakDev,
+                plannedStart: plannedStart,
+                plannedFinish: plannedFinish,
+                duration: duration,
+                status: status,
+                deliveryRisk: risk);
         }
 
         // Update calendar reserved/remaining capacity

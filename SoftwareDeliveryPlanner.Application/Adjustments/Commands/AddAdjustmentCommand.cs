@@ -1,4 +1,5 @@
 using MediatR;
+using SoftwareDeliveryPlanner.SharedKernel;
 
 namespace SoftwareDeliveryPlanner.Application.Adjustments.Commands;
 
@@ -8,6 +9,6 @@ public sealed record AddAdjustmentCommand(
     double AvailabilityPct,
     DateTime AdjStart,
     DateTime AdjEnd,
-    string? Notes) : IRequest<Unit>;
+    string? Notes) : IRequest<Result>;
 
-public sealed record DeleteAdjustmentCommand(int Id) : IRequest<Unit>;
+public sealed record DeleteAdjustmentCommand(int Id) : IRequest<Result>;

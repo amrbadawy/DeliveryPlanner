@@ -26,33 +26,23 @@ public class ModelsTests
     [Fact]
     public void TaskItem_CanSetProperties()
     {
-        var task = new TaskItem
-        {
-            TaskId = "T-001",
-            ServiceName = "API Development",
-            DevEstimation = 10,
-            MaxDev = 2,
-            Priority = 1,
-            StrictDate = new DateTime(2026, 6, 1),
-            Status = "In Progress",
-            DeliveryRisk = "At Risk"
-        };
+        var task = TaskItem.Create("TST-01", "API Development", 10, 2, 1, strictDate: new DateTime(2026, 6, 1));
 
-        Assert.Equal("T-001", task.TaskId);
+        Assert.Equal("TST-01", task.TaskId);
         Assert.Equal("API Development", task.ServiceName);
         Assert.Equal(10, task.DevEstimation);
         Assert.Equal(2, task.MaxDev);
         Assert.Equal(1, task.Priority);
         Assert.Equal(new DateTime(2026, 6, 1), task.StrictDate);
-        Assert.Equal("In Progress", task.Status);
-        Assert.Equal("At Risk", task.DeliveryRisk);
+        Assert.Equal("Not Started", task.Status);
+        Assert.Equal("On Track", task.DeliveryRisk);
     }
 
     [Fact]
     public void TaskItem_Timestamps_AreSetOnCreation()
     {
         var before = DateTime.Now.AddSeconds(-1);
-        var task = new TaskItem();
+        var task = TaskItem.Create("TST-02", "Timestamp Test", 1, 1, 5);
         var after = DateTime.Now.AddSeconds(1);
 
         Assert.True(task.CreatedAt >= before && task.CreatedAt <= after);
@@ -80,18 +70,7 @@ public class ModelsTests
     [Fact]
     public void TeamMember_CanSetProperties()
     {
-        var member = new TeamMember
-        {
-            ResourceId = "DEV-001",
-            ResourceName = "Ahmed Al-Rashid",
-            Role = "Senior Developer",
-            Team = "Platform",
-            AvailabilityPct = 80.0,
-            DailyCapacity = 0.8,
-            StartDate = new DateTime(2026, 1, 1),
-            EndDate = new DateTime(2026, 12, 31),
-            Active = "No"
-        };
+        var member = TeamMember.Create("DEV-001", "Ahmed Al-Rashid", "Senior Developer", "Platform", 80.0, 0.8, new DateTime(2026, 1, 1), active: "No");
 
         Assert.Equal("DEV-001", member.ResourceId);
         Assert.Equal("Ahmed Al-Rashid", member.ResourceName);
@@ -100,14 +79,13 @@ public class ModelsTests
         Assert.Equal(80.0, member.AvailabilityPct);
         Assert.Equal(0.8, member.DailyCapacity);
         Assert.Equal(new DateTime(2026, 1, 1), member.StartDate);
-        Assert.Equal(new DateTime(2026, 12, 31), member.EndDate);
         Assert.Equal("No", member.Active);
     }
 
     [Fact]
     public void TeamMember_EndDate_IsNullable()
     {
-        var member = new TeamMember { EndDate = null };
+        var member = TeamMember.Create("DEV-002", "Test Dev", "Developer", "Default", 100, 8, new DateTime(2026, 1, 1));
         Assert.Null(member.EndDate);
     }
 
@@ -128,15 +106,7 @@ public class ModelsTests
     [Fact]
     public void Adjustment_CanSetProperties()
     {
-        var adj = new Adjustment
-        {
-            ResourceId = "DEV-001",
-            AdjType = "Vacation",
-            AdjStart = new DateTime(2026, 7, 1),
-            AdjEnd = new DateTime(2026, 7, 14),
-            AvailabilityPct = 0.0,
-            Notes = "Summer vacation"
-        };
+        var adj = Adjustment.Create("DEV-001", "Vacation", 0.0, new DateTime(2026, 7, 1), new DateTime(2026, 7, 14), "Summer vacation");
 
         Assert.Equal("DEV-001", adj.ResourceId);
         Assert.Equal("Vacation", adj.AdjType);
@@ -162,14 +132,7 @@ public class ModelsTests
     [Fact]
     public void Holiday_CanSetProperties_DateRange()
     {
-        var holiday = new Holiday
-        {
-            HolidayName = "Eid Al-Fitr",
-            StartDate = new DateTime(2026, 3, 30),
-            EndDate = new DateTime(2026, 4, 2),
-            HolidayType = "Religious",
-            Notes = "Festival of Breaking Fast"
-        };
+        var holiday = Holiday.Create("Eid Al-Fitr", new DateTime(2026, 3, 30), new DateTime(2026, 4, 2), "Religious", "Festival of Breaking Fast");
 
         Assert.Equal("Eid Al-Fitr", holiday.HolidayName);
         Assert.Equal(new DateTime(2026, 3, 30), holiday.StartDate);
@@ -181,22 +144,14 @@ public class ModelsTests
     [Fact]
     public void Holiday_DurationDays_SingleDay()
     {
-        var holiday = new Holiday
-        {
-            StartDate = new DateTime(2026, 1, 1),
-            EndDate = new DateTime(2026, 1, 1)
-        };
+        var holiday = Holiday.Create("Test Day", new DateTime(2026, 1, 1));
         Assert.Equal(1, holiday.DurationDays);
     }
 
     [Fact]
     public void Holiday_DurationDays_MultiDay()
     {
-        var holiday = new Holiday
-        {
-            StartDate = new DateTime(2026, 3, 30),
-            EndDate = new DateTime(2026, 4, 2)
-        };
+        var holiday = Holiday.Create("Test Range", new DateTime(2026, 3, 30), new DateTime(2026, 4, 2));
         Assert.Equal(4, holiday.DurationDays);
     }
 

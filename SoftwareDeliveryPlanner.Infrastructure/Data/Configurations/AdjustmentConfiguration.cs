@@ -23,10 +23,6 @@ public sealed class AdjustmentConfiguration : IEntityTypeConfiguration<Adjustmen
         builder.Property(a => a.Notes)
             .HasMaxLength(500);
 
-        builder.HasOne(a => a.Resource)
-            .WithMany()
-            .HasForeignKey(a => a.ResourceId)
-            .HasPrincipalKey(r => r.ResourceId)
-            .OnDelete(DeleteBehavior.Restrict);
+        // FK to TeamMembers is configured via TeamMemberConfiguration.HasMany(Adjustments)
     }
 }
