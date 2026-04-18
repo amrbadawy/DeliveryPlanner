@@ -25,7 +25,7 @@ export default defineConfig({
     viewport: { width: 1440, height: 900 },
   },
   webServer: {
-    command: 'dotnet run --project "D:\\OpenCode\\SoftwareDeliveryPlanner.Blazor\\SoftwareDeliveryPlanner.Blazor.csproj" --urls "http://localhost:2026"',
+    command: 'dotnet run --project "../SoftwareDeliveryPlanner.Web/SoftwareDeliveryPlanner.Web.csproj" --urls "http://localhost:2026"',
     url: 'http://localhost:2026',
     reuseExistingServer: false,
     timeout: 180_000,

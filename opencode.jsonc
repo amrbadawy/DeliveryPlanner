@@ -1,0 +1,42 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // ---------------------------------------------------------------------------
+  // MCP Servers
+  // ---------------------------------------------------------------------------
+  // Playwright MCP gives OpenCode a real browser: navigate, click, fill,
+  // screenshot, evaluate JS, etc.  Runs via npx so no local install needed.
+  "mcp": {
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "@playwright/mcp@latest"],
+      "enabled": true
+    }
+  },
+
+  // ---------------------------------------------------------------------------
+  // Tool visibility
+  // ---------------------------------------------------------------------------
+  // Playwright tools are expensive on tokens (especially screenshots).
+  // Disable them globally so they do not pollute every session.
+  "tools": {
+    "playwright_*": false
+  },
+
+  // ---------------------------------------------------------------------------
+  // Agents
+  // ---------------------------------------------------------------------------
+  // The "tester" agent re-enables Playwright tools so the AI can browse the
+  // live app, verify UI state, and write/run e2e tests interactively.
+  //
+  // Usage: invoke this agent when you want to write, debug, or explore tests.
+  // Example prompt: "Use the tester agent to navigate to /tasks and write a
+  //                  Playwright spec for the search filter."
+  "agent": {
+    "tester": {
+      "tools": {
+        "playwright_*": true
+      }
+    }
+  }
+}
