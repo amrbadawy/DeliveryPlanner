@@ -13,6 +13,11 @@ internal class PlannerDbContext : DbContext
     public DbSet<Allocation> Allocations { get; set; }
     public DbSet<Setting> Settings { get; set; }
     public DbSet<LookupValue> Lookups { get; set; }
+    public DbSet<TaskNote> TaskNotes => Set<TaskNote>();
+    public DbSet<SchedulerSnapshot> SchedulerSnapshots => Set<SchedulerSnapshot>();
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+    public DbSet<RiskNotification> RiskNotifications => Set<RiskNotification>();
+    public DbSet<PlanScenario> PlanScenarios => Set<PlanScenario>();
 
     public PlannerDbContext(DbContextOptions<PlannerDbContext> options) : base(options)
     {

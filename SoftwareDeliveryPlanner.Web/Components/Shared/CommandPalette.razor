@@ -1,0 +1,303 @@
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@implements IDisposable
+
+@if (isVisible)
+{
+    <div class="command-palette-backdrop" @onclick="Close">
+        <div class="command-palette" @onclick:stopPropagation="true">
+            <div class="command-palette-input-wrapper">
+                <i class="bi bi-search"></i>
+                <input @ref="searchInput" class="command-palette-input"
+                       placeholder="Type a command..."
+                       @bind-value="searchText" @bind-value:event="oninput"
+                       @onkeydown="HandleKeyDown" />
+                <kbd>ESC</kbd>
+            </div>
+            <div class="command-palette-results">
+                @{ var filtered = GetFilteredCommands(); }
+                @for (int i = 0; i < filtered.Count; i++)
+                {
+                    var cmd = filtered[i];
+                    var index = i;
+                    <div class="command-item @(index == selectedIndex ? "active" : "")"
+                         @onclick="() => ExecuteCommand(cmd)">
+                        <i class="bi @cmd.Icon"></i>
+                        <div class="command-item-text">
+                            <span class="command-item-name">@cmd.Name</span>
+                            @if (cmd.Category is not null)
+                            {
+                                <span class="command-item-category">@cmd.Category</span>
+                            }
+                        </div>
+                        @if (cmd.Url is not null)
+                        {
+                            <span class="command-item-url">@cmd.Url</span>
+                        }
+                    </div>
+                }
+                @if (filtered.Count == 0)
+                {
+                    <div class="command-palette-empty">No matching commands</div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .command-palette-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1050;
+        display: flex;
+        justify-content: center;
+        padding-top: 20vh;
+    }
+
+    .command-palette {
+        width: 100%;
+        max-width: 550px;
+        height: fit-content;
+        background: var(--color-bg-primary);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-lg), 0 25px 50px rgba(0, 0, 0, 0.15);
+        border: 1px solid var(--color-border);
+        overflow: hidden;
+    }
+
+    .command-palette-input-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.875rem 1rem;
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .command-palette-input-wrapper > i {
+        color: var(--color-text-muted);
+        font-size: var(--font-size-lg);
+    }
+
+    .command-palette-input {
+        flex: 1;
+        border: none;
+        outline: none;
+        background: transparent;
+        font-size: var(--font-size-lg);
+        color: var(--color-text-primary);
+        font-family: var(--font-family);
+    }
+
+    .command-palette-input::placeholder {
+        color: var(--color-text-muted);
+    }
+
+    .command-palette-input-wrapper kbd {
+        font-family: var(--font-family);
+        font-size: var(--font-size-xs);
+        padding: 0.15rem 0.4rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--color-border);
+        background: var(--color-bg-secondary);
+        color: var(--color-text-muted);
+    }
+
+    .command-palette-results {
+        max-height: 350px;
+        overflow-y: auto;
+        padding: 0.5rem;
+    }
+
+    .command-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.625rem 0.75rem;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        color: var(--color-text-primary);
+        transition: background-color 0.1s;
+    }
+
+    .command-item:hover,
+    .command-item.active {
+        background: var(--color-accent-light);
+    }
+
+    .command-item > i {
+        font-size: var(--font-size-lg);
+        color: var(--color-text-secondary);
+        width: 1.5rem;
+        text-align: center;
+    }
+
+    .command-item-text {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .command-item-name {
+        font-size: var(--font-size-base);
+        font-weight: 500;
+    }
+
+    .command-item-category {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-muted);
+    }
+
+    .command-item-url {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-muted);
+    }
+
+    .command-palette-empty {
+        padding: 1.5rem;
+        text-align: center;
+        color: var(--color-text-muted);
+        font-size: var(--font-size-sm);
+    }
+
+    .command-palette-hint {
+        position: fixed;
+        bottom: 1rem;
+        right: 1rem;
+        z-index: 1000;
+    }
+
+    .command-palette-hint kbd {
+        font-family: var(--font-family);
+        font-size: var(--font-size-xs);
+        padding: 0.25rem 0.5rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--color-border);
+        background: var(--color-bg-secondary);
+        color: var(--color-text-muted);
+        cursor: pointer;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .command-palette-hint kbd:hover {
+        background: var(--color-bg-tertiary);
+        color: var(--color-text-secondary);
+    }
+</style>
+
+@code {
+    [Parameter] public EventCallback OnToggleTheme { get; set; }
+
+    private bool isVisible;
+    private string searchText = string.Empty;
+    private int selectedIndex;
+    private ElementReference searchInput;
+    private DotNetObjectReference<CommandPalette>? dotnetRef;
+
+    private record CommandItem(string Name, string Icon, string? Url, string? Category, string? ActionId);
+
+    private static readonly List<CommandItem> AllCommands = new()
+    {
+        new("Dashboard", "bi-speedometer2", "/", "Overview", null),
+        new("Task Register", "bi-list-check", "/tasks", "Data Management", null),
+        new("Resources", "bi-people", "/resources", "Data Management", null),
+        new("Adjustments", "bi-calendar2-minus", "/adjustments", "Data Management", null),
+        new("Holidays", "bi-calendar-heart", "/holidays", "Data Management", null),
+        new("Calendar", "bi-calendar3", "/calendar", "Schedule Views", null),
+        new("Employee Timeline", "bi-calendar-range", "/timeline", "Schedule Views", null),
+        new("Gantt Chart", "bi-bar-chart-steps", "/gantt", "Output", null),
+        new("Delivery Plan", "bi-clipboard-data", "/output", "Output", null),
+        new("Run Scheduler", "bi-arrow-repeat", null, "Action", "refresh"),
+        new("Toggle Dark Mode", "bi-circle-half", null, "Action", "toggle-theme"),
+    };
+
+    private List<CommandItem> GetFilteredCommands()
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return AllCommands;
+
+        return AllCommands
+            .Where(c => c.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotnetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("CommandPalette.init", dotnetRef);
+        }
+
+        if (isVisible)
+        {
+            await JS.InvokeVoidAsync("CommandPalette.focusInput", searchInput);
+        }
+    }
+
+    [JSInvokable]
+    public void Toggle()
+    {
+        isVisible = !isVisible;
+        if (isVisible)
+        {
+            searchText = string.Empty;
+            selectedIndex = 0;
+        }
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Close()
+    {
+        isVisible = false;
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        var filtered = GetFilteredCommands();
+
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                selectedIndex = Math.Min(selectedIndex + 1, filtered.Count - 1);
+                break;
+            case "ArrowUp":
+                selectedIndex = Math.Max(selectedIndex - 1, 0);
+                break;
+            case "Enter":
+                if (filtered.Count > 0 && selectedIndex < filtered.Count)
+                    ExecuteCommand(filtered[selectedIndex]);
+                break;
+            case "Escape":
+                Close();
+                break;
+        }
+    }
+
+    private async void ExecuteCommand(CommandItem cmd)
+    {
+        isVisible = false;
+
+        if (cmd.ActionId == "refresh")
+        {
+            var uri = new Uri(NavigationManager.Uri);
+            var baseUrl = uri.GetLeftPart(UriPartial.Path);
+            NavigationManager.NavigateTo($"{baseUrl}?refresh=true", forceLoad: true);
+        }
+        else if (cmd.ActionId == "toggle-theme")
+        {
+            await OnToggleTheme.InvokeAsync();
+        }
+        else if (cmd.Url is not null)
+        {
+            NavigationManager.NavigateTo(cmd.Url);
+        }
+    }
+
+    public void Dispose()
+    {
+        _ = JS.InvokeVoidAsync("CommandPalette.dispose");
+        dotnetRef?.Dispose();
+    }
+}

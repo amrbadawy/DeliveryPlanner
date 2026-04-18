@@ -5,13 +5,6 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Data;
 
 /// <summary>
 /// Read-only DbContext that connects to a read replica (or the primary with no-tracking).
-/// <list type="bullet">
-///   <item>Tracking is disabled globally (<see cref="QueryTrackingBehavior.NoTracking"/>).</item>
-///   <item>Change detection is turned off for performance.</item>
-///   <item><see cref="SaveChanges()"/> and <see cref="SaveChangesAsync(CancellationToken)"/> throw
-///         <see cref="InvalidOperationException"/> to prevent accidental writes.</item>
-/// </list>
-/// Use <see cref="PlannerDbContext"/> for all write operations.
 /// </summary>
 internal class ReadOnlyPlannerDbContext : DbContext
 {
@@ -23,6 +16,11 @@ internal class ReadOnlyPlannerDbContext : DbContext
     public DbSet<Allocation> Allocations { get; set; }
     public DbSet<Setting> Settings { get; set; }
     public DbSet<LookupValue> Lookups { get; set; }
+    public DbSet<TaskNote> TaskNotes => Set<TaskNote>();
+    public DbSet<SchedulerSnapshot> SchedulerSnapshots => Set<SchedulerSnapshot>();
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+    public DbSet<RiskNotification> RiskNotifications => Set<RiskNotification>();
+    public DbSet<PlanScenario> PlanScenarios => Set<PlanScenario>();
 
     public ReadOnlyPlannerDbContext(DbContextOptions<ReadOnlyPlannerDbContext> options)
         : base(options)
@@ -33,12 +31,8 @@ internal class ReadOnlyPlannerDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Reuse the same entity configurations as the read-write context.
-        // This ensures both contexts map to the same schema.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlannerDbContext).Assembly);
     }
-
-    // ─── Sealed write operations — prevent accidental mutations ────────────
 
     public override int SaveChanges()
         => throw new InvalidOperationException(

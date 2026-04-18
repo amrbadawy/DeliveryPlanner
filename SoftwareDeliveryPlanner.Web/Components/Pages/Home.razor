@@ -2,7 +2,11 @@
 @using MediatR
 @using SoftwareDeliveryPlanner.Application.DeliveryInsights.Queries
 @using SoftwareDeliveryPlanner.Application.Planning.Commands
+@using SoftwareDeliveryPlanner.Application.Planning.Queries
+@using SoftwareDeliveryPlanner.Application.Abstractions
+@using SoftwareDeliveryPlanner.Domain.Models
 @inject IMediator Mediator
+@inject INotificationOrchestrator NotificationService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Dashboard</PageTitle>
@@ -36,6 +40,42 @@
 }
 else
 {
+    @if (isPlanStale)
+    {
+        <div class="alert alert-warning d-flex align-items-center mb-3" role="alert" data-testid="stale-plan-warning">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <div>
+                <strong>Plan may be outdated.</strong> Run the scheduler to refresh delivery dates and risk assessments.
+            </div>
+        </div>
+    }
+
+    @if (notifications.Any())
+    {
+        <div class="card border-0 shadow-sm mb-3 border-start border-danger border-3" data-testid="risk-notifications">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0"><i class="bi bi-bell-fill text-danger me-2"></i>Risk Alerts (@notifications.Count)</h6>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="DismissNotifications" data-testid="dismiss-notifications">
+                        <i class="bi bi-check-all me-1"></i>Dismiss All
+                    </button>
+                </div>
+                @foreach (var n in notifications.Take(5))
+                {
+                    <div class="d-flex align-items-center gap-2 py-1 border-bottom">
+                        <i class="bi bi-arrow-right-circle text-danger"></i>
+                        <span><strong>@n.ServiceName</strong> (@n.TaskId) moved from <span class="badge bg-secondary">@n.PreviousRisk</span> to <span class="badge bg-danger">@n.CurrentRisk</span></span>
+                        <small class="text-muted ms-auto">@n.CreatedAt.ToString("MMM dd HH:mm")</small>
+                    </div>
+                }
+                @if (notifications.Count > 5)
+                {
+                    <small class="text-muted mt-2 d-block">...and @(notifications.Count - 5) more</small>
+                }
+            </div>
+        </div>
+    }
+
     <!-- KPI Row -->
     <div class="row g-3 mb-4">
         <div class="col-md-3">
@@ -124,6 +164,44 @@ else
             }
         </div>
     </div>
+
+    <!-- Risk Trend Chart -->
+    @if (riskTrend.Any())
+    {
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-header border-bottom">
+                <i class="bi bi-graph-up-arrow me-2"></i>Risk Trend
+            </div>
+            <div class="card-body" data-testid="risk-trend-chart">
+                <div class="d-flex align-items-end gap-1" style="height: 120px;">
+                    @foreach (var point in riskTrend)
+                    {
+                        var total = Math.Max(point.Total, 1);
+                        var onTrackPct = (double)point.OnTrack / total * 100;
+                        var atRiskPct = (double)point.AtRisk / total * 100;
+                        var latePct = (double)point.Late / total * 100;
+                        <div class="d-flex flex-column flex-fill" style="height: 100%;" title="@point.RunTimestamp.ToString("MMM dd HH:mm")">
+                            <div style="flex: @latePct; background: var(--color-danger); border-radius: 2px 2px 0 0;" class="mb-0"></div>
+                            <div style="flex: @atRiskPct; background: var(--color-warning);" class="mb-0"></div>
+                            <div style="flex: @onTrackPct; background: var(--color-success); border-radius: 0 0 2px 2px;" class="mb-0"></div>
+                        </div>
+                    }
+                </div>
+                <div class="d-flex justify-content-between mt-2 small text-muted">
+                    @if (riskTrend.Any())
+                    {
+                        <span>@riskTrend.First().RunTimestamp.ToString("MMM dd")</span>
+                        <span>@riskTrend.Last().RunTimestamp.ToString("MMM dd")</span>
+                    }
+                </div>
+                <div class="d-flex gap-3 mt-2 small">
+                    <span><span class="badge" style="background: var(--color-success);">&nbsp;</span> On Track</span>
+                    <span><span class="badge" style="background: var(--color-warning);">&nbsp;</span> At Risk</span>
+                    <span><span class="badge" style="background: var(--color-danger);">&nbsp;</span> Late</span>
+                </div>
+            </div>
+        </div>
+    }
 }
 
 @code {
@@ -139,10 +217,20 @@ else
     private string schedulerResult = "";
     private bool isLoaded = false;
     private bool isRunning = false;
+    private bool isPlanStale = true;
+    private List<RiskTrendPointDto> riskTrend = new();
+    private List<RiskNotification> notifications = new();
 
     protected override async Task OnInitializedAsync()
     {
         await LoadKPIs();
+
+        var trendResult = await Mediator.Send(new GetRiskTrendQuery(10));
+        if (trendResult.IsSuccess)
+            riskTrend = trendResult.Value;
+
+        notifications = await NotificationService.GetNotificationsAsync(true);
+
         isLoaded = true;
     }
 
@@ -169,6 +257,7 @@ else
             var result = await Mediator.Send(new RunSchedulerCommand());
             schedulerResult = result.Value;
             await LoadKPIs();
+            isPlanStale = false;
         }
         finally
         {
@@ -188,5 +277,11 @@ else
     {
         if (e.Key is "Enter" or " ")
             NavigateToTasks(filterType, filterValue);
+    }
+
+    private async Task DismissNotifications()
+    {
+        await NotificationService.MarkAllAsReadAsync();
+        notifications.Clear();
     }
 }

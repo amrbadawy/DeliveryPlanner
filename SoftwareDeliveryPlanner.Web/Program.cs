@@ -10,6 +10,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddApplication();
+builder.Services.AddScoped<SoftwareDeliveryPlanner.Web.Services.AutoScheduleService>();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();

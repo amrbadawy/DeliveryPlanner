@@ -1,6 +1,8 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using SoftwareDeliveryPlanner.Application.Abstractions;
+using SoftwareDeliveryPlanner.Application.Planning.Queries;
+using SoftwareDeliveryPlanner.Application.Tasks.Queries;
 using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.Domain.Models;
 using SoftwareDeliveryPlanner.Infrastructure.Data;
@@ -190,5 +192,62 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
         }
 
         return new TimelineDataDto(days);
+    }
+
+    public async Task<WorkloadHeatmapDto> GetWorkloadHeatmapAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await ReadOnlyDbFactory.CreateDbContextAsync(cancellationToken);
+
+        var resources = await db.Resources
+            .Where(r => r.Active == DomainConstants.ActiveStatus.Yes)
+            .OrderBy(r => r.ResourceName)
+            .ToListAsync(cancellationToken);
+
+        var allocations = await db.Allocations.ToListAsync(cancellationToken);
+
+        var resourceNames = resources.Select(r => r.ResourceName).ToList();
+
+        // Group allocations by week
+        var weekStarts = allocations
+            .Select(a => a.CalendarDate.Date.AddDays(-(int)a.CalendarDate.DayOfWeek))
+            .Distinct()
+            .OrderBy(d => d)
+            .ToList();
+
+        var cells = new List<WorkloadCellDto>();
+        foreach (var resource in resources)
+        {
+            foreach (var weekStart in weekStarts)
+            {
+                var weekEnd = weekStart.AddDays(7);
+                var weekAllocs = allocations
+                    .Where(a => a.CalendarDate >= weekStart && a.CalendarDate < weekEnd)
+                    .Sum(a => a.AssignedDev);
+                cells.Add(new WorkloadCellDto(resource.ResourceId, resource.ResourceName, weekStart, weekAllocs));
+            }
+        }
+
+        return new WorkloadHeatmapDto(resourceNames, weekStarts, cells);
+    }
+
+    public async Task<List<RiskTrendPointDto>> GetRiskTrendAsync(int maxPoints)
+    {
+        await using var db = await ReadOnlyDbFactory.CreateDbContextAsync();
+
+        var snapshots = await db.SchedulerSnapshots
+            .OrderByDescending(s => s.RunTimestamp)
+            .Take(maxPoints)
+            .ToListAsync();
+
+        return snapshots
+            .OrderBy(s => s.RunTimestamp)
+            .Select(s => new RiskTrendPointDto(s.RunTimestamp, s.OnTrackCount, s.AtRiskCount, s.LateCount, s.TotalTasks))
+            .ToList();
+    }
+
+    public Task<List<TaskAllocationDto>> GetTaskAllocationsAsync(string taskId, CancellationToken cancellationToken = default)
+    {
+        // Task allocations are derived from the scheduling engine; return empty for now
+        return System.Threading.Tasks.Task.FromResult(new List<TaskAllocationDto>());
     }
 }

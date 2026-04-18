@@ -1,0 +1,126 @@
+@page "/heatmap"
+@using MediatR
+@using SoftwareDeliveryPlanner.Application.Planning.Queries
+@inject IMediator Mediator
+
+<PageTitle>Workload Heatmap</PageTitle>
+
+<ToastNotification @ref="toast" TestId="heatmap-toast" />
+
+<div class="d-flex justify-content-between align-items-start mb-4 page-header">
+    <div>
+        <h3 class="mb-1"><i class="bi bi-grid-3x3-gap me-2"></i>Resource Workload</h3>
+        <p class="page-subtitle">Visualize team utilization across weeks</p>
+    </div>
+    <div>
+        <button class="btn btn-outline-secondary" @onclick="RefreshData" disabled="@isRefreshing" data-testid="heatmap-refresh">
+            @if (isRefreshing)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+            }
+            else
+            {
+                <i class="bi bi-arrow-clockwise"></i>
+            }
+            Refresh
+        </button>
+    </div>
+</div>
+
+@if (!isLoaded)
+{
+    <SkeletonLoader Variant="table" Rows="6" Columns="8" TestId="heatmap-skeleton" />
+}
+else if (heatmap is null || !heatmap.WeekStarts.Any())
+{
+    <div class="empty-state">
+        <div class="empty-icon"><i class="bi bi-grid-3x3-gap"></i></div>
+        <h5>No heatmap data</h5>
+        <p>Run the scheduler to generate task assignments, then refresh.</p>
+    </div>
+}
+else
+{
+    <div class="card border-0 shadow-sm">
+        <div class="heatmap-scroll" data-testid="heatmap-table-container">
+            <table class="heatmap-table" data-testid="heatmap-table">
+                <thead>
+                    <tr>
+                        <th class="heatmap-resource-header">Resource</th>
+                        @foreach (var week in heatmap.WeekStarts)
+                        {
+                            <th class="heatmap-week-header">@week.ToString("MMM dd")</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var resourceName in heatmap.ResourceNames)
+                    {
+                        <tr>
+                            <td class="heatmap-resource-cell">@resourceName</td>
+                            @foreach (var week in heatmap.WeekStarts)
+                            {
+                                var cell = heatmap.Cells.FirstOrDefault(c => c.ResourceName == resourceName && c.WeekStart == week);
+                                var pct = cell?.UtilizationPct ?? 0;
+                                <td class="heatmap-cell" style="background-color: @GetCellColor(pct);" title="@resourceName — Week of @week.ToString("MMM dd") — @pct.ToString("F1")%">
+                                    @pct.ToString("F0")%
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="heatmap-legend mt-3" data-testid="heatmap-legend">
+        <span class="legend-label">Utilization:</span>
+        <span class="legend-item"><span class="legend-swatch" style="background-color: var(--color-bg-secondary);"></span>0%</span>
+        <span class="legend-item"><span class="legend-swatch" style="background-color: var(--color-info-light);"></span>1–50%</span>
+        <span class="legend-item"><span class="legend-swatch" style="background-color: var(--color-success-light);"></span>51–80%</span>
+        <span class="legend-item"><span class="legend-swatch" style="background-color: var(--color-warning-light);"></span>81–100%</span>
+        <span class="legend-item"><span class="legend-swatch" style="background-color: var(--color-danger-light);"></span>&gt;100%</span>
+    </div>
+}
+
+@code {
+    private WorkloadHeatmapDto? heatmap;
+    private bool isLoaded;
+    private bool isRefreshing;
+    private ToastNotification toast = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        isLoaded = true;
+    }
+
+    private async Task LoadData()
+    {
+        var result = await Mediator.Send(new GetWorkloadHeatmapQuery());
+        heatmap = result.Value;
+    }
+
+    private async Task RefreshData()
+    {
+        isRefreshing = true;
+        try
+        {
+            await LoadData();
+            toast.Show("Heatmap refreshed.");
+        }
+        finally
+        {
+            isRefreshing = false;
+        }
+    }
+
+    private static string GetCellColor(double pct) => pct switch
+    {
+        0 => "var(--color-bg-secondary)",
+        <= 50 => "var(--color-info-light)",
+        <= 80 => "var(--color-success-light)",
+        <= 100 => "var(--color-warning-light)",
+        _ => "var(--color-danger-light)"
+    };
+}

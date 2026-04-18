@@ -43,6 +43,7 @@ public static class DomainConstants
         public const string PlanStartDate = "plan_start_date";
         public const string AtRiskThreshold = "at_risk_threshold";
         public const string WorkingWeek = "working_week";
+        public const string LastSchedulerRun = "last_scheduler_run";
     }
 
     /// <summary>Holiday classification types.</summary>
@@ -76,6 +77,26 @@ public static class DomainConstants
         public const string SeniorDeveloper = "Senior Developer";
         public const string TechLead = "Tech Lead";
         public const string QA = "QA";
+    }
+
+    /// <summary>Audit action types.</summary>
+    public static class AuditAction
+    {
+        public const string Created = "Created";
+        public const string Updated = "Updated";
+        public const string Deleted = "Deleted";
+        public const string SchedulerRun = "SchedulerRun";
+        public const string Import = "Import";
+    }
+
+    /// <summary>Entity type identifiers for audit logging.</summary>
+    public static class EntityType
+    {
+        public const string Task = "Task";
+        public const string Resource = "Resource";
+        public const string Adjustment = "Adjustment";
+        public const string Holiday = "Holiday";
+        public const string Scheduler = "Scheduler";
     }
 
     /// <summary>Default team name.</summary>

@@ -151,3 +151,15 @@
 .gantt-bar-notstarted { background: var(--color-neutral); }
 .gantt-bar-atrisk     { background: var(--color-warning); }
 .gantt-bar-late       { background: var(--color-danger); }
+
+/* ── Critical path highlight ─────────────────────────────── */
+.gantt-bar-critical {
+    outline: 2px solid var(--color-danger, #dc3545);
+    outline-offset: 1px;
+    animation: critical-pulse 2s ease-in-out infinite;
+}
+
+@keyframes critical-pulse {
+    0%, 100% { outline-color: var(--color-danger, #dc3545); }
+    50% { outline-color: transparent; }
+}

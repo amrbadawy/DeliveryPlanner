@@ -4,6 +4,9 @@
 @using SoftwareDeliveryPlanner.Application.Abstractions
 @using SoftwareDeliveryPlanner.Domain.Models
 @using SoftwareDeliveryPlanner.Domain
+@using SoftwareDeliveryPlanner.Application.TaskNotes.Commands
+@using SoftwareDeliveryPlanner.Application.TaskNotes.Queries
+@using FluentValidation
 @inject IMediator Mediator
 @inject NavigationManager NavigationManager
 
@@ -83,6 +86,48 @@ else
         </div>
     </div>
 
+    <!-- Assigned Resources -->
+    <h4 class="mt-4 mb-3"><i class="bi bi-people me-2"></i>Assigned Resources</h4>
+    @if (isAllocationsLoading)
+    {
+        <div class="text-center py-3">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Loading resources...</span>
+            </div>
+        </div>
+    }
+    else if (!allocations.Any())
+    {
+        <div class="text-center py-3">
+            <i class="bi bi-people display-6 text-muted"></i>
+            <p class="text-muted mt-2">No resources allocated. Run the scheduler to assign developers.</p>
+        </div>
+    }
+    else
+    {
+        <div class="row g-3 mb-3" data-testid="task-allocations">
+            @foreach (var alloc in allocations)
+            {
+                <div class="col-md-4" data-testid="task-allocation-@alloc.ResourceId">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <i class="bi bi-person-circle fs-4 text-primary"></i>
+                                <div>
+                                    <strong>@alloc.ResourceName</strong>
+                                    <div class="small text-muted">@alloc.Role · @alloc.Team</div>
+                                </div>
+                            </div>
+                            <div class="small">
+                                <span class="text-muted">Availability:</span> @alloc.AvailabilityPct.ToString("F0")%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
     <h4 class="mt-4 mb-3"><i class="bi bi-calendar-range me-2"></i>Assignment Timeline</h4>
     @if (isTimelineLoading)
     {
@@ -138,6 +183,57 @@ else
             </div>
         </div>
     }
+
+    <!-- Notes Section -->
+    <h4 class="mt-4 mb-3"><i class="bi bi-sticky me-2"></i>Notes</h4>
+    @if (isNotesLoading)
+    {
+        <div class="text-center py-3">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Loading notes...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card border-0 shadow-sm mb-3" data-testid="task-notes-section">
+            <div class="card-body">
+                <div class="input-group mb-3">
+                    <input class="form-control" placeholder="Add a note..." @bind="newNoteText" @onkeydown="HandleNoteKeyDown" data-testid="task-note-input" />
+                    <button class="btn btn-primary" @onclick="AddNote" disabled="@isAddingNote" data-testid="task-note-add">
+                        @if (isAddingNote)
+                        {
+                            <span class="spinner-border spinner-border-sm"></span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-plus-lg"></i>
+                        }
+                        Add
+                    </button>
+                </div>
+                @if (!notes.Any())
+                {
+                    <p class="text-muted text-center mb-0">No notes yet.</p>
+                }
+                else
+                {
+                    @foreach (var note in notes.OrderByDescending(n => n.CreatedAt))
+                    {
+                        <div class="d-flex justify-content-between align-items-start border-bottom py-2" data-testid="task-note-@note.Id">
+                            <div>
+                                <div>@note.NoteText</div>
+                                <small class="text-muted">@note.Author · @note.CreatedAt.ToString("MMM dd, yyyy HH:mm")</small>
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteNote(note.Id)" data-testid="task-note-delete-@note.Id">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
 }
 
 @code {
@@ -148,6 +244,12 @@ else
     private TaskTimelineDto? timeline;
     private bool isLoading = true;
     private bool isTimelineLoading = true;
+    private List<TaskNote> notes = new();
+    private string newNoteText = string.Empty;
+    private bool isAddingNote = false;
+    private bool isNotesLoading = true;
+    private List<TaskAllocationDto> allocations = new();
+    private bool isAllocationsLoading = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -164,10 +266,56 @@ else
             timeline = timelineResult.Value;
         }
         isTimelineLoading = false;
+
+        if (task != null)
+        {
+            var notesResult = await Mediator.Send(new GetTaskNotesQuery(TaskId));
+            if (notesResult.IsSuccess)
+                notes = notesResult.Value;
+        }
+        isNotesLoading = false;
+
+        var allocResult = await Mediator.Send(new GetTaskAllocationsQuery(TaskId));
+        if (allocResult.IsSuccess)
+            allocations = allocResult.Value;
+        isAllocationsLoading = false;
     }
 
     private void GoBack()
     {
         NavigationManager.NavigateTo("/tasks");
+    }
+
+    private async Task HandleNoteKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await AddNote();
+    }
+
+    private async Task AddNote()
+    {
+        if (string.IsNullOrWhiteSpace(newNoteText)) return;
+        isAddingNote = true;
+        try
+        {
+            await Mediator.Send(new AddTaskNoteCommand(TaskId, newNoteText, "User"));
+            var notesResult = await Mediator.Send(new GetTaskNotesQuery(TaskId));
+            if (notesResult.IsSuccess)
+                notes = notesResult.Value;
+            newNoteText = string.Empty;
+        }
+        catch (ValidationException) { }
+        finally
+        {
+            isAddingNote = false;
+        }
+    }
+
+    private async Task DeleteNote(int noteId)
+    {
+        await Mediator.Send(new DeleteTaskNoteCommand(noteId));
+        var notesResult = await Mediator.Send(new GetTaskNotesQuery(TaskId));
+        if (notesResult.IsSuccess)
+            notes = notesResult.Value;
     }
 }

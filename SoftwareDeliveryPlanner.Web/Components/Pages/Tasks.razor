@@ -21,6 +21,9 @@
         <button class="btn btn-primary" @onclick="ShowAddModal" data-testid="tasks-add">
             <i class="bi bi-plus-lg"></i> Add Service
         </button>
+        <button class="btn btn-outline-primary" @onclick="ShowBulkImportModal" data-testid="tasks-bulk-import">
+            <i class="bi bi-upload"></i> Import CSV
+        </button>
         <button class="btn btn-outline-secondary" @onclick="RefreshData" disabled="@isRefreshing" data-testid="tasks-refresh">
             @if (isRefreshing)
             {
@@ -168,6 +171,64 @@
     </div>
 }
 
+@if (showBulkImport)
+{
+    <div class="modal d-block modal-backdrop-custom" role="dialog" aria-modal="true" data-testid="bulk-import-modal">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Bulk Import Services (CSV)</h5>
+                    <button type="button" class="btn-close" @onclick="CloseBulkImport" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(bulkError))
+                    {
+                        <div class="alert alert-danger">@bulkError</div>
+                    }
+                    <p class="text-muted small">Paste CSV with headers: <code>TaskId,ServiceName,DevEstimation,MaxDev,Priority,StrictDate,DependsOnTaskIds</code></p>
+                    <textarea class="form-control font-monospace" rows="8" @bind="csvText" placeholder="SVC-010,Auth Service,15,2,3,,&#10;SVC-011,User API,20,3,5,2026-06-01,SVC-010" data-testid="bulk-import-csv"></textarea>
+                    @if (parsedRows.Any())
+                    {
+                        <div class="mt-3">
+                            <h6>Preview (@parsedRows.Count rows)</h6>
+                            <div class="table-responsive" style="max-height: 200px;">
+                                <table class="table table-sm table-bordered mb-0">
+                                    <thead class="table-light">
+                                        <tr><th>ID</th><th>Name</th><th>Est</th><th>Max Dev</th><th>Priority</th><th>Strict</th><th>Deps</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var row in parsedRows)
+                                        {
+                                            <tr>
+                                                <td>@row.TaskId</td><td>@row.ServiceName</td><td>@row.DevEstimation</td>
+                                                <td>@row.MaxDev</td><td>@row.Priority</td>
+                                                <td>@(row.StrictDate?.ToString("yyyy-MM-dd") ?? "")</td><td>@(row.DependsOnTaskIds ?? "")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" @onclick="ParseCsv" data-testid="bulk-import-preview">
+                        <i class="bi bi-eye me-1"></i>Preview
+                    </button>
+                    <button class="btn btn-primary" @onclick="ImportCsv" disabled="@(isImporting || !parsedRows.Any())" data-testid="bulk-import-confirm">
+                        @if (isImporting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Import @parsedRows.Count Services
+                    </button>
+                    <button class="btn btn-secondary" @onclick="CloseBulkImport">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @if (showDeleteConfirm)
 {
     <ConfirmDialog
@@ -221,7 +282,16 @@ else
                 <tbody>
                     @foreach (var task in FilteredTasks)
                     {
-                        <tr class="clickable-row" @onclick="() => NavigateToTask(task.TaskId)" data-testid="tasks-row-@task.TaskId">
+                        <tr class="clickable-row @(dragTaskId == task.TaskId ? "dragging" : "") @(dragOverTaskId == task.TaskId ? "drag-over" : "")"
+                            draggable="true"
+                            @ondragstart="() => OnDragStart(task.TaskId)"
+                            @ondragover:preventDefault="true"
+                            @ondragover="() => OnDragOver(task.TaskId)"
+                            @ondragleave="() => OnDragLeave()"
+                            @ondrop="() => OnDrop(task)"
+                            @ondragend="OnDragEnd"
+                            @onclick="() => NavigateToTask(task.TaskId)"
+                            data-testid="tasks-row-@task.TaskId">
                             <td>
                                 <a href="/tasks/@task.TaskId" @onclick:stopPropagation data-testid="tasks-details-link-@task.TaskId">@task.TaskId</a>
                             </td>
@@ -293,6 +363,17 @@ else
     private string riskFilter = string.Empty;
     private string sortColumn = string.Empty;
     private bool sortAscending = true;
+
+    // Bulk import state
+    private bool showBulkImport = false;
+    private string csvText = string.Empty;
+    private string bulkError = string.Empty;
+    private bool isImporting = false;
+    private List<BulkTaskRowDto> parsedRows = new();
+
+    // Drag-and-drop state
+    private string? dragTaskId;
+    private string? dragOverTaskId;
 
     private class TaskFormModel
     {
@@ -561,5 +642,137 @@ else
         {
             selectedDependencies = string.IsNullOrWhiteSpace(single) ? new() : new HashSet<string> { single };
         }
+    }
+
+    private void ShowBulkImportModal()
+    {
+        csvText = string.Empty;
+        bulkError = string.Empty;
+        parsedRows.Clear();
+        showBulkImport = true;
+    }
+
+    private void CloseBulkImport()
+    {
+        showBulkImport = false;
+        parsedRows.Clear();
+    }
+
+    private void ParseCsv()
+    {
+        bulkError = string.Empty;
+        parsedRows.Clear();
+        try
+        {
+            var lines = csvText.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var startIndex = 0;
+            if (lines.Length > 0 && lines[0].Contains("TaskId", StringComparison.OrdinalIgnoreCase))
+                startIndex = 1;
+
+            foreach (var line in lines.Skip(startIndex))
+            {
+                var parts = line.Split(',');
+                if (parts.Length < 3) continue;
+                parsedRows.Add(new BulkTaskRowDto(
+                    TaskId: parts[0].Trim(),
+                    ServiceName: parts[1].Trim(),
+                    DevEstimation: double.TryParse(parts[2].Trim(), out var est) ? est : 0,
+                    MaxDev: parts.Length > 3 && double.TryParse(parts[3].Trim(), out var maxDev) ? maxDev : 1,
+                    Priority: parts.Length > 4 && int.TryParse(parts[4].Trim(), out var pri) ? pri : 5,
+                    StrictDate: parts.Length > 5 && DateTime.TryParse(parts[5].Trim(), out var sd) ? sd : null,
+                    DependsOnTaskIds: parts.Length > 6 ? parts[6].Trim() : null
+                ));
+            }
+        }
+        catch (Exception ex)
+        {
+            bulkError = $"Parse error: {ex.Message}";
+        }
+    }
+
+    private async Task ImportCsv()
+    {
+        if (!parsedRows.Any()) return;
+        isImporting = true;
+        bulkError = string.Empty;
+        try
+        {
+            var result = await Mediator.Send(new BulkImportTasksCommand(parsedRows));
+            if (result.IsSuccess)
+            {
+                toast.Show($"Successfully imported {result.Value} services.");
+                CloseBulkImport();
+                await LoadTasks();
+            }
+            else
+            {
+                bulkError = result.Error.Message;
+            }
+        }
+        catch (FluentValidation.ValidationException ex)
+        {
+            bulkError = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+        finally
+        {
+            isImporting = false;
+        }
+    }
+
+    private void OnDragStart(string taskId)
+    {
+        dragTaskId = taskId;
+    }
+
+    private void OnDragOver(string taskId)
+    {
+        dragOverTaskId = taskId;
+    }
+
+    private void OnDragLeave()
+    {
+        dragOverTaskId = null;
+    }
+
+    private async Task OnDrop(TaskItem targetTask)
+    {
+        dragOverTaskId = null;
+        if (dragTaskId == null || dragTaskId == targetTask.TaskId) return;
+
+        var draggedTask = tasks.FirstOrDefault(t => t.TaskId == dragTaskId);
+        if (draggedTask == null) return;
+
+        // Swap priorities
+        var dragPriority = draggedTask.Priority;
+        var targetPriority = targetTask.Priority;
+        if (dragPriority == targetPriority) return;
+
+        try
+        {
+            await Mediator.Send(new UpsertTaskCommand(
+                Id: draggedTask.Id, TaskId: draggedTask.TaskId, ServiceName: draggedTask.ServiceName,
+                DevEstimation: draggedTask.DevEstimation, MaxDev: draggedTask.MaxDev,
+                Priority: targetPriority, StrictDate: draggedTask.StrictDate,
+                DependsOnTaskIds: draggedTask.DependsOnTaskIds, IsNew: false));
+
+            await Mediator.Send(new UpsertTaskCommand(
+                Id: targetTask.Id, TaskId: targetTask.TaskId, ServiceName: targetTask.ServiceName,
+                DevEstimation: targetTask.DevEstimation, MaxDev: targetTask.MaxDev,
+                Priority: dragPriority, StrictDate: targetTask.StrictDate,
+                DependsOnTaskIds: targetTask.DependsOnTaskIds, IsNew: false));
+
+            await LoadTasks();
+            toast.Show($"Priority swapped: {draggedTask.TaskId} ↔ {targetTask.TaskId}");
+        }
+        catch (Exception)
+        {
+            toast.Show("Failed to update priorities.");
+        }
+    }
+
+    private void OnDragEnd()
+    {
+        dragTaskId = null;
+        dragOverTaskId = null;
     }
 }

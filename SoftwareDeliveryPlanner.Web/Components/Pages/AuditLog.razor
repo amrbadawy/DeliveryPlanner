@@ -1,0 +1,109 @@
+@page "/audit-log"
+@using MediatR
+@using SoftwareDeliveryPlanner.Application.AuditLog.Queries
+@using SoftwareDeliveryPlanner.Domain.Models
+@inject IMediator Mediator
+
+<PageTitle>Activity Log</PageTitle>
+
+<div class="d-flex justify-content-between align-items-start mb-4 page-header">
+    <div>
+        <h3 class="mb-1"><i class="bi bi-clock-history me-2"></i>Activity Log</h3>
+        <p class="page-subtitle">Recent changes and actions across the system</p>
+    </div>
+    <div>
+        <button class="btn btn-outline-secondary" @onclick="RefreshData" disabled="@isLoading" data-testid="audit-refresh">
+            @if (isLoading)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+            }
+            else
+            {
+                <i class="bi bi-arrow-clockwise"></i>
+            }
+            Refresh
+        </button>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!auditEntries.Any())
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5" data-testid="audit-empty">
+            <i class="bi bi-clock-history display-4 text-muted"></i>
+            <p class="mt-3 text-muted">No activity recorded yet. Actions will appear here as you use the system.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-body" data-testid="audit-feed">
+            <div class="activity-feed">
+                @foreach (var entry in auditEntries)
+                {
+                    <div class="activity-item d-flex gap-3 mb-3" data-testid="audit-entry-@entry.Id">
+                        <div class="activity-icon">
+                            <i class="bi @GetActionIcon(entry.Action)"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold">@entry.Description</div>
+                            <small class="text-muted">
+                                <i class="bi bi-clock"></i> @entry.Timestamp.ToString("MMM dd, yyyy HH:mm") ·
+                                <span class="badge bg-secondary">@entry.EntityType</span>
+                                <span class="badge @GetActionBadgeClass(entry.Action)">@entry.Action</span>
+                            </small>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<AuditEntry> auditEntries = [];
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshData();
+    }
+
+    private async Task RefreshData()
+    {
+        isLoading = true;
+        var result = await Mediator.Send(new GetAuditLogQuery(100));
+        if (result.IsSuccess)
+        {
+            auditEntries = result.Value;
+        }
+        isLoading = false;
+    }
+
+    private static string GetActionIcon(string action) => action switch
+    {
+        "Created" => "bi-plus-circle text-success",
+        "Updated" => "bi-pencil text-info",
+        "Deleted" => "bi-trash text-danger",
+        "SchedulerRun" => "bi-lightning text-warning",
+        _ => "bi-circle"
+    };
+
+    private static string GetActionBadgeClass(string action) => action switch
+    {
+        "Created" => "bg-success",
+        "Updated" => "bg-info",
+        "Deleted" => "bg-danger",
+        "SchedulerRun" => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+}

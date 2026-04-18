@@ -18,6 +18,9 @@
         <p class="page-subtitle">Visual timeline of task scheduling and progress</p>
     </div>
     <div>
+        <button class="btn @(showCriticalPath ? "btn-danger" : "btn-outline-danger") me-2" @onclick="ToggleCriticalPath" data-testid="gantt-critical-path-toggle">
+            <i class="bi bi-lightning"></i> Critical Path
+        </button>
         <button class="btn btn-outline-secondary" @onclick="RefreshData" disabled="@isRefreshing" data-testid="gantt-refresh">
             @if (isRefreshing)
             {
@@ -61,6 +64,10 @@ else
         <span><span class="badge gantt-bar-notstarted">&nbsp;&nbsp;</span> Not Started</span>
         <span><span class="badge gantt-bar-atrisk">&nbsp;&nbsp;</span> At Risk</span>
         <span><span class="badge gantt-bar-late">&nbsp;&nbsp;</span> Late</span>
+        @if (showCriticalPath)
+        {
+            <span><span class="badge gantt-bar-critical">&nbsp;&nbsp;</span> Critical Path</span>
+        }
     </div>
 
     <!-- Month headers -->
@@ -102,7 +109,7 @@ else
                 <div class="gantt-timeline-col">
                     @if (task.PlannedStart.HasValue && task.PlannedFinish.HasValue)
                     {
-                        <div class="gantt-bar @barClass" style="@barStyle" title="@tooltip"
+                        <div class="gantt-bar @barClass @(IsCriticalTask(task) ? "gantt-bar-critical" : "")" style="@barStyle" title="@tooltip"
                              role="button" tabindex="0"
                              @onclick="() => NavigateToTask(task.TaskId)" @onclick:stopPropagation
                              @onkeydown="(e) => OnGanttKeyDown(e, task.TaskId)" @onkeydown:stopPropagation
@@ -152,6 +159,8 @@ else
     private int totalDays;
     private bool isRefreshing = false;
     private bool isLoaded = false;
+    private bool showCriticalPath = false;
+    private HashSet<string> criticalPathTaskIds = new();
     private ToastNotification toast = default!;
 
     protected override async Task OnInitializedAsync()
@@ -285,6 +294,65 @@ else
     {
         if (e.Key is "Enter" or " ")
             NavigateToTask(taskId);
+    }
+
+    private void ToggleCriticalPath()
+    {
+        showCriticalPath = !showCriticalPath;
+        if (showCriticalPath)
+            ComputeCriticalPath();
+    }
+
+    private void ComputeCriticalPath()
+    {
+        criticalPathTaskIds.Clear();
+        if (!scheduledTasks.Any()) return;
+
+        var taskMap = scheduledTasks.ToDictionary(t => t.TaskId);
+        var memo = new Dictionary<string, (int length, List<string> path)>();
+
+        (int length, List<string> path) GetLongestPath(string taskId)
+        {
+            if (memo.TryGetValue(taskId, out var cached)) return cached;
+
+            var task = taskMap.GetValueOrDefault(taskId);
+            if (task == null) return (0, new List<string>());
+
+            var deps = string.IsNullOrWhiteSpace(task.DependsOnTaskIds)
+                ? Array.Empty<string>()
+                : task.DependsOnTaskIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            int maxLen = 0;
+            var bestPath = new List<string>();
+
+            foreach (var dep in deps)
+            {
+                var (len, path) = GetLongestPath(dep);
+                if (len > maxLen)
+                {
+                    maxLen = len;
+                    bestPath = new List<string>(path);
+                }
+            }
+
+            bestPath.Add(taskId);
+            var taskDuration = (task.Duration ?? 0) > 0 ? task.Duration!.Value : (int)task.DevEstimation;
+            var result = (maxLen + taskDuration, bestPath);
+            memo[taskId] = result;
+            return result;
+        }
+
+        var longestPath = scheduledTasks
+            .Select(t => GetLongestPath(t.TaskId))
+            .OrderByDescending(r => r.length)
+            .FirstOrDefault();
+
+        criticalPathTaskIds = new HashSet<string>(longestPath.path);
+    }
+
+    private bool IsCriticalTask(TaskItem task)
+    {
+        return showCriticalPath && criticalPathTaskIds.Contains(task.TaskId);
     }
 
     private record MonthMarker
