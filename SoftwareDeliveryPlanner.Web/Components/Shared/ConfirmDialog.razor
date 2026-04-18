@@ -2,19 +2,26 @@
 
 @if (Visible)
 {
-    <div class="modal d-block modal-backdrop-custom" data-testid="@TestId">
+    <div class="modal d-block modal-backdrop-custom" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title-@TestId"
+         @onkeydown="HandleKeyDown" tabindex="-1" @ref="dialogRef" data-testid="@TestId">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">@Title</h5>
-                    <button type="button" class="btn-close" @onclick="OnCancel"></button>
+                    <h5 class="modal-title" id="confirm-dialog-title-@TestId">@Title</h5>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="OnCancel" disabled="@IsProcessing"></button>
                 </div>
                 <div class="modal-body">
                     <p>@Message</p>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-danger" @onclick="OnConfirm" data-testid="@(TestId)-confirm">@ConfirmText</button>
-                    <button class="btn btn-secondary" @onclick="OnCancel" data-testid="@(TestId)-cancel">Cancel</button>
+                    <button class="btn btn-danger" @onclick="OnConfirm" disabled="@IsProcessing" data-testid="@(TestId)-confirm">
+                        @if (IsProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
+                        @ConfirmText
+                    </button>
+                    <button class="btn btn-secondary" @onclick="OnCancel" disabled="@IsProcessing" data-testid="@(TestId)-cancel">Cancel</button>
                 </div>
             </div>
         </div>
@@ -27,6 +34,25 @@
     [Parameter] public string Message { get; set; } = "Are you sure you want to delete this item?";
     [Parameter] public string ConfirmText { get; set; } = "Delete";
     [Parameter] public string TestId { get; set; } = "confirm-modal";
+    [Parameter] public bool IsProcessing { get; set; }
     [Parameter] public EventCallback OnConfirm { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
+
+    private ElementReference dialogRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Visible)
+        {
+            try { await dialogRef.FocusAsync(); } catch { /* element may not be in DOM yet */ }
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape" && !IsProcessing)
+        {
+            await OnCancel.InvokeAsync();
+        }
+    }
 }

@@ -5,8 +5,12 @@
 @using SoftwareDeliveryPlanner.Domain.Models
 @using SoftwareDeliveryPlanner.Domain
 @inject IMediator Mediator
+@inject NavigationManager NavigationManager
 
 <PageTitle>Gantt Chart</PageTitle>
+
+<!-- ── Toast (shared component) ───────────────────────────── -->
+<ToastNotification @ref="toast" TestId="gantt-toast" />
 
 <div class="d-flex justify-content-between align-items-start mb-4 page-header">
     <div>
@@ -14,16 +18,33 @@
         <p class="page-subtitle">Visual timeline of task scheduling and progress</p>
     </div>
     <div>
-        <button class="btn btn-outline-secondary" @onclick="RefreshData" data-testid="gantt-refresh">
-            <i class="bi bi-arrow-clockwise"></i> Refresh
+        <button class="btn btn-outline-secondary" @onclick="RefreshData" disabled="@isRefreshing" data-testid="gantt-refresh">
+            @if (isRefreshing)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+            }
+            else
+            {
+                <i class="bi bi-arrow-clockwise"></i>
+            }
+            Refresh
         </button>
     </div>
 </div>
 
-@if (!scheduledTasks.Any())
+@if (!isLoaded)
 {
-    <div class="alert alert-info" data-testid="gantt-empty">
-        No scheduled tasks to display. Click Refresh to run the scheduler first.
+    <SkeletonLoader Variant="block" TestId="gantt-skeleton" />
+}
+else if (!scheduledTasks.Any())
+{
+    <div class="empty-state" data-testid="gantt-empty">
+        <div class="empty-icon"><i class="bi bi-bar-chart-steps"></i></div>
+        <h5>No scheduled tasks</h5>
+        <p>Click Refresh to run the scheduler and generate the Gantt chart.</p>
+        <button class="btn btn-outline-secondary" @onclick="RefreshData">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
     </div>
 }
 else
@@ -35,11 +56,11 @@ else
 
     <!-- Legend -->
     <div class="d-flex gap-3 mb-3" data-testid="gantt-legend">
-        <span><span class="badge" style="background: var(--color-success);">&nbsp;&nbsp;</span> Completed</span>
-        <span><span class="badge" style="background: var(--color-info);">&nbsp;&nbsp;</span> In Progress</span>
-        <span><span class="badge" style="background: var(--color-neutral);">&nbsp;&nbsp;</span> Not Started</span>
-        <span><span class="badge" style="background: var(--color-warning);">&nbsp;&nbsp;</span> At Risk</span>
-        <span><span class="badge" style="background: var(--color-danger);">&nbsp;&nbsp;</span> Late</span>
+        <span><span class="badge gantt-bar-completed">&nbsp;&nbsp;</span> Completed</span>
+        <span><span class="badge gantt-bar-inprogress">&nbsp;&nbsp;</span> In Progress</span>
+        <span><span class="badge gantt-bar-notstarted">&nbsp;&nbsp;</span> Not Started</span>
+        <span><span class="badge gantt-bar-atrisk">&nbsp;&nbsp;</span> At Risk</span>
+        <span><span class="badge gantt-bar-late">&nbsp;&nbsp;</span> Late</span>
     </div>
 
     <!-- Month headers -->
@@ -62,7 +83,7 @@ else
         @foreach (var task in scheduledTasks)
         {
             var barStyle = GetBarStyle(task);
-            var barColor = GetBarColor(task);
+            var barClass = GetBarColorClass(task);
             var tooltip = $"{task.TaskId}: {task.ServiceName}\n" +
                           $"Start: {task.PlannedStart?.ToString("yyyy-MM-dd")}\n" +
                           $"Finish: {task.PlannedFinish?.ToString("yyyy-MM-dd")}\n" +
@@ -71,14 +92,20 @@ else
                           $"Risk: {task.DeliveryRisk}";
 
             <div class="gantt-row" data-testid="gantt-row-@task.TaskId">
-                <div class="gantt-label-col" title="@task.ServiceName">
+                <div class="gantt-label-col clickable-row" title="@task.ServiceName"
+                     role="button" tabindex="0"
+                     @onclick="() => NavigateToTask(task.TaskId)"
+                     @onkeydown="(e) => OnGanttKeyDown(e, task.TaskId)">
                     <span class="gantt-task-id">@task.TaskId</span>
                     <span class="gantt-task-name">@Truncate(task.ServiceName, 18)</span>
                 </div>
                 <div class="gantt-timeline-col">
                     @if (task.PlannedStart.HasValue && task.PlannedFinish.HasValue)
                     {
-                        <div class="gantt-bar" style="@barStyle background: @barColor;" title="@tooltip"
+                        <div class="gantt-bar @barClass" style="@barStyle" title="@tooltip"
+                             role="button" tabindex="0"
+                             @onclick="() => NavigateToTask(task.TaskId)" @onclick:stopPropagation
+                             @onkeydown="(e) => OnGanttKeyDown(e, task.TaskId)" @onkeydown:stopPropagation
                              data-testid="gantt-bar-@task.TaskId">
                             <span class="gantt-bar-label">@task.Duration d</span>
                         </div>
@@ -118,157 +145,19 @@ else
     </div>
 }
 
-<style>
-    .gantt-container {
-        position: relative;
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-md);
-        overflow-x: auto;
-        min-width: 800px;
-    }
-
-    .gantt-header {
-        display: flex;
-        border-bottom: 2px solid var(--color-sidebar);
-        background: var(--color-sidebar);
-        color: white;
-        font-size: 0.85rem;
-    }
-
-    .gantt-label-col {
-        min-width: 200px;
-        max-width: 200px;
-        padding: 6px 10px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        border-right: 1px solid var(--color-border);
-    }
-
-    .gantt-timeline-col {
-        flex: 1;
-        position: relative;
-        min-height: 32px;
-        padding: 4px 0;
-    }
-
-    .gantt-months {
-        display: flex;
-        position: relative;
-        height: 100%;
-    }
-
-    .gantt-month {
-        position: absolute;
-        text-align: center;
-        font-size: 0.75rem;
-        padding: 4px 0;
-        border-left: 1px solid rgba(255,255,255,0.3);
-    }
-
-    .gantt-row {
-        display: flex;
-        border-bottom: 1px solid var(--color-border-light);
-    }
-
-    .gantt-row:nth-child(even) {
-        background: var(--color-bg-secondary);
-    }
-
-    .gantt-row:hover {
-        background: var(--color-accent-light);
-    }
-
-    .gantt-task-id {
-        font-weight: 600;
-        font-size: 0.8rem;
-        color: var(--color-text-secondary);
-        margin-right: 6px;
-    }
-
-    .gantt-task-name {
-        font-size: 0.8rem;
-        color: var(--color-text-muted);
-    }
-
-    .gantt-bar {
-        position: absolute;
-        height: 20px;
-        top: 6px;
-        border-radius: var(--radius-sm);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 0.7rem;
-        font-weight: 600;
-        cursor: default;
-        min-width: 2px;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.15);
-    }
-
-    .gantt-bar-label {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        padding: 0 4px;
-    }
-
-    .gantt-strict-marker {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        width: 2px;
-        background: var(--color-danger);
-        z-index: 2;
-    }
-
-    .gantt-strict-marker::after {
-        content: "▼";
-        position: absolute;
-        top: -2px;
-        left: -5px;
-        font-size: 0.6rem;
-        color: var(--color-danger);
-    }
-
-    .gantt-dep-indicator {
-        position: absolute;
-        right: 4px;
-        top: 8px;
-        font-size: 0.7rem;
-    }
-
-    .gantt-today-line {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        width: 2px;
-        background: var(--color-accent);
-        z-index: 3;
-        opacity: 0.7;
-    }
-
-    .gantt-today-line::after {
-        content: "Today";
-        position: absolute;
-        top: 2px;
-        left: 4px;
-        font-size: 0.65rem;
-        color: var(--color-accent);
-        white-space: nowrap;
-    }
-</style>
-
 @code {
     private List<TaskItem> scheduledTasks = new();
     private DateTime planStart;
     private DateTime planEnd;
     private int totalDays;
+    private bool isRefreshing = false;
+    private bool isLoaded = false;
+    private ToastNotification toast = default!;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadData();
+        isLoaded = true;
     }
 
     private async Task LoadData()
@@ -307,8 +196,17 @@ else
 
     private async Task RefreshData()
     {
-        var result = await Mediator.Send(new RunSchedulerCommand());
-        await LoadData();
+        isRefreshing = true;
+        try
+        {
+            var result = await Mediator.Send(new RunSchedulerCommand());
+            await LoadData();
+            toast.Show("Schedule refreshed.");
+        }
+        finally
+        {
+            isRefreshing = false;
+        }
     }
 
     private double GetDatePercent(DateTime date)
@@ -330,20 +228,20 @@ else
         return $"left: {leftPct}%; width: {widthPct}%;";
     }
 
-    private string GetBarColor(TaskItem task)
+    private string GetBarColorClass(TaskItem task)
     {
         // Color by risk first (Late/AtRisk take precedence for visual warnings)
         if (task.DeliveryRisk == DomainConstants.DeliveryRisk.Late)
-            return "#dc2626";
+            return "gantt-bar-late";
         if (task.DeliveryRisk == DomainConstants.DeliveryRisk.AtRisk)
-            return "#f59e0b";
+            return "gantt-bar-atrisk";
 
         // Otherwise color by status
         return task.Status switch
         {
-            var s when s == DomainConstants.TaskStatus.Completed => "#16a34a",
-            var s when s == DomainConstants.TaskStatus.InProgress => "#0ea5e9",
-            _ => "#64748b"
+            var s when s == DomainConstants.TaskStatus.Completed => "gantt-bar-completed",
+            var s when s == DomainConstants.TaskStatus.InProgress => "gantt-bar-inprogress",
+            _ => "gantt-bar-notstarted"
         };
     }
 
@@ -377,6 +275,17 @@ else
 
     private static string Truncate(string text, int maxLength)
         => text.Length <= maxLength ? text : text[..(maxLength - 1)] + "…";
+
+    private void NavigateToTask(string taskId)
+    {
+        NavigationManager.NavigateTo($"/tasks/{taskId}");
+    }
+
+    private void OnGanttKeyDown(KeyboardEventArgs e, string taskId)
+    {
+        if (e.Key is "Enter" or " ")
+            NavigateToTask(taskId);
+    }
 
     private record MonthMarker
     {

@@ -1,19 +1,21 @@
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <span class="navbar-brand">Navigation</span>
+        <span class="navbar-brand">SDP</span>
     </div>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" aria-expanded="false" aria-controls="nav-menu" />
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
+<div id="nav-menu" class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column" aria-label="Main navigation">
+        <div class="nav-section-header">Overview</div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All" data-testid="nav-dashboard">
                 <i class="bi bi-speedometer2"></i> Dashboard
             </NavLink>
         </div>
 
+        <div class="nav-section-header">Data Management</div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="tasks" data-testid="nav-tasks">
                 <i class="bi bi-list-check"></i> Task Register
@@ -38,6 +40,7 @@
             </NavLink>
         </div>
 
+        <div class="nav-section-header">Schedule Views</div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="calendar" data-testid="nav-calendar">
                 <i class="bi bi-calendar3"></i> Calendar
@@ -50,6 +53,7 @@
             </NavLink>
         </div>
 
+        <div class="nav-section-header">Output</div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="output" data-testid="nav-output">
                 <i class="bi bi-box-arrow-up"></i> Delivery Plan

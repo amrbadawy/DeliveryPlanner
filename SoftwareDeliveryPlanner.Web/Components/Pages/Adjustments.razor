@@ -8,7 +8,7 @@
 @using SoftwareDeliveryPlanner.Domain.Models
 @using SoftwareDeliveryPlanner.Domain
 @inject IMediator Mediator
-
+@implements IDisposable
 <PageTitle>Adjustments</PageTitle>
 
 <div class="d-flex justify-content-between align-items-start mb-4 page-header">
@@ -20,20 +20,66 @@
         <button class="btn btn-primary" @onclick="ShowAddModal" data-testid="adjustments-add">
             <i class="bi bi-plus-lg"></i> Add Adjustment
         </button>
-        <button class="btn btn-outline-secondary" @onclick="RefreshData" data-testid="adjustments-refresh">
-            <i class="bi bi-arrow-clockwise"></i> Refresh
+        <button class="btn btn-outline-secondary" @onclick="RefreshData" disabled="@isRefreshing" data-testid="adjustments-refresh">
+            @if (isRefreshing)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+            }
+            else
+            {
+                <i class="bi bi-arrow-clockwise"></i>
+            }
+            Refresh
         </button>
+    </div>
+</div>
+
+<!-- Search / Filter bar -->
+<div class="card border-0 shadow-sm mb-3 filter-bar" data-testid="adjustments-filter-bar">
+    <div class="card-body py-2">
+        <div class="row align-items-center g-2">
+            <div class="col-md-4">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input class="form-control" placeholder="Search by employee or notes..." value="@searchInput" @oninput="OnSearchInput" aria-label="Search adjustments" data-testid="adjustments-search" />
+                </div>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select form-select-sm" @bind="typeFilter" aria-label="Filter by type" data-testid="adjustments-filter-type">
+                    <option value="">All Types</option>
+                    <option value="@DomainConstants.AdjustmentType.Vacation">@DomainConstants.AdjustmentType.Vacation</option>
+                    <option value="@DomainConstants.AdjustmentType.Training">@DomainConstants.AdjustmentType.Training</option>
+                    <option value="@DomainConstants.AdjustmentType.SickLeave">@DomainConstants.AdjustmentType.SickLeave</option>
+                    <option value="@DomainConstants.AdjustmentType.Other">@DomainConstants.AdjustmentType.Other</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select form-select-sm" @bind="employeeFilter" aria-label="Filter by employee" data-testid="adjustments-filter-employee">
+                    <option value="">All Employees</option>
+                    @foreach (var r in resources)
+                    {
+                        <option value="@r.ResourceId">@r.ResourceName</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-outline-secondary btn-sm w-100" @onclick="ClearFilters" data-testid="adjustments-clear-filters">Clear</button>
+            </div>
+            <div class="col-md-2 text-muted small text-end">
+                @FilteredAdjustments.Count() of @adjustments.Count
+            </div>
+        </div>
     </div>
 </div>
 
 @if (showModal)
 {
-    <div class="modal d-block modal-backdrop-custom" data-testid="adjustments-modal">
+    <div class="modal d-block modal-backdrop-custom" role="dialog" aria-modal="true" aria-labelledby="adjustments-modal-title" data-testid="adjustments-modal">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Add New Adjustment</h5>
-                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                    <h5 class="modal-title" id="adjustments-modal-title">Add New Adjustment</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     @if (!string.IsNullOrWhiteSpace(modalError))
@@ -41,37 +87,57 @@
                         <div class="alert alert-danger" data-testid="adjustments-error">@modalError</div>
                     }
                     <div class="mb-2">
-                        <label class="form-label">Employee:</label>
-                        <select class="form-control" @bind="adjustmentForm.ResourceId" data-testid="adjustments-resource-id">
+                        <label class="form-label">Employee: <span class="required-indicator">*</span></label>
+                        <select class="form-select @(fieldErrors.ContainsKey("ResourceId") ? "is-invalid" : "")" @bind="adjustmentForm.ResourceId" data-testid="adjustments-resource-id">
                             @foreach (var r in resources)
                             {
                                 <option value="@r.ResourceId">@r.ResourceName</option>
                             }
                         </select>
+                        @if (fieldErrors.ContainsKey("ResourceId"))
+                        {
+                            <div class="invalid-feedback">@fieldErrors["ResourceId"]</div>
+                        }
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-2">
-                            <label class="form-label">Adjustment Type:</label>
-                            <select class="form-control" @bind="adjustmentForm.AdjType" data-testid="adjustments-type">
+                            <label class="form-label">Adjustment Type: <span class="required-indicator">*</span></label>
+                            <select class="form-select @(fieldErrors.ContainsKey("AdjType") ? "is-invalid" : "")" @bind="adjustmentForm.AdjType" data-testid="adjustments-type">
                                 <option>Vacation</option>
                                 <option>Training</option>
                                 <option>Sick Leave</option>
                                 <option>Other</option>
                             </select>
+                            @if (fieldErrors.ContainsKey("AdjType"))
+                            {
+                                <div class="invalid-feedback">@fieldErrors["AdjType"]</div>
+                            }
                         </div>
                         <div class="col-md-6 mb-2">
                             <label class="form-label">Availability (%):</label>
-                            <input class="form-control" type="number" @bind="adjustmentForm.AvailabilityPct" data-testid="adjustments-availability" />
+                            <input class="form-control @(fieldErrors.ContainsKey("AvailabilityPct") ? "is-invalid" : "")" type="number" min="0" max="100" @bind="adjustmentForm.AvailabilityPct" data-testid="adjustments-availability" />
+                            @if (fieldErrors.ContainsKey("AvailabilityPct"))
+                            {
+                                <div class="invalid-feedback">@fieldErrors["AvailabilityPct"]</div>
+                            }
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-2">
-                            <label class="form-label">Start Date:</label>
-                            <input class="form-control" type="date" @bind="startDateValue" data-testid="adjustments-start-date" />
+                            <label class="form-label">Start Date: <span class="required-indicator">*</span></label>
+                            <input class="form-control @(fieldErrors.ContainsKey("AdjStart") ? "is-invalid" : "")" type="date" @bind="startDateValue" data-testid="adjustments-start-date" />
+                            @if (fieldErrors.ContainsKey("AdjStart"))
+                            {
+                                <div class="invalid-feedback">@fieldErrors["AdjStart"]</div>
+                            }
                         </div>
                         <div class="col-md-6 mb-2">
-                            <label class="form-label">End Date:</label>
-                            <input class="form-control" type="date" @bind="endDateValue" data-testid="adjustments-end-date" />
+                            <label class="form-label">End Date: <span class="required-indicator">*</span></label>
+                            <input class="form-control @(fieldErrors.ContainsKey("AdjEnd") ? "is-invalid" : "")" type="date" @bind="endDateValue" data-testid="adjustments-end-date" />
+                            @if (fieldErrors.ContainsKey("AdjEnd"))
+                            {
+                                <div class="invalid-feedback">@fieldErrors["AdjEnd"]</div>
+                            }
                         </div>
                     </div>
                     <div class="mb-2">
@@ -80,8 +146,14 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-primary" @onclick="SaveAdjustment" data-testid="adjustments-save">Save</button>
-                    <button class="btn btn-secondary" @onclick="CloseModal" data-testid="adjustments-cancel">Cancel</button>
+                    <button class="btn btn-primary" @onclick="SaveAdjustment" disabled="@isSaving" data-testid="adjustments-save">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
+                        Save
+                    </button>
+                    <button class="btn btn-secondary" @onclick="CloseModal" disabled="@isSaving" data-testid="adjustments-cancel">Cancel</button>
                 </div>
             </div>
         </div>
@@ -95,6 +167,7 @@
         TestId="adjustments-delete-modal"
         Title="Confirm Delete"
         Message="Are you sure you want to delete this adjustment?"
+        IsProcessing="isDeleting"
         OnConfirm="ConfirmDelete"
         OnCancel="CloseDeleteModal" />
 }
@@ -103,48 +176,51 @@
 
 @if (!isLoaded)
 {
-    <div class="text-center py-5">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-        <p class="mt-2 text-muted">Loading adjustments...</p>
-    </div>
+    <SkeletonLoader Variant="table" Rows="4" Columns="6" TestId="adjustments-skeleton" />
 }
 else if (!adjustments.Any())
 {
-    <div class="text-center py-5">
-        <i class="bi bi-calendar2-minus display-4 text-muted"></i>
-        <p class="mt-3 text-muted">No adjustments found. Add one to get started.</p>
+    <div class="empty-state">
+        <div class="empty-icon"><i class="bi bi-calendar2-minus"></i></div>
+        <h5>No adjustments configured</h5>
+        <p>Add adjustments to track vacations, training, and other availability changes.</p>
+        <button class="btn btn-primary" @onclick="ShowAddModal">
+            <i class="bi bi-plus-lg"></i> Add First Adjustment
+        </button>
     </div>
 }
 else
 {
     <div class="card border-0 shadow-sm">
         <div class="table-responsive">
-            <table class="table table-striped table-hover" data-testid="adjustments-table">
+            <table class="table table-striped table-hover mb-0" data-testid="adjustments-table">
                 <thead class="table-light">
                     <tr>
-                        <th>Employee</th>
-                        <th>Type</th>
-                        <th>Start</th>
-                        <th>End</th>
-                        <th>Availability %</th>
+                        <th role="button" @onclick='() => ApplySort("ResourceId")' aria-sort="@AriaSort("ResourceId")" data-testid="adjustments-sort-employee">Employee @SortIndicator("ResourceId")</th>
+                        <th role="button" @onclick='() => ApplySort("AdjType")' aria-sort="@AriaSort("AdjType")" data-testid="adjustments-sort-type">Type @SortIndicator("AdjType")</th>
+                        <th role="button" @onclick='() => ApplySort("AdjStart")' aria-sort="@AriaSort("AdjStart")" data-testid="adjustments-sort-start">Start @SortIndicator("AdjStart")</th>
+                        <th role="button" @onclick='() => ApplySort("AdjEnd")' aria-sort="@AriaSort("AdjEnd")" data-testid="adjustments-sort-end">End @SortIndicator("AdjEnd")</th>
+                        <th role="button" @onclick='() => ApplySort("AvailabilityPct")' aria-sort="@AriaSort("AvailabilityPct")" data-testid="adjustments-sort-avail">Availability % @SortIndicator("AvailabilityPct")</th>
                         <th>Notes</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var a in adjustments)
+                    @foreach (var a in FilteredAdjustments)
                     {
                         <tr data-testid="adjustments-row-@a.Id">
                             <td>@a.ResourceId</td>
-                            <td>@a.AdjType</td>
+                            <td>
+                                <span class="badge bg-@(a.AdjType == DomainConstants.AdjustmentType.Vacation ? "info" : a.AdjType == DomainConstants.AdjustmentType.Training ? "primary" : a.AdjType == DomainConstants.AdjustmentType.SickLeave ? "warning text-dark" : "secondary")">
+                                    @a.AdjType
+                                </span>
+                            </td>
                             <td>@a.AdjStart.ToString("yyyy-MM-dd")</td>
                             <td>@a.AdjEnd.ToString("yyyy-MM-dd")</td>
                             <td>@a.AvailabilityPct%</td>
-                            <td>@a.Notes</td>
+                            <td class="text-muted">@a.Notes</td>
                             <td>
-                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAdjustment(a)" data-testid="adjustments-delete-@a.Id"><i class="bi bi-trash"></i></button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAdjustment(a)" aria-label="Delete adjustment @a.Id" data-testid="adjustments-delete-@a.Id"><i class="bi bi-trash"></i></button>
                             </td>
                         </tr>
                     }
@@ -152,6 +228,11 @@ else
             </table>
         </div>
     </div>
+
+    @if (!FilteredAdjustments.Any() && adjustments.Any())
+    {
+        <div class="text-center text-muted py-3" data-testid="adjustments-no-results">No adjustments match the current filters.</div>
+    }
 }
 
 @code {
@@ -166,6 +247,19 @@ else
     private string modalError = string.Empty;
     private ToastNotification toast = default!;
     private bool isLoaded = false;
+    private bool isSaving = false;
+    private bool isDeleting = false;
+    private bool isRefreshing = false;
+    private Dictionary<string, string> fieldErrors = new();
+
+    // Search/Sort/Filter state
+    private string searchTerm = string.Empty;
+    private string searchInput = string.Empty;
+    private System.Threading.Timer? _debounceTimer;
+    private string typeFilter = string.Empty;
+    private string employeeFilter = string.Empty;
+    private string sortColumn = string.Empty;
+    private bool sortAscending = true;
 
     private class AdjustmentFormModel
     {
@@ -174,6 +268,88 @@ else
         public double AvailabilityPct { get; set; }
         public string? Notes { get; set; }
     }
+
+    private IReadOnlyList<Adjustment> FilteredAdjustments
+    {
+        get
+        {
+            IEnumerable<Adjustment> result = adjustments;
+
+            // Search
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.Trim();
+                result = result.Where(a =>
+                    a.ResourceId.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                    (a.Notes ?? "").Contains(term, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // Filter by type
+            if (!string.IsNullOrEmpty(typeFilter))
+                result = result.Where(a => a.AdjType == typeFilter);
+
+            // Filter by employee
+            if (!string.IsNullOrEmpty(employeeFilter))
+                result = result.Where(a => a.ResourceId == employeeFilter);
+
+            // Sort
+            if (!string.IsNullOrEmpty(sortColumn))
+            {
+                result = sortColumn switch
+                {
+                    "ResourceId" => sortAscending ? result.OrderBy(a => a.ResourceId) : result.OrderByDescending(a => a.ResourceId),
+                    "AdjType" => sortAscending ? result.OrderBy(a => a.AdjType) : result.OrderByDescending(a => a.AdjType),
+                    "AdjStart" => sortAscending ? result.OrderBy(a => a.AdjStart) : result.OrderByDescending(a => a.AdjStart),
+                    "AdjEnd" => sortAscending ? result.OrderBy(a => a.AdjEnd) : result.OrderByDescending(a => a.AdjEnd),
+                    "AvailabilityPct" => sortAscending ? result.OrderBy(a => a.AvailabilityPct) : result.OrderByDescending(a => a.AvailabilityPct),
+                    _ => result
+                };
+            }
+
+            return result.ToList();
+        }
+    }
+
+    private void ApplySort(string column)
+    {
+        if (sortColumn == column)
+            sortAscending = !sortAscending;
+        else
+        {
+            sortColumn = column;
+            sortAscending = true;
+        }
+    }
+
+    private string SortIndicator(string column)
+    {
+        if (sortColumn != column) return "";
+        return sortAscending ? "▲" : "▼";
+    }
+
+    private string AriaSort(string column) =>
+        sortColumn != column ? "none" : sortAscending ? "ascending" : "descending";
+
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        searchInput = string.Empty;
+        typeFilter = string.Empty;
+        employeeFilter = string.Empty;
+        sortColumn = string.Empty;
+        sortAscending = true;
+    }
+
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        searchInput = e.Value?.ToString() ?? string.Empty;
+        _debounceTimer?.Dispose();
+        _debounceTimer = new System.Threading.Timer(_ =>
+            InvokeAsync(() => { searchTerm = searchInput; StateHasChanged(); }),
+            null, 300, System.Threading.Timeout.Infinite);
+    }
+
+    public void Dispose() => _debounceTimer?.Dispose();
 
     protected override async Task OnInitializedAsync()
     {
@@ -200,6 +376,7 @@ else
         startDateValue = DateTime.Today;
         endDateValue = DateTime.Today.AddDays(7);
         modalError = string.Empty;
+        fieldErrors.Clear();
         showModal = true;
     }
 
@@ -212,6 +389,8 @@ else
     private async Task SaveAdjustment()
     {
         modalError = string.Empty;
+        fieldErrors.Clear();
+        isSaving = true;
         try
         {
             var command = new AddAdjustmentCommand(
@@ -229,26 +408,44 @@ else
         }
         catch (ValidationException ex)
         {
+            foreach (var err in ex.Errors)
+            {
+                if (!string.IsNullOrWhiteSpace(err.PropertyName) && !fieldErrors.ContainsKey(err.PropertyName))
+                    fieldErrors[err.PropertyName] = err.ErrorMessage;
+            }
             modalError = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+        finally
+        {
+            isSaving = false;
         }
     }
 
     private async Task ConfirmDelete()
     {
-        if (editingAdjustment != null)
+        isDeleting = true;
+        try
         {
-            var result = await Mediator.Send(new DeleteAdjustmentCommand(editingAdjustment.Id));
-            toast.Show("Adjustment deleted.");
+            if (editingAdjustment != null)
+            {
+                var result = await Mediator.Send(new DeleteAdjustmentCommand(editingAdjustment.Id));
+                toast.Show("Adjustment deleted.");
+            }
+            showDeleteConfirm = false;
+            editingAdjustment = null;
+            await LoadData();
         }
-        showDeleteConfirm = false;
-        editingAdjustment = null;
-        await LoadData();
+        finally
+        {
+            isDeleting = false;
+        }
     }
 
     private void CloseModal()
     {
         showModal = false;
         modalError = string.Empty;
+        fieldErrors.Clear();
     }
 
     private void CloseDeleteModal()
@@ -259,8 +456,16 @@ else
 
     private async Task RefreshData()
     {
-        var result = await Mediator.Send(new RunSchedulerCommand());
-        await LoadData();
-        toast.Show("Schedule refreshed.");
+        isRefreshing = true;
+        try
+        {
+            var result = await Mediator.Send(new RunSchedulerCommand());
+            await LoadData();
+            toast.Show("Schedule refreshed.");
+        }
+        finally
+        {
+            isRefreshing = false;
+        }
     }
 }

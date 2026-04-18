@@ -6,6 +6,7 @@
 @using SoftwareDeliveryPlanner.Domain
 @inject IMediator Mediator
 @inject IJSRuntime JS
+@implements IDisposable
 
 <PageTitle>Delivery Plan</PageTitle>
 
@@ -14,31 +15,85 @@
         <h3 class="mb-1"><i class="bi bi-box-arrow-up me-2"></i>Delivery Plan</h3>
         <p class="page-subtitle">View and export the final delivery schedule</p>
     </div>
-    <div>
-        <button class="btn btn-success" @onclick="ExportToCsv" data-testid="output-export-csv">
-            <i class="bi bi-download"></i> Export CSV
+    <div class="d-flex gap-2">
+        <button class="btn btn-success" @onclick="ExportToCsv" disabled="@isExporting" data-testid="output-export-csv">
+            @if (isExporting)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+            }
+            else
+            {
+                <i class="bi bi-download"></i>
+            }
+            Export CSV
         </button>
-        <button class="btn btn-outline-secondary" @onclick="RefreshData" data-testid="output-refresh">
-            <i class="bi bi-arrow-clockwise"></i> Refresh
+        <button class="btn btn-outline-secondary" @onclick="RefreshData" disabled="@isRefreshing" data-testid="output-refresh">
+            @if (isRefreshing)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+            }
+            else
+            {
+                <i class="bi bi-arrow-clockwise"></i>
+            }
+            Refresh
         </button>
-        <span class="ms-2" data-testid="output-export-status">@exportStatus</span>
+        <span class="ms-2 align-self-center" data-testid="output-export-status">@exportStatus</span>
     </div>
 </div>
 
+<!-- Search / Filter bar -->
+@if (isLoaded && output.Any())
+{
+    <div class="card border-0 shadow-sm mb-3 filter-bar" data-testid="output-filter-bar">
+        <div class="card-body py-2">
+            <div class="row align-items-center g-2">
+                <div class="col-md-4">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input class="form-control" placeholder="Search by ID or service..." value="@searchInput" @oninput="OnSearchInput" aria-label="Search delivery plan" data-testid="output-search" />
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select form-select-sm" @bind="statusFilter" aria-label="Filter by status" data-testid="output-filter-status">
+                        <option value="">All Statuses</option>
+                        <option value="@DomainConstants.TaskStatus.NotStarted">@DomainConstants.TaskStatus.NotStarted</option>
+                        <option value="@DomainConstants.TaskStatus.InProgress">@DomainConstants.TaskStatus.InProgress</option>
+                        <option value="@DomainConstants.TaskStatus.Completed">@DomainConstants.TaskStatus.Completed</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select form-select-sm" @bind="riskFilter" aria-label="Filter by risk" data-testid="output-filter-risk">
+                        <option value="">All Risks</option>
+                        <option value="@DomainConstants.DeliveryRisk.OnTrack">@DomainConstants.DeliveryRisk.OnTrack</option>
+                        <option value="@DomainConstants.DeliveryRisk.AtRisk">@DomainConstants.DeliveryRisk.AtRisk</option>
+                        <option value="@DomainConstants.DeliveryRisk.Late">@DomainConstants.DeliveryRisk.Late</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-outline-secondary btn-sm w-100" @onclick="ClearFilters" data-testid="output-clear-filters">Clear</button>
+                </div>
+                <div class="col-md-2 text-muted small text-end">
+                    @FilteredOutput.Count() of @output.Count
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @if (!isLoaded)
 {
-    <div class="text-center py-5">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-        <p class="mt-2 text-muted">Loading delivery plan...</p>
-    </div>
+    <SkeletonLoader Variant="table" Rows="6" Columns="8" TestId="output-skeleton" />
 }
 else if (output.Count == 0)
 {
-    <div class="text-center py-5">
-        <i class="bi bi-inbox display-4 text-muted"></i>
-        <p class="mt-2 text-muted">No delivery plan data available. Click Refresh to generate.</p>
+    <div class="empty-state">
+        <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+        <h5>No delivery plan data</h5>
+        <p>Click Refresh to run the scheduler and generate the plan.</p>
+        <button class="btn btn-outline-secondary" @onclick="RefreshData">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
     </div>
 }
 else
@@ -48,21 +103,21 @@ else
             <table class="table table-striped table-hover mb-0" data-testid="output-table">
                 <thead class="table-light">
                     <tr>
-                        <th>#</th>
-                        <th>Task ID</th>
-                        <th>Service</th>
+                        <th role="button" @onclick='() => ApplySort("Num")' aria-sort="@AriaSort("Num")" data-testid="output-sort-num"># @SortIndicator("Num")</th>
+                        <th role="button" @onclick='() => ApplySort("TaskId")' aria-sort="@AriaSort("TaskId")" data-testid="output-sort-id">Task ID @SortIndicator("TaskId")</th>
+                        <th role="button" @onclick='() => ApplySort("ServiceName")' aria-sort="@AriaSort("ServiceName")" data-testid="output-sort-name">Service @SortIndicator("ServiceName")</th>
                         <th>Devs</th>
-                        <th>Start</th>
-                        <th>Finish</th>
+                        <th role="button" @onclick='() => ApplySort("PlannedStart")' aria-sort="@AriaSort("PlannedStart")" data-testid="output-sort-start">Start @SortIndicator("PlannedStart")</th>
+                        <th role="button" @onclick='() => ApplySort("PlannedFinish")' aria-sort="@AriaSort("PlannedFinish")" data-testid="output-sort-finish">Finish @SortIndicator("PlannedFinish")</th>
                         <th>Days</th>
                         <th>Est</th>
                         <th>Strict Date</th>
-                        <th>Status</th>
-                        <th>Risk</th>
+                        <th role="button" @onclick='() => ApplySort("Status")' aria-sort="@AriaSort("Status")" data-testid="output-sort-status">Status @SortIndicator("Status")</th>
+                        <th role="button" @onclick='() => ApplySort("DeliveryRisk")' aria-sort="@AriaSort("DeliveryRisk")" data-testid="output-sort-risk">Risk @SortIndicator("DeliveryRisk")</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var item in output)
+                    @foreach (var item in FilteredOutput)
                     {
                         <tr>
                             <td>@item.Num</td>
@@ -90,12 +145,108 @@ else
             </table>
         </div>
     </div>
+
+    @if (!FilteredOutput.Any() && output.Any())
+    {
+        <div class="text-center text-muted py-3" data-testid="output-no-results">No results match the current filters.</div>
+    }
 }
 
 @code {
     private List<OutputPlanRowDto> output = new();
     private string exportStatus = string.Empty;
     private bool isLoaded = false;
+    private bool isRefreshing = false;
+    private bool isExporting = false;
+
+    // Search/Sort/Filter state
+    private string searchTerm = string.Empty;
+    private string searchInput = string.Empty;
+    private System.Threading.Timer? _debounceTimer;
+    private string statusFilter = string.Empty;
+    private string riskFilter = string.Empty;
+    private string sortColumn = string.Empty;
+    private bool sortAscending = true;
+
+    private IReadOnlyList<OutputPlanRowDto> FilteredOutput
+    {
+        get
+        {
+            IEnumerable<OutputPlanRowDto> result = output;
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.Trim();
+                result = result.Where(o =>
+                    o.TaskId.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                    o.ServiceName.Contains(term, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrEmpty(statusFilter))
+                result = result.Where(o => o.Status == statusFilter);
+
+            if (!string.IsNullOrEmpty(riskFilter))
+                result = result.Where(o => o.DeliveryRisk == riskFilter);
+
+            if (!string.IsNullOrEmpty(sortColumn))
+            {
+                result = sortColumn switch
+                {
+                    "Num" => sortAscending ? result.OrderBy(o => o.Num) : result.OrderByDescending(o => o.Num),
+                    "TaskId" => sortAscending ? result.OrderBy(o => o.TaskId) : result.OrderByDescending(o => o.TaskId),
+                    "ServiceName" => sortAscending ? result.OrderBy(o => o.ServiceName) : result.OrderByDescending(o => o.ServiceName),
+                    "PlannedStart" => sortAscending ? result.OrderBy(o => o.PlannedStart) : result.OrderByDescending(o => o.PlannedStart),
+                    "PlannedFinish" => sortAscending ? result.OrderBy(o => o.PlannedFinish) : result.OrderByDescending(o => o.PlannedFinish),
+                    "Status" => sortAscending ? result.OrderBy(o => o.Status) : result.OrderByDescending(o => o.Status),
+                    "DeliveryRisk" => sortAscending ? result.OrderBy(o => o.DeliveryRisk) : result.OrderByDescending(o => o.DeliveryRisk),
+                    _ => result
+                };
+            }
+
+            return result.ToList();
+        }
+    }
+
+    private void ApplySort(string column)
+    {
+        if (sortColumn == column)
+            sortAscending = !sortAscending;
+        else
+        {
+            sortColumn = column;
+            sortAscending = true;
+        }
+    }
+
+    private string SortIndicator(string column)
+    {
+        if (sortColumn != column) return "";
+        return sortAscending ? "▲" : "▼";
+    }
+
+    private string AriaSort(string column) =>
+        sortColumn != column ? "none" : sortAscending ? "ascending" : "descending";
+
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        searchInput = string.Empty;
+        statusFilter = string.Empty;
+        riskFilter = string.Empty;
+        sortColumn = string.Empty;
+        sortAscending = true;
+    }
+
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        searchInput = e.Value?.ToString() ?? string.Empty;
+        _debounceTimer?.Dispose();
+        _debounceTimer = new System.Threading.Timer(_ =>
+            InvokeAsync(() => { searchTerm = searchInput; StateHasChanged(); }),
+            null, 300, System.Threading.Timeout.Infinite);
+    }
+
+    public void Dispose() => _debounceTimer?.Dispose();
 
     protected override async Task OnInitializedAsync()
     {
@@ -134,6 +285,7 @@ else
     {
         try
         {
+            isExporting = true;
             exportStatus = string.Empty;
             if (output.Count == 0)
             {
@@ -141,38 +293,40 @@ else
                 return;
             }
 
-            var csv = "Num,Task ID,Service,Dev,Start,Finish,Days,Est,Strict,Status,Risk\n";
+            var csv = new System.Text.StringBuilder();
+            csv.AppendLine("Num,Task ID,Service,Dev,Start,Finish,Days,Est,Strict,Status,Risk");
 
             foreach (var item in output)
             {
-                var num = item.Num.ToString();
-                var taskId = item.TaskId;
                 var service = item.ServiceName.Replace(",", ";").Replace("\r", " ").Replace("\n", " ");
-                var assignedDev = item.AssignedDev?.ToString() ?? string.Empty;
-                var plannedStart = item.PlannedStart ?? string.Empty;
-                var plannedFinish = item.PlannedFinish ?? string.Empty;
-                var duration = item.Duration?.ToString() ?? string.Empty;
-                var estimation = item.DevEstimation.ToString();
-                var strictDate = item.StrictDate ?? string.Empty;
-                var status = item.Status;
-                var risk = item.DeliveryRisk;
-
-                csv += $"{num},{taskId},{service},{assignedDev},{plannedStart},{plannedFinish},{duration},{estimation},{strictDate},{status},{risk}\n";
+                csv.AppendLine($"{item.Num},{item.TaskId},{service},{item.AssignedDev?.ToString() ?? ""},{item.PlannedStart ?? ""},{item.PlannedFinish ?? ""},{item.Duration?.ToString() ?? ""},{item.DevEstimation},{item.StrictDate ?? ""},{item.Status},{item.DeliveryRisk}");
             }
 
             var fileName = $"delivery_plan_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
-            await JS.InvokeVoidAsync("BlazorDownloadFile", fileName, csv, "text/csv");
+            await JS.InvokeVoidAsync("BlazorDownloadFile", fileName, csv.ToString(), "text/csv");
             exportStatus = $"Exported {output.Count} rows";
         }
-        catch
+        catch (Exception ex)
         {
-            exportStatus = "Export failed";
+            exportStatus = $"Export failed: {ex.Message}";
+        }
+        finally
+        {
+            isExporting = false;
         }
     }
 
     private async Task RefreshData()
     {
-        var result = await Mediator.Send(new RunSchedulerCommand());
-        await LoadOutput();
+        isRefreshing = true;
+        try
+        {
+            var result = await Mediator.Send(new RunSchedulerCommand());
+            await LoadOutput();
+        }
+        finally
+        {
+            isRefreshing = false;
+        }
     }
 }

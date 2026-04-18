@@ -8,21 +8,29 @@
 @using SoftwareDeliveryPlanner.Domain.Models
 @using SoftwareDeliveryPlanner.Domain
 @inject IMediator Mediator
-
+@implements IDisposable
 <PageTitle>Holidays</PageTitle>
 
 <!-- ── Header ─────────────────────────────────────────────── -->
-<div class="d-flex justify-content-between align-items-start mb-4">
+<div class="d-flex justify-content-between align-items-start mb-4 page-header">
     <div>
-        <h3 class="mb-1"><i class="bi bi-calendar2-heart"></i> Holidays</h3>
-        <p class="text-muted mb-0">Manage official holidays that affect the delivery schedule</p>
+        <h3 class="mb-1"><i class="bi bi-calendar2-heart me-2"></i>Holidays</h3>
+        <p class="page-subtitle">Manage official holidays that affect the delivery schedule</p>
     </div>
     <div class="d-flex gap-2">
         <button class="btn btn-primary" @onclick="ShowAddModal" data-testid="holidays-add">
             <i class="bi bi-plus-lg"></i> Add Holiday
         </button>
-        <button class="btn btn-outline-secondary" @onclick="RefreshData" data-testid="holidays-refresh">
-            <i class="bi bi-arrow-clockwise"></i> Refresh
+        <button class="btn btn-outline-secondary" @onclick="RefreshData" disabled="@isRefreshing" data-testid="holidays-refresh">
+            @if (isRefreshing)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+            }
+            else
+            {
+                <i class="bi bi-arrow-clockwise"></i>
+            }
+            Refresh
         </button>
         @if (holidays.Any())
         {
@@ -33,50 +41,38 @@
     </div>
 </div>
 
-<!-- ── Toast ──────────────────────────────────────────────── -->
-@if (!string.IsNullOrWhiteSpace(toastMessage))
-{
-    <div class="alert alert-success alert-dismissible fade show" role="alert" data-testid="holidays-toast">
-        <i class="bi bi-check-circle"></i> @toastMessage
-        <button type="button" class="btn-close" @onclick="() => toastMessage = string.Empty"></button>
-    </div>
-}
+<!-- ── Toast (shared component) ───────────────────────────── -->
+<ToastNotification @ref="toast" TestId="holidays-toast" />
 
 <!-- ── KPI Summary Bar ────────────────────────────────────── -->
 @if (!isLoading && holidays.Any())
 {
     <div class="row g-3 mb-4" data-testid="holidays-kpi">
         <div class="col-md-4">
-            <div class="card text-center border-0 shadow-sm">
-                <div class="card-body py-3">
-                    <div class="text-muted small">Total Holidays</div>
-                    <div class="fs-3 fw-bold text-primary">@holidays.Count</div>
-                </div>
+            <div class="kpi-card p-3 text-center">
+                <div class="kpi-label">Total Holidays</div>
+                <div class="kpi-value kpi-text-primary">@holidays.Count</div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card text-center border-0 shadow-sm">
-                <div class="card-body py-3">
-                    <div class="text-muted small">Working Days Lost</div>
-                    <div class="fs-3 fw-bold text-danger">@totalWorkingDaysLost</div>
-                </div>
+            <div class="kpi-card kpi-danger p-3 text-center">
+                <div class="kpi-label">Working Days Lost</div>
+                <div class="kpi-value kpi-text-danger">@totalWorkingDaysLost</div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card text-center border-0 shadow-sm">
-                <div class="card-body py-3">
-                    <div class="text-muted small">Next Holiday</div>
-                    <div class="fs-6 fw-bold text-success">
-                        @if (nextHoliday != null)
-                        {
-                            <span>@nextHoliday.HolidayName</span>
-                            <br /><small class="text-muted">@nextHoliday.StartDate.ToString("MMM dd, yyyy")</small>
-                        }
-                        else
-                        {
-                            <span class="text-muted">None upcoming</span>
-                        }
-                    </div>
+            <div class="kpi-card kpi-success p-3 text-center">
+                <div class="kpi-label">Next Holiday</div>
+                <div class="kpi-value kpi-value-sm kpi-text-success">
+                    @if (nextHoliday != null)
+                    {
+                        <span>@nextHoliday.HolidayName</span>
+                        <br /><small class="text-muted">@nextHoliday.StartDate.ToString("MMM dd, yyyy")</small>
+                    }
+                    else
+                    {
+                        <span class="text-muted">None upcoming</span>
+                    }
                 </div>
             </div>
         </div>
@@ -86,17 +82,17 @@
 <!-- ── Filters ─────────────────────────────────────────────── -->
 @if (!isLoading && holidays.Any())
 {
-    <div class="card border-0 shadow-sm mb-3">
+    <div class="card border-0 shadow-sm mb-3 filter-bar" data-testid="holidays-filter-bar">
         <div class="card-body py-2">
             <div class="row align-items-center g-2">
                 <div class="col-md-4">
                     <div class="input-group input-group-sm">
                         <span class="input-group-text"><i class="bi bi-search"></i></span>
-                        <input class="form-control" placeholder="Search holidays..." @bind="searchTerm" @bind:event="oninput" data-testid="holidays-search" />
+                        <input class="form-control" placeholder="Search holidays..." value="@searchInput" @oninput="OnSearchInput" aria-label="Search holidays" data-testid="holidays-search" />
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <select class="form-select form-select-sm" @bind="selectedYear" data-testid="holidays-year-filter">
+                    <select class="form-select form-select-sm" @bind="selectedYear" aria-label="Filter by year" data-testid="holidays-year-filter">
                         <option value="0">All Years</option>
                         @foreach (var y in availableYears)
                         {
@@ -105,7 +101,7 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <select class="form-select form-select-sm" @bind="selectedType">
+                    <select class="form-select form-select-sm" @bind="selectedType" aria-label="Filter by type" data-testid="holidays-type-filter">
                         <option value="">All Types</option>
                         <option value="National">National</option>
                         <option value="Religious">Religious</option>
@@ -113,7 +109,7 @@
                     </select>
                 </div>
                 <div class="col-md-2 text-muted small text-end">
-                    @filteredHolidays.Count() of @holidays.Count
+                    @filteredHolidays.Count of @holidays.Count
                 </div>
             </div>
         </div>
@@ -123,20 +119,16 @@
 <!-- ── Loading State ───────────────────────────────────────── -->
 @if (isLoading)
 {
-    <div class="text-center py-5">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-        <p class="text-muted mt-2">Loading holidays...</p>
-    </div>
+    <SkeletonLoader Variant="kpi" Columns="3" TestId="holidays-skeleton-kpi" />
+    <SkeletonLoader Variant="table" Rows="5" Columns="6" TestId="holidays-skeleton-table" />
 }
 <!-- ── Empty State ─────────────────────────────────────────── -->
 else if (!holidays.Any())
 {
-    <div class="text-center py-5">
-        <i class="bi bi-calendar-x display-1 text-muted"></i>
-        <h5 class="mt-3 text-muted">No holidays configured</h5>
-        <p class="text-muted">Add holidays to accurately calculate delivery schedules.</p>
+    <div class="empty-state">
+        <div class="empty-icon"><i class="bi bi-calendar-x"></i></div>
+        <h5>No holidays configured</h5>
+        <p>Add holidays to accurately calculate delivery schedules.</p>
         <button class="btn btn-primary" @onclick="ShowAddModal">
             <i class="bi bi-plus-lg"></i> Add First Holiday
         </button>
@@ -150,11 +142,11 @@ else
             <table class="table table-hover align-middle mb-0" data-testid="holidays-table">
                 <thead class="table-light">
                     <tr>
-                        <th>Name</th>
-                        <th>Start Date</th>
-                        <th>End Date</th>
+                        <th role="button" @onclick='() => ApplySort("HolidayName")' aria-sort="@AriaSort("HolidayName")">Name @SortIndicator("HolidayName")</th>
+                        <th role="button" @onclick='() => ApplySort("StartDate")' aria-sort="@AriaSort("StartDate")">Start Date @SortIndicator("StartDate")</th>
+                        <th role="button" @onclick='() => ApplySort("EndDate")' aria-sort="@AriaSort("EndDate")">End Date @SortIndicator("EndDate")</th>
                         <th>Duration</th>
-                        <th>Type</th>
+                        <th role="button" @onclick='() => ApplySort("HolidayType")' aria-sort="@AriaSort("HolidayType")">Type @SortIndicator("HolidayType")</th>
                         <th>Notes</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -182,10 +174,10 @@ else
                             </td>
                             <td class="text-muted">@h.Notes</td>
                             <td class="text-end">
-                                <button class="btn btn-sm btn-outline-warning" @onclick="() => EditHoliday(h)" data-testid="holidays-edit-@h.Id">
+                                <button class="btn btn-sm btn-outline-warning" @onclick="() => EditHoliday(h)" aria-label="Edit @h.HolidayName" data-testid="holidays-edit-@h.Id">
                                     <i class="bi bi-pencil"></i>
                                 </button>
-                                <button class="btn btn-sm btn-outline-danger ms-1" @onclick="() => DeleteHoliday(h)" data-testid="holidays-delete-@h.Id">
+                                <button class="btn btn-sm btn-outline-danger ms-1" @onclick="() => DeleteHoliday(h)" aria-label="Delete @h.HolidayName" data-testid="holidays-delete-@h.Id">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </td>
@@ -200,15 +192,15 @@ else
 <!-- ── Add/Edit Modal ──────────────────────────────────────── -->
 @if (showModal)
 {
-    <div class="modal d-block modal-backdrop-custom" data-testid="holidays-modal">
+    <div class="modal d-block modal-backdrop-custom" role="dialog" aria-modal="true" aria-labelledby="holidays-modal-title" data-testid="holidays-modal">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">
+                    <h5 class="modal-title" id="holidays-modal-title">
                         <i class="bi bi-@(editingHoliday == null ? "plus-circle" : "pencil-square")"></i>
                         @(editingHoliday == null ? "Add New Holiday" : "Edit Holiday")
                     </h5>
-                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
                 </div>
                 <div class="modal-body">
                     @if (!string.IsNullOrWhiteSpace(modalError))
@@ -218,7 +210,7 @@ else
                         </div>
                     }
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Holiday Name</label>
+                        <label class="form-label fw-semibold">Holiday Name <span class="required-indicator">*</span></label>
                         <input class="form-control @(fieldErrors.ContainsKey("HolidayName") ? "is-invalid" : "")"
                                @bind="formName" data-testid="holidays-name" />
                         @if (fieldErrors.ContainsKey("HolidayName"))
@@ -228,7 +220,7 @@ else
                     </div>
                     <div class="row">
                         <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold">Start Date</label>
+                            <label class="form-label fw-semibold">Start Date <span class="required-indicator">*</span></label>
                             <input class="form-control @(fieldErrors.ContainsKey("StartDate") ? "is-invalid" : "")"
                                    type="date" @bind="formStartDate" @bind:event="onchange" data-testid="holidays-start-date" />
                             @if (fieldErrors.ContainsKey("StartDate"))
@@ -237,7 +229,7 @@ else
                             }
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold">End Date</label>
+                            <label class="form-label fw-semibold">End Date <span class="required-indicator">*</span></label>
                             <input class="form-control @(fieldErrors.ContainsKey("EndDate") ? "is-invalid" : "")"
                                    type="date" @bind="formEndDate" @bind:event="onchange" data-testid="holidays-end-date" />
                             @if (fieldErrors.ContainsKey("EndDate"))
@@ -292,48 +284,42 @@ else
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-primary" @onclick="SaveHoliday" data-testid="holidays-save">
+                    <button class="btn btn-primary" @onclick="SaveHoliday" disabled="@isSaving" data-testid="holidays-save">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
                         <i class="bi bi-check-lg"></i> Save
                     </button>
-                    <button class="btn btn-secondary" @onclick="CloseModal" data-testid="holidays-cancel">Cancel</button>
+                    <button class="btn btn-secondary" @onclick="CloseModal" disabled="@isSaving" data-testid="holidays-cancel">Cancel</button>
                 </div>
             </div>
         </div>
     </div>
 }
 
-<!-- ── Delete Confirm Modal ────────────────────────────────── -->
+<!-- ── Delete Confirm (shared component) ───────────────────── -->
 @if (showDeleteConfirm)
 {
-    <div class="modal d-block modal-backdrop-custom" data-testid="holidays-delete-modal">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-trash"></i> Confirm Delete</h5>
-                </div>
-                <div class="modal-body">
-                    <p>Are you sure you want to delete <strong>@editingHoliday?.HolidayName</strong>?</p>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-danger" @onclick="ConfirmDelete" data-testid="holidays-delete-confirm">
-                        <i class="bi bi-trash"></i> Delete
-                    </button>
-                    <button class="btn btn-secondary" @onclick="CloseDeleteModal" data-testid="holidays-delete-cancel">Cancel</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <ConfirmDialog
+        Visible="true"
+        TestId="holidays-delete-modal"
+        Title="Confirm Delete"
+        Message="@($"Are you sure you want to delete \"{editingHoliday?.HolidayName}\"?")"
+        IsProcessing="isDeleting"
+        OnConfirm="ConfirmDelete"
+        OnCancel="CloseDeleteModal" />
 }
 
 <!-- ── Copy to Year Modal ──────────────────────────────────── -->
 @if (showCopyModal)
 {
-    <div class="modal d-block modal-backdrop-custom" data-testid="holidays-copy-modal">
+    <div class="modal d-block modal-backdrop-custom" role="dialog" aria-modal="true" aria-labelledby="holidays-copy-title" data-testid="holidays-copy-modal">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-copy"></i> Copy Holidays to Year</h5>
-                    <button type="button" class="btn-close" @onclick="() => showCopyModal = false"></button>
+                    <h5 class="modal-title" id="holidays-copy-title"><i class="bi bi-copy"></i> Copy Holidays to Year</h5>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="() => showCopyModal = false"></button>
                 </div>
                 <div class="modal-body">
                     <div class="row">
@@ -353,10 +339,14 @@ else
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-primary" @onclick="DoCopyToYear" data-testid="holidays-copy-confirm">
+                    <button class="btn btn-primary" @onclick="DoCopyToYear" disabled="@isCopying" data-testid="holidays-copy-confirm">
+                        @if (isCopying)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
                         <i class="bi bi-copy"></i> Copy
                     </button>
-                    <button class="btn btn-secondary" @onclick="() => showCopyModal = false">Cancel</button>
+                    <button class="btn btn-secondary" @onclick="() => showCopyModal = false" disabled="@isCopying">Cancel</button>
                 </div>
             </div>
         </div>
@@ -372,8 +362,12 @@ else
     private bool showCopyModal;
     private Holiday? editingHoliday;
     private string modalError = string.Empty;
-    private string toastMessage = string.Empty;
     private Dictionary<string, string> fieldErrors = new();
+    private ToastNotification toast = default!;
+    private bool isSaving = false;
+    private bool isDeleting = false;
+    private bool isRefreshing = false;
+    private bool isCopying = false;
 
     // Form fields
     private string formName = string.Empty;
@@ -384,8 +378,14 @@ else
 
     // Filters
     private string searchTerm = string.Empty;
+    private string searchInput = string.Empty;
+    private System.Threading.Timer? _debounceTimer;
     private int selectedYear;
     private string selectedType = string.Empty;
+
+    // Sort
+    private string sortColumn = string.Empty;
+    private bool sortAscending = true;
 
     // Copy
     private int copyFromYear;
@@ -400,7 +400,7 @@ else
     private IEnumerable<int> availableYears =>
         holidays.Select(h => h.StartDate.Year).Distinct().OrderBy(y => y);
 
-    private IEnumerable<Holiday> filteredHolidays
+    private IReadOnlyList<Holiday> filteredHolidays
     {
         get
         {
@@ -412,7 +412,20 @@ else
             if (!string.IsNullOrWhiteSpace(searchTerm))
                 q = q.Where(h => h.HolidayName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
                     || (h.Notes ?? "").Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
-            return q;
+
+            if (!string.IsNullOrEmpty(sortColumn))
+            {
+                q = sortColumn switch
+                {
+                    "HolidayName" => sortAscending ? q.OrderBy(h => h.HolidayName) : q.OrderByDescending(h => h.HolidayName),
+                    "StartDate" => sortAscending ? q.OrderBy(h => h.StartDate) : q.OrderByDescending(h => h.StartDate),
+                    "EndDate" => sortAscending ? q.OrderBy(h => h.EndDate) : q.OrderByDescending(h => h.EndDate),
+                    "HolidayType" => sortAscending ? q.OrderBy(h => h.HolidayType) : q.OrderByDescending(h => h.HolidayType),
+                    _ => q
+                };
+            }
+
+            return q.ToList();
         }
     }
 
@@ -486,6 +499,7 @@ else
     {
         modalError = string.Empty;
         fieldErrors.Clear();
+        isSaving = true;
         try
         {
             var command = new UpsertHolidayCommand(
@@ -499,8 +513,9 @@ else
 
             var result = await Mediator.Send(command);
             await LoadHolidays();
+            var message = editingHoliday == null ? "Holiday added successfully." : "Holiday updated successfully.";
             CloseModal();
-            toastMessage = editingHoliday == null ? "Holiday added successfully." : "Holiday updated successfully.";
+            toast.Show(message);
         }
         catch (ValidationException ex)
         {
@@ -510,6 +525,10 @@ else
                     fieldErrors[err.PropertyName] = err.ErrorMessage;
             }
             modalError = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+        finally
+        {
+            isSaving = false;
         }
     }
 
@@ -523,14 +542,22 @@ else
 
     private async Task ConfirmDelete()
     {
-        if (editingHoliday != null)
+        isDeleting = true;
+        try
         {
-            var result = await Mediator.Send(new DeleteHolidayCommand(editingHoliday.Id));
-            toastMessage = $"Holiday \"{editingHoliday.HolidayName}\" deleted.";
+            if (editingHoliday != null)
+            {
+                var result = await Mediator.Send(new DeleteHolidayCommand(editingHoliday.Id));
+                toast.Show($"Holiday \"{editingHoliday.HolidayName}\" deleted.");
+            }
+            showDeleteConfirm = false;
+            editingHoliday = null;
+            await LoadHolidays();
         }
-        showDeleteConfirm = false;
-        editingHoliday = null;
-        await LoadHolidays();
+        finally
+        {
+            isDeleting = false;
+        }
     }
 
     private void CloseModal()
@@ -556,21 +583,72 @@ else
 
     private async Task DoCopyToYear()
     {
-        var result = await Mediator.Send(new CopyHolidaysToYearCommand(copyFromYear, copyToYear));
-        var copied = result.Value;
-        showCopyModal = false;
-        await LoadHolidays();
-        toastMessage = copied > 0
-            ? $"Copied {copied} holiday(s) from {copyFromYear} to {copyToYear}."
-            : $"No holidays copied (target year may already have overlapping dates).";
+        isCopying = true;
+        try
+        {
+            var result = await Mediator.Send(new CopyHolidaysToYearCommand(copyFromYear, copyToYear));
+            var copied = result.Value;
+            showCopyModal = false;
+            await LoadHolidays();
+            toast.Show(copied > 0
+                ? $"Copied {copied} holiday(s) from {copyFromYear} to {copyToYear}."
+                : $"No holidays copied (target year may already have overlapping dates).");
+        }
+        finally
+        {
+            isCopying = false;
+        }
     }
 
     // ── Refresh ──────────────────────────────────────────────
 
     private async Task RefreshData()
     {
-        var result = await Mediator.Send(new RunSchedulerCommand());
-        await LoadHolidays();
-        toastMessage = "Schedule refreshed.";
+        isRefreshing = true;
+        try
+        {
+            var result = await Mediator.Send(new RunSchedulerCommand());
+            await LoadHolidays();
+            toast.Show("Schedule refreshed.");
+        }
+        finally
+        {
+            isRefreshing = false;
+        }
     }
+
+    // ── Search Debounce ──────────────────────────────────────
+
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        searchInput = e.Value?.ToString() ?? string.Empty;
+        _debounceTimer?.Dispose();
+        _debounceTimer = new System.Threading.Timer(_ =>
+            InvokeAsync(() => { searchTerm = searchInput; StateHasChanged(); }),
+            null, 300, System.Threading.Timeout.Infinite);
+    }
+
+    // ── Sort ───────────────────────────────────────────────────
+
+    private void ApplySort(string column)
+    {
+        if (sortColumn == column)
+            sortAscending = !sortAscending;
+        else
+        {
+            sortColumn = column;
+            sortAscending = true;
+        }
+    }
+
+    private string SortIndicator(string column)
+    {
+        if (sortColumn != column) return "";
+        return sortAscending ? "▲" : "▼";
+    }
+
+    private string AriaSort(string column) =>
+        sortColumn != column ? "none" : sortAscending ? "ascending" : "descending";
+
+    public void Dispose() => _debounceTimer?.Dispose();
 }

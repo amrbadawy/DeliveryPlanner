@@ -1,13 +1,14 @@
 @* Reusable toast notification. Auto-hides after a configurable duration. *@
+@implements IDisposable
 
 @if (isVisible)
 {
     <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
-        <div class="toast show border-0 shadow" data-testid="@TestId">
+        <div class="toast show border-0 shadow" role="alert" aria-live="polite" aria-atomic="true" data-testid="@TestId">
             <div class="toast-body d-flex align-items-center gap-2 bg-@CssClass text-white rounded">
                 <i class="bi @IconClass"></i>
                 <span>@Message</span>
-                <button type="button" class="btn-close btn-close-white ms-auto" @onclick="Hide"></button>
+                <button type="button" class="btn-close btn-close-white ms-auto" aria-label="Close notification" @onclick="Hide"></button>
             </div>
         </div>
     </div>

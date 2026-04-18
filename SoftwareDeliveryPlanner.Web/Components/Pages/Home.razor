@@ -3,6 +3,7 @@
 @using SoftwareDeliveryPlanner.Application.DeliveryInsights.Queries
 @using SoftwareDeliveryPlanner.Application.Planning.Commands
 @inject IMediator Mediator
+@inject NavigationManager NavigationManager
 
 <PageTitle>Dashboard</PageTitle>
 
@@ -13,48 +14,53 @@
         <p class="page-subtitle">Overview of your delivery schedule and key metrics</p>
     </div>
     <div>
-        <button class="btn btn-primary" @onclick="RunScheduler" data-testid="btn-run-scheduler">
-            <i class="bi bi-arrow-clockwise me-1"></i> Run Scheduler
+        <button class="btn btn-primary" @onclick="RunScheduler" disabled="@isRunning" data-testid="btn-run-scheduler">
+            @if (isRunning)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+            }
+            else
+            {
+                <i class="bi bi-arrow-clockwise me-1"></i>
+            }
+            Run Scheduler
         </button>
     </div>
 </div>
 
 @if (!isLoaded)
 {
-    <div class="text-center py-5">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-        <p class="text-muted mt-2">Loading dashboard...</p>
-    </div>
+    <SkeletonLoader Variant="kpi" Columns="4" TestId="dashboard-skeleton-kpi" />
+    <SkeletonLoader Variant="kpi" Columns="3" TestId="dashboard-skeleton-status" />
+    <SkeletonLoader Variant="block" TestId="dashboard-skeleton-stats" />
 }
 else
 {
     <!-- KPI Row -->
     <div class="row g-3 mb-4">
         <div class="col-md-3">
-            <div class="kpi-card p-3">
+            <div class="kpi-card p-3 kpi-clickable" @onclick='() => NavigateToTasks("", "")' @onkeydown="(e) => OnKpiKeyDown(e, string.Empty, string.Empty)" role="button" tabindex="0" title="View all tasks">
                 <div class="kpi-label">Total Services</div>
-                <div class="kpi-value text-primary">@totalServices</div>
+                <div class="kpi-value kpi-text-primary">@totalServices</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="kpi-card kpi-success p-3">
                 <div class="kpi-label">Total Estimation</div>
-                <div class="kpi-value" style="color: var(--color-success);">@totalEstimation <small class="text-muted fw-normal" style="font-size: 0.875rem;">days</small></div>
+                <div class="kpi-value kpi-text-success">@totalEstimation <small class="text-muted kpi-sub">days</small></div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="kpi-card kpi-info p-3">
                 <div class="kpi-label">Active Resources</div>
-                <div class="kpi-value" style="color: var(--color-info);">@activeResources</div>
-                <div class="text-muted" style="font-size: 0.75rem;">Capacity: @totalCapacity.ToString("F1")</div>
+                <div class="kpi-value kpi-text-info">@activeResources</div>
+                <div class="text-muted kpi-sub-detail">Capacity: @totalCapacity.ToString("F1")</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="kpi-card kpi-warning p-3">
                 <div class="kpi-label">Projected Finish</div>
-                <div class="kpi-value" style="color: var(--color-warning); font-size: 1.125rem;">@overallFinish</div>
+                <div class="kpi-value kpi-value-sm kpi-text-warning">@overallFinish</div>
             </div>
         </div>
     </div>
@@ -62,35 +68,35 @@ else
     <!-- Status Row -->
     <div class="row g-3 mb-4">
         <div class="col-md-4">
-            <div class="kpi-card kpi-success p-3">
+            <div class="kpi-card kpi-success p-3 kpi-clickable" @onclick='() => NavigateToTasks("risk", "On Track")' @onkeydown='(e) => OnKpiKeyDown(e, "risk", "On Track")' role="button" tabindex="0" title="View On Track tasks">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <div class="kpi-label">On Track</div>
-                        <div class="kpi-value" style="color: var(--color-success);">@onTrack</div>
+                        <div class="kpi-value kpi-text-success">@onTrack</div>
                     </div>
-                    <i class="bi bi-check-circle" style="font-size: 2rem; color: var(--color-success); opacity: 0.3;"></i>
+                    <i class="bi bi-check-circle kpi-icon kpi-icon-success"></i>
                 </div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="kpi-card kpi-warning p-3">
+            <div class="kpi-card kpi-warning p-3 kpi-clickable" @onclick='() => NavigateToTasks("risk", "At Risk")' @onkeydown='(e) => OnKpiKeyDown(e, "risk", "At Risk")' role="button" tabindex="0" title="View At Risk tasks">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <div class="kpi-label">At Risk</div>
-                        <div class="kpi-value" style="color: var(--color-warning);">@atRisk</div>
+                        <div class="kpi-value kpi-text-warning">@atRisk</div>
                     </div>
-                    <i class="bi bi-exclamation-triangle" style="font-size: 2rem; color: var(--color-warning); opacity: 0.3;"></i>
+                    <i class="bi bi-exclamation-triangle kpi-icon kpi-icon-warning"></i>
                 </div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="kpi-card kpi-danger p-3">
+            <div class="kpi-card kpi-danger p-3 kpi-clickable" @onclick='() => NavigateToTasks("risk", "Late")' @onkeydown='(e) => OnKpiKeyDown(e, "risk", "Late")' role="button" tabindex="0" title="View Late tasks">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <div class="kpi-label">Late</div>
-                        <div class="kpi-value" style="color: var(--color-danger);">@late</div>
+                        <div class="kpi-value kpi-text-danger">@late</div>
                     </div>
-                    <i class="bi bi-x-circle" style="font-size: 2rem; color: var(--color-danger); opacity: 0.3;"></i>
+                    <i class="bi bi-x-circle kpi-icon kpi-icon-danger"></i>
                 </div>
             </div>
         </div>
@@ -98,7 +104,7 @@ else
 
     <!-- Statistics Card -->
     <div class="card border-0 shadow-sm">
-        <div class="card-header bg-transparent border-bottom">
+        <div class="card-header border-bottom">
             <i class="bi bi-graph-up me-2"></i>Statistics
         </div>
         <div class="card-body">
@@ -132,6 +138,7 @@ else
     private double avgAssigned = 0;
     private string schedulerResult = "";
     private bool isLoaded = false;
+    private bool isRunning = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -156,8 +163,30 @@ else
 
     private async Task RunScheduler()
     {
-        var result = await Mediator.Send(new RunSchedulerCommand());
-        schedulerResult = result.Value;
-        await LoadKPIs();
+        isRunning = true;
+        try
+        {
+            var result = await Mediator.Send(new RunSchedulerCommand());
+            schedulerResult = result.Value;
+            await LoadKPIs();
+        }
+        finally
+        {
+            isRunning = false;
+        }
+    }
+
+    private void NavigateToTasks(string filterType, string filterValue)
+    {
+        if (string.IsNullOrEmpty(filterType))
+            NavigationManager.NavigateTo("/tasks");
+        else
+            NavigationManager.NavigateTo($"/tasks?{filterType}={Uri.EscapeDataString(filterValue)}");
+    }
+
+    private void OnKpiKeyDown(KeyboardEventArgs e, string filterType, string filterValue)
+    {
+        if (e.Key is "Enter" or " ")
+            NavigateToTasks(filterType, filterValue);
     }
 }

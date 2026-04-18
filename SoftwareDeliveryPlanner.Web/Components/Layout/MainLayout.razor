@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@inject IJSRuntime JS
 
 <div class="page">
     <div class="sidebar">
@@ -13,14 +14,38 @@
         <div class="top-row px-4">
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-0">
-                    <li class="breadcrumb-item active">Software Delivery Planner</li>
+                    <li class="breadcrumb-item"><a href="/">SDP</a></li>
+                    @if (GetBreadcrumbs() is { } crumbs)
+                    {
+                        @foreach (var crumb in crumbs)
+                        {
+                            @if (crumb.IsActive)
+                            {
+                                <li class="breadcrumb-item active" aria-current="page">@crumb.Label</li>
+                            }
+                            else
+                            {
+                                <li class="breadcrumb-item"><a href="@crumb.Href">@crumb.Label</a></li>
+                            }
+                        }
+                    }
                 </ol>
             </nav>
+            <button class="theme-toggle ms-auto" @onclick="ToggleTheme" title="Toggle dark mode" aria-label="Toggle dark mode">
+                <i class="bi @(isDark ? "bi-sun" : "bi-moon")"></i>
+                <span class="d-none d-md-inline">@(isDark ? "Light" : "Dark")</span>
+            </button>
         </div>
 
         <article class="content px-4">
             @Body
         </article>
+
+        <footer class="app-footer">
+            <span>Software Delivery Planner</span>
+            <span class="footer-separator">|</span>
+            <span>.NET @Environment.Version.ToString(2)</span>
+        </footer>
     </main>
 </div>
 
@@ -29,3 +54,63 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">&#x2715;</span>
 </div>
+
+@code {
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    private bool isDark = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var theme = await JS.InvokeAsync<string>("localStorage.getItem", "sdp-theme");
+            isDark = theme == "dark";
+            if (isDark)
+            {
+                await JS.InvokeVoidAsync("setThemeAttribute", "dark");
+            }
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        isDark = !isDark;
+        var theme = isDark ? "dark" : "light";
+        await JS.InvokeVoidAsync("localStorage.setItem", "sdp-theme", theme);
+        await JS.InvokeVoidAsync("setThemeAttribute", theme);
+    }
+
+    private record BreadcrumbItem(string Label, string? Href, bool IsActive);
+
+    private List<BreadcrumbItem>? GetBreadcrumbs()
+    {
+        var relativePath = new Uri(Navigation.Uri).AbsolutePath.TrimStart('/').TrimEnd('/');
+
+        if (string.IsNullOrEmpty(relativePath))
+            return new() { new("Dashboard", null, true) };
+
+        // Map route segments to labels
+        var segments = relativePath.Split('/');
+        var first = segments[0].ToLowerInvariant();
+
+        return first switch
+        {
+            "tasks" when segments.Length > 1 => new()
+            {
+                new("Task Register", "/tasks", false),
+                new(segments[1].ToUpperInvariant(), null, true)
+            },
+            "tasks" => new() { new("Task Register", null, true) },
+            "resources" => new() { new("Resources", null, true) },
+            "adjustments" => new() { new("Adjustments", null, true) },
+            "holidays" => new() { new("Holidays", null, true) },
+            "calendar" => new() { new("Calendar", null, true) },
+            "timeline" => new() { new("Timeline", null, true) },
+            "output" => new() { new("Delivery Plan", null, true) },
+            "gantt" => new() { new("Gantt Chart", null, true) },
+            _ => new() { new(first, null, true) }
+        };
+    }
+}

@@ -1,0 +1,48 @@
+@* Skeleton loading placeholder. Shows animated bars that mimic table/card content. *@
+
+<div class="skeleton-loader" data-testid="@TestId">
+    @if (Variant == "table")
+    {
+        <div class="card border-0 shadow-sm">
+            <div class="skeleton-header"></div>
+            @for (int i = 0; i < Rows; i++)
+            {
+                <div class="skeleton-row">
+                    @for (int j = 0; j < Columns; j++)
+                    {
+                        <div class="skeleton-cell"></div>
+                    }
+                </div>
+            }
+        </div>
+    }
+    else if (Variant == "kpi")
+    {
+        <div class="row g-3 mb-4">
+            @for (int i = 0; i < Columns; i++)
+            {
+                <div class="col-md-@(12 / Math.Max(Columns, 1))">
+                    <div class="skeleton-kpi"></div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        @* Default: generic block *@
+        <div class="skeleton-block"></div>
+    }
+</div>
+
+@code {
+    /// <summary>"table", "kpi", or "block"</summary>
+    [Parameter] public string Variant { get; set; } = "table";
+
+    /// <summary>Number of rows (for table variant)</summary>
+    [Parameter] public int Rows { get; set; } = 5;
+
+    /// <summary>Number of columns (for table variant) or cards (for kpi variant)</summary>
+    [Parameter] public int Columns { get; set; } = 4;
+
+    [Parameter] public string TestId { get; set; } = "skeleton";
+}

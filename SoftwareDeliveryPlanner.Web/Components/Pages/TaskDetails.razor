@@ -11,26 +11,26 @@
 
 @if (isLoading)
 {
-    <p><em>Loading task details...</em></p>
+    <SkeletonLoader Variant="block" TestId="task-details-skeleton" />
 }
 else if (task == null)
 {
-    <p><em>Task not found.</em></p>
-    <button class="btn btn-secondary" @onclick="GoBack" data-testid="task-details-back"><i class="bi bi-arrow-left me-1"></i> Back to Tasks</button>
+    <div class="empty-state">
+        <div class="empty-icon"><i class="bi bi-file-earmark-x"></i></div>
+        <h5>Task not found</h5>
+        <p>The task "@TaskId" does not exist or may have been deleted.</p>
+        <button class="btn btn-secondary" @onclick="GoBack" data-testid="task-details-back">
+            <i class="bi bi-arrow-left me-1"></i> Back to Tasks
+        </button>
+    </div>
 }
 else
 {
     <div class="page-header mb-4">
-        <nav aria-label="breadcrumb" class="mb-2">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="/tasks">Task Register</a></li>
-                <li class="breadcrumb-item active">@task.TaskId</li>
-            </ol>
-        </nav>
         <h3 class="mb-1"><i class="bi bi-file-earmark-text me-2"></i>@task.ServiceName</h3>
     </div>
 
-    <div class="card mb-3" data-testid="task-details-card">
+    <div class="card border-0 shadow-sm mb-3" data-testid="task-details-card">
         <div class="card-header bg-transparent">
             <strong>@task.ServiceName</strong>
         </div>
@@ -86,45 +86,57 @@ else
     <h4 class="mt-4 mb-3"><i class="bi bi-calendar-range me-2"></i>Assignment Timeline</h4>
     @if (isTimelineLoading)
     {
-        <p><em>Loading timeline...</em></p>
+        <div class="text-center py-4">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Loading timeline...</span>
+            </div>
+            <p class="text-muted mt-2 small">Loading timeline...</p>
+        </div>
     }
     else if (timeline == null || !timeline.Days.Any())
     {
-        <p><em>No timeline data available for this task. It may not be scheduled yet.</em></p>
+        <div class="text-center py-4">
+            <i class="bi bi-calendar-x display-6 text-muted"></i>
+            <p class="text-muted mt-2">No timeline data available for this task. It may not be scheduled yet.</p>
+        </div>
     }
     else
     {
-        <table class="table table-bordered table-sm" data-testid="task-timeline-table">
-            <thead class="table-light">
-                <tr>
-                    <th style="width: 15%">Date</th>
-                    <th style="width: 20%">Status</th>
-                    <th style="width: 65%">Assigned Developers</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var day in timeline.Days)
-                {
-                    <tr class="@(day.IsWorkingDay ? "" : "table-secondary")">
-                        <td>@day.DateDisplay</td>
-                        <td>@day.StatusText</td>
-                        <td>
-                            @if (day.AssignedDevelopers.Any())
-                            {
-                                @foreach (var dev in day.AssignedDevelopers)
-                                {
-                                    <span class="badge bg-primary me-1">@dev</span>
-                                }
-                            }
-                            else if (day.IsWorkingDay)
-                            {
-                                <span class="text-muted">None</span>
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+        <div class="card border-0 shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm mb-0" data-testid="task-timeline-table">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 15%">Date</th>
+                            <th style="width: 20%">Status</th>
+                            <th style="width: 65%">Assigned Developers</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var day in timeline.Days)
+                        {
+                            <tr class="@(day.IsWorkingDay ? "" : "table-secondary")">
+                                <td>@day.DateDisplay</td>
+                                <td>@day.StatusText</td>
+                                <td>
+                                    @if (day.AssignedDevelopers.Any())
+                                    {
+                                        @foreach (var dev in day.AssignedDevelopers)
+                                        {
+                                            <span class="badge bg-primary me-1">@dev</span>
+                                        }
+                                    }
+                                    else if (day.IsWorkingDay)
+                                    {
+                                        <span class="text-muted">None</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
     }
 }
 
