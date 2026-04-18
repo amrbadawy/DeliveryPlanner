@@ -8,6 +8,7 @@
 @using SoftwareDeliveryPlanner.Domain
 @inject IMediator Mediator
 @inject NavigationManager NavigationManager
+@inject SoftwareDeliveryPlanner.Web.Services.AutoScheduleService autoSchedule
 @implements IDisposable
 
 <PageTitle>Task Register</PageTitle>
@@ -562,6 +563,7 @@ else
             var message = editingTask == null ? "Service added successfully." : "Service updated successfully.";
             CloseModal();
             toast.Show(message);
+            await AutoScheduleIfEnabled();
         }
         catch (ValidationException ex)
         {
@@ -591,6 +593,7 @@ else
             showDeleteConfirm = false;
             editingTask = null;
             await LoadTasks();
+            await AutoScheduleIfEnabled();
         }
         finally
         {
@@ -700,9 +703,10 @@ else
             var result = await Mediator.Send(new BulkImportTasksCommand(parsedRows));
             if (result.IsSuccess)
             {
-                toast.Show($"Successfully imported {result.Value} services.");
-                CloseBulkImport();
-                await LoadTasks();
+            toast.Show($"Successfully imported {result.Value} services.");
+            CloseBulkImport();
+            await LoadTasks();
+            await AutoScheduleIfEnabled();
             }
             else
             {
@@ -763,6 +767,7 @@ else
 
             await LoadTasks();
             toast.Show($"Priority swapped: {draggedTask.TaskId} ↔ {targetTask.TaskId}");
+            await AutoScheduleIfEnabled();
         }
         catch (Exception)
         {
@@ -774,5 +779,14 @@ else
     {
         dragTaskId = null;
         dragOverTaskId = null;
+    }
+
+    private async Task AutoScheduleIfEnabled()
+    {
+        if (autoSchedule.IsEnabled)
+        {
+            await Mediator.Send(new RunSchedulerCommand());
+            await LoadTasks();
+        }
     }
 }

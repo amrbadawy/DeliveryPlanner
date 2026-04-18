@@ -8,6 +8,7 @@
 @using SoftwareDeliveryPlanner.Domain.Models
 @using SoftwareDeliveryPlanner.Domain
 @inject IMediator Mediator
+@inject SoftwareDeliveryPlanner.Web.Services.AutoScheduleService autoSchedule
 @implements IDisposable
 <PageTitle>Holidays</PageTitle>
 
@@ -516,6 +517,7 @@ else
             var message = editingHoliday == null ? "Holiday added successfully." : "Holiday updated successfully.";
             CloseModal();
             toast.Show(message);
+            await AutoScheduleIfEnabled();
         }
         catch (ValidationException ex)
         {
@@ -553,6 +555,7 @@ else
             showDeleteConfirm = false;
             editingHoliday = null;
             await LoadHolidays();
+            await AutoScheduleIfEnabled();
         }
         finally
         {
@@ -649,6 +652,15 @@ else
 
     private string AriaSort(string column) =>
         sortColumn != column ? "none" : sortAscending ? "ascending" : "descending";
+
+    private async Task AutoScheduleIfEnabled()
+    {
+        if (autoSchedule.IsEnabled)
+        {
+            await Mediator.Send(new RunSchedulerCommand());
+            await LoadHolidays();
+        }
+    }
 
     public void Dispose() => _debounceTimer?.Dispose();
 }

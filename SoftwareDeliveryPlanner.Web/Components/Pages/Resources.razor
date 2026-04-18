@@ -7,6 +7,7 @@
 @using SoftwareDeliveryPlanner.Domain.Models
 @using SoftwareDeliveryPlanner.Domain
 @inject IMediator Mediator
+@inject SoftwareDeliveryPlanner.Web.Services.AutoScheduleService autoSchedule
 @implements IDisposable
 <PageTitle>Resources</PageTitle>
 
@@ -454,6 +455,7 @@ else
             var message = editingResource == null ? "Resource added successfully." : "Resource updated successfully.";
             CloseModal();
             toast.Show(message);
+            await AutoScheduleIfEnabled();
         }
         catch (ValidationException ex)
         {
@@ -482,6 +484,7 @@ else
             showDeleteConfirm = false;
             editingResource = null;
             await LoadResources();
+            await AutoScheduleIfEnabled();
         }
         finally
         {
@@ -515,6 +518,15 @@ else
         finally
         {
             isRefreshing = false;
+        }
+    }
+
+    private async Task AutoScheduleIfEnabled()
+    {
+        if (autoSchedule.IsEnabled)
+        {
+            await Mediator.Send(new RunSchedulerCommand());
+            await LoadResources();
         }
     }
 }

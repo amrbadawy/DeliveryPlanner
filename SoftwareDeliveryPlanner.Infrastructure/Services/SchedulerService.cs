@@ -18,13 +18,18 @@ internal sealed class SchedulerService : ServiceBase, ISchedulerService
 
     public async Task<string> RunSchedulerAsync(CancellationToken cancellationToken = default)
     {
+        // Capture pre-run risk states for notification detection
+        await using var db = await DbFactory.CreateDbContextAsync(cancellationToken);
+        var preRunRisks = await db.Tasks
+            .Where(t => t.PlannedStart != null)
+            .Select(t => new { t.TaskId, t.ServiceName, t.DeliveryRisk })
+            .ToListAsync(cancellationToken);
+
         using var engine = await EngineFactory.CreateAsync(cancellationToken);
         var result = engine.RunScheduler();
 
         // Record last scheduler run timestamp
-        await using var db = await DbFactory.CreateDbContextAsync(cancellationToken);
         var now = TimeProvider.System.GetUtcNow().DateTime;
-
         var setting = await db.Settings
             .FirstOrDefaultAsync(s => s.Key == DomainConstants.SettingKeys.LastSchedulerRun, cancellationToken);
         if (setting is not null)
@@ -41,6 +46,33 @@ internal sealed class SchedulerService : ServiceBase, ISchedulerService
             late: (int)kpis["late"],
             total: (int)kpis["total_services"]);
         db.SchedulerSnapshots.Add(snapshot);
+
+        // Detect risk changes and create notifications
+        var postRunTasks = await db.Tasks
+            .Where(t => t.PlannedStart != null)
+            .Select(t => new { t.TaskId, t.ServiceName, t.DeliveryRisk })
+            .ToListAsync(cancellationToken);
+
+        foreach (var post in postRunTasks)
+        {
+            var pre = preRunRisks.FirstOrDefault(p => p.TaskId == post.TaskId);
+            if (pre is null) continue;
+
+            // Only notify when risk worsens (OnTrack→AtRisk, OnTrack→Late, AtRisk→Late)
+            var worsened = (pre.DeliveryRisk, post.DeliveryRisk) switch
+            {
+                (DomainConstants.DeliveryRisk.OnTrack, DomainConstants.DeliveryRisk.AtRisk) => true,
+                (DomainConstants.DeliveryRisk.OnTrack, DomainConstants.DeliveryRisk.Late) => true,
+                (DomainConstants.DeliveryRisk.AtRisk, DomainConstants.DeliveryRisk.Late) => true,
+                _ => false
+            };
+
+            if (worsened)
+            {
+                db.RiskNotifications.Add(
+                    RiskNotification.Create(post.TaskId, post.ServiceName, pre.DeliveryRisk, post.DeliveryRisk));
+            }
+        }
 
         await db.SaveChangesAsync(cancellationToken);
 

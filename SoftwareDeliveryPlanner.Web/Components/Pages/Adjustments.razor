@@ -8,6 +8,7 @@
 @using SoftwareDeliveryPlanner.Domain.Models
 @using SoftwareDeliveryPlanner.Domain
 @inject IMediator Mediator
+@inject SoftwareDeliveryPlanner.Web.Services.AutoScheduleService autoSchedule
 @implements IDisposable
 <PageTitle>Adjustments</PageTitle>
 
@@ -405,6 +406,7 @@ else
             await LoadData();
             CloseModal();
             toast.Show("Adjustment added successfully.");
+            await AutoScheduleIfEnabled();
         }
         catch (ValidationException ex)
         {
@@ -434,6 +436,7 @@ else
             showDeleteConfirm = false;
             editingAdjustment = null;
             await LoadData();
+            await AutoScheduleIfEnabled();
         }
         finally
         {
@@ -466,6 +469,15 @@ else
         finally
         {
             isRefreshing = false;
+        }
+    }
+
+    private async Task AutoScheduleIfEnabled()
+    {
+        if (autoSchedule.IsEnabled)
+        {
+            await Mediator.Send(new RunSchedulerCommand());
+            await LoadData();
         }
     }
 }
