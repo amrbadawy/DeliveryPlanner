@@ -50,10 +50,14 @@ test.describe('Layout Features', () => {
     await gotoPage(page, '/tasks');
 
     await page.keyboard.press('Control+k');
-    await expect(page.getByTestId('command-palette')).toBeVisible();
+    const palette = page.getByTestId('command-palette');
+    const input = page.getByTestId('command-palette-input');
+    await expect(palette).toBeVisible();
+    await expect(input).toBeVisible();
+    await input.click();
 
-    await page.keyboard.press('Escape');
-    await expect(page.getByTestId('command-palette')).toBeHidden();
+    await input.press('Escape');
+    await expect(palette).toBeHidden();
   });
 
   test('command palette lists all expected pages', async ({ page }) => {
