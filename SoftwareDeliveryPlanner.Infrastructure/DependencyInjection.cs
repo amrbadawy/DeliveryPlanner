@@ -14,6 +14,26 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        var plannerDbPath = configuration["PLANNER_DB_PATH"];
+
+        // Playwright E2E runs set PLANNER_DB_PATH to force an isolated SQLite file per run.
+        // In normal local/dev/prod environments this value is absent and SQL Server is used.
+        if (!string.IsNullOrWhiteSpace(plannerDbPath))
+        {
+            var sqliteConnectionString = $"Data Source={plannerDbPath}";
+
+            services.AddDbContextFactory<PlannerDbContext>(options =>
+            {
+                options.UseSqlite(sqliteConnectionString);
+            });
+
+            services.AddDbContextFactory<ReadOnlyPlannerDbContext>(options =>
+            {
+                options.UseSqlite(sqliteConnectionString);
+            });
+        }
+        else
+        {
         var connectionString = configuration.GetConnectionString("PlannerDb")
             ?? throw new InvalidOperationException("Connection string 'PlannerDb' is not configured.");
 
@@ -29,6 +49,7 @@ public static class DependencyInjection
         {
             options.UseSqlServer(readOnlyConnectionString);
         });
+        }
 
         services.AddScoped<IDatabaseMigrator, DatabaseMigrator>();
         services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
@@ -75,7 +96,8 @@ public static class DependencyInjection
         // AND distinct from the primary. In Development both point to the same _Dev database,
         // so only one check appears. In Production with a real AlwaysOn replica, both appear.
         var readOnlyCs = configuration.GetConnectionString("PlannerDbReadOnly");
-        if (!string.IsNullOrEmpty(readOnlyCs) && readOnlyCs != connectionString)
+        var primaryCs = configuration.GetConnectionString("PlannerDb");
+        if (!string.IsNullOrEmpty(readOnlyCs) && readOnlyCs != primaryCs)
         {
             healthChecks.AddDbContextCheck<ReadOnlyPlannerDbContext>(
                 name: "ef-readonly",

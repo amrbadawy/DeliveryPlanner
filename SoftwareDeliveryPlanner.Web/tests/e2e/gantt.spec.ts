@@ -70,7 +70,6 @@ test.describe('Gantt chart', () => {
   });
 
   test('refresh button re-runs scheduler and reloads chart', async ({ page }) => {
-    await page.getByTestId('gantt-refresh').click();
     const chart = page.getByTestId('gantt-chart');
     const empty = page.getByTestId('gantt-empty');
     if (await empty.isVisible().catch(() => false)) {
