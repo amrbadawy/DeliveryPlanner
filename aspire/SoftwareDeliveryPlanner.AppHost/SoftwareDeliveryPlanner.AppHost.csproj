@@ -1,0 +1,29 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.2.2">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>aspire-SoftwareDeliveryPlanner-AppHost</UserSecretsId>
+  </PropertyGroup>
+
+  <!--
+    Aspire.Hosting.SqlServer is needed for AddConnectionString("PlannerDb") SQL Server modelling.
+    Aspire.Hosting.AppHost is automatically included by the SDK — no explicit reference needed.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.2.2" />
+  </ItemGroup>
+
+  <!--
+    Reference the Web project by path for orchestration only.
+    This is a build-time reference — it does NOT add runtime dependencies
+    to the Web project. The main solution (SoftwareDeliveryPlanner.slnx)
+    remains completely unaware of Aspire.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\SoftwareDeliveryPlanner.Web\SoftwareDeliveryPlanner.Web.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -34,3 +34,7 @@ coverage/
 # Logs and temporary files
 *.log
 *.tmp
+
+# Aspire working directory (dashboard state, local orchestration data)
+.aspire/
+aspire/**/.aspire/

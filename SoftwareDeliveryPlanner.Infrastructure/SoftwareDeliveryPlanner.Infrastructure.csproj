@@ -22,6 +22,8 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <!-- Health checks -->
+    <PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="9.0.0" />
   </ItemGroup>
 
 </Project>

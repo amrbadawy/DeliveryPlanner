@@ -1,0 +1,15 @@
+<Solution>
+  <!--
+    Software Delivery Planner — Aspire Orchestration Solution
+    
+    This is a completely standalone solution. It contains only the Aspire
+    AppHost project. It references the Web project by path for orchestration
+    purposes only. The main application solution (SoftwareDeliveryPlanner.slnx)
+    remains completely unchanged and unaware of Aspire.
+    
+    Usage:
+      aspire run    — from this folder, launches dashboard + app
+      dotnet run    — from SoftwareDeliveryPlanner.AppHost/ folder
+  -->
+  <Project Path="SoftwareDeliveryPlanner.AppHost\SoftwareDeliveryPlanner.AppHost.csproj" />
+</Solution>
