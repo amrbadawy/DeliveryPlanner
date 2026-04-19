@@ -43,16 +43,16 @@ test.describe('Task Details + Notes', () => {
     await noteInput.fill(noteText);
     await addBtn.click();
 
-    // Note should appear
-    await expect(notesSection.locator('div', { hasText: noteText })).toBeVisible({ timeout: 10_000 });
+    // Note should appear (use exact text to avoid matching parent divs)
+    await expect(notesSection.getByText(noteText, { exact: true })).toBeVisible({ timeout: 10_000 });
 
-    // Delete the note
-    const noteElement = notesSection.locator(`div:has-text("${noteText}")`).first();
-    const deleteBtn = noteElement.locator('button[data-testid^="task-note-delete-"]');
+    // Delete the note — find the note row that contains our text, then click its delete button
+    const noteRow = notesSection.locator('[data-testid^="task-note-"]').filter({ hasText: noteText });
+    const deleteBtn = noteRow.locator('button[data-testid^="task-note-delete-"]');
     await deleteBtn.click();
 
     // Note should be gone
-    await expect(notesSection.locator(`div:has-text("${noteText}")`).first()).toBeHidden({ timeout: 10_000 });
+    await expect(notesSection.getByText(noteText, { exact: true })).toBeHidden({ timeout: 10_000 });
   });
 
   test('add note via Enter key', async ({ page }) => {
@@ -72,9 +72,13 @@ test.describe('Task Details + Notes', () => {
     const noteInput = page.getByTestId('task-note-input');
 
     await noteInput.fill(noteText);
+    // Blur to ensure Blazor @bind (change event) processes via SignalR, then re-focus and press Enter
+    await noteInput.blur();
+    await page.waitForTimeout(1000);
+    await noteInput.focus();
     await noteInput.press('Enter');
 
-    await expect(notesSection.locator('div', { hasText: noteText })).toBeVisible({ timeout: 10_000 });
+    await expect(notesSection.getByText(noteText, { exact: true })).toBeVisible({ timeout: 10_000 });
   });
 
   test('back button navigates to tasks page', async ({ page }) => {

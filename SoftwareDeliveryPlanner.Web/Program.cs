@@ -1,3 +1,5 @@
+using System.Reflection;
+using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
@@ -17,6 +19,7 @@ var builder = WebApplication.CreateBuilder(args);
 // In standalone mode the OTLP exporter is not registered — zero export overhead.
 // ---------------------------------------------------------------------------
 const string serviceName = "SoftwareDeliveryPlanner";
+var serviceVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0";
 
 // Export to OTLP only when a collector endpoint is present (e.g. Aspire AppHost).
 // This env var is automatically injected by the Aspire AppHost during orchestration.
@@ -25,13 +28,21 @@ var hasOtlpCollector = !string.IsNullOrWhiteSpace(otlpEndpoint);
 
 builder.Services
     .AddOpenTelemetry()
-    .ConfigureResource(r => r.AddService(serviceName))
+    .ConfigureResource(r => r
+        .AddService(serviceName, serviceVersion: serviceVersion)
+        .AddAttributes(new Dictionary<string, object>
+        {
+            // Environment tag flows through to every trace, metric, and log —
+            // essential for filtering in production APM (Datadog, Grafana, Azure Monitor).
+            ["deployment.environment"] = builder.Environment.EnvironmentName
+        }))
     .WithTracing(tracing =>
     {
         tracing
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
-            .AddSource("Microsoft.EntityFrameworkCore");  // EF Core built-in activity source
+            .AddSource("Microsoft.EntityFrameworkCore")          // EF Core built-in activity source
+            .AddSource("SoftwareDeliveryPlanner.SchedulingEngine"); // Scheduling engine spans
 
         if (hasOtlpCollector)
             tracing.AddOtlpExporter();
@@ -41,7 +52,8 @@ builder.Services
         metrics
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
-            .AddRuntimeInstrumentation();
+            .AddRuntimeInstrumentation()
+            .AddMeter("SoftwareDeliveryPlanner.Scheduling"); // Scheduling run metrics
 
         if (hasOtlpCollector)
             metrics.AddOtlpExporter();
@@ -80,16 +92,30 @@ using (var scope = app.Services.CreateScope())
 
 // ---------------------------------------------------------------------------
 // Health endpoints
-//   /health  — readiness (includes SQL Server check)
-//   /alive   — liveness (process is up, no dependency checks)
+//
+//   /alive         — liveness  : process is up, no dependency checks.
+//                    Restricted to localhost — only Aspire/process manager needs it.
+//
+//   /health        — readiness : includes all registered checks (EF Core / SQL Server).
+//                    Restricted to localhost — only Aspire dashboard needs it.
+//
+//   /health/detail — full JSON : structured response for external monitoring agents
+//                    (Datadog, Azure Monitor, uptime checkers). Publicly accessible.
 // ---------------------------------------------------------------------------
-app.MapHealthChecks("/health", new HealthCheckOptions
-{
-    Predicate = _ => true   // include all registered checks
-});
 app.MapHealthChecks("/alive", new HealthCheckOptions
 {
-    Predicate = r => r.Tags.Contains("live")   // liveness-only subset
+    Predicate = r => r.Tags.Contains("live")
+}).RequireHost("localhost", "localhost:*", "127.0.0.1", "127.0.0.1:*");
+
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    Predicate = _ => true
+}).RequireHost("localhost", "localhost:*", "127.0.0.1", "127.0.0.1:*");
+
+app.MapHealthChecks("/health/detail", new HealthCheckOptions
+{
+    Predicate = _ => true,
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse  // structured JSON
 });
 
 // Configure the HTTP request pipeline.

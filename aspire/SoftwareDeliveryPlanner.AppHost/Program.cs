@@ -14,11 +14,14 @@
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-// External SQL Server resource — uses existing local SQL Server, no container needed.
-// Connection string is read from this project's appsettings.json.
+// External SQL Server resources — uses existing local SQL Server, no container needed.
+// Connection strings are read from this project's appsettings.json and injected into
+// the Web project as environment variables (ConnectionStrings__PlannerDb etc.).
 var plannerDb = builder.AddConnectionString("PlannerDb");
+var plannerDbReadOnly = builder.AddConnectionString("PlannerDbReadOnly");
 
 builder.AddProject<Projects.SoftwareDeliveryPlanner_Web>("web")
-    .WithReference(plannerDb);
+    .WithReference(plannerDb)
+    .WithReference(plannerDbReadOnly);
 
 await builder.Build().RunAsync();

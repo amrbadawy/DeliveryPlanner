@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using SoftwareDeliveryPlanner.Application.Abstractions;
 using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Domain;
@@ -7,6 +8,10 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Services;
 
 internal class SchedulingEngine : ISchedulingEngine
 {
+    // ActivitySource for distributed tracing — registered in Program.cs via AddSource().
+    // Produces spans visible in the Aspire dashboard and any OTLP-compatible APM.
+    internal static readonly ActivitySource ActivitySource =
+        new("SoftwareDeliveryPlanner.SchedulingEngine", "1.0.0");
     private readonly PlannerDbContext _db;
     private readonly TimeProvider _timeProvider;
     private readonly int _atRiskThreshold;
@@ -118,6 +123,8 @@ internal class SchedulingEngine : ISchedulingEngine
 
     public string RunScheduler()
     {
+        using var activity = ActivitySource.StartActivity("RunScheduler", ActivityKind.Internal);
+
         // Prime the holiday cache once at the start (eliminates 1460+ individual DB queries)
         _holidayCache = _db.Holidays.ToList();
 
@@ -327,7 +334,14 @@ internal class SchedulingEngine : ISchedulingEngine
 
         _db.SaveChanges();
 
-        return $"Successfully scheduled {tasks.Count} tasks with {allocations.Count} allocations";
+        var resultMessage = $"Successfully scheduled {tasks.Count} tasks with {allocations.Count} allocations";
+
+        // Tag the trace span with scheduling outcome — visible in Aspire dashboard and APM tools.
+        activity?.SetTag("scheduling.task_count", tasks.Count);
+        activity?.SetTag("scheduling.allocation_count", allocations.Count);
+        activity?.SetTag("scheduling.status", "success");
+
+        return resultMessage;
     }
 
     public Dictionary<string, object> GetDashboardKPIs()

@@ -23,11 +23,25 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
       - name: Restore
         run: dotnet restore SoftwareDeliveryPlanner.slnx
 
       - name: Build
         run: dotnet build SoftwareDeliveryPlanner.slnx --configuration Release --no-restore
+
+      - name: Restore Aspire solution
+        run: dotnet restore aspire/SoftwareDeliveryPlanner.Aspire.slnx
+
+      - name: Build Aspire solution
+        run: dotnet build aspire/SoftwareDeliveryPlanner.Aspire.slnx --configuration Release --no-restore
 
       - name: Test
         run: dotnet test SoftwareDeliveryPlanner.Tests/SoftwareDeliveryPlanner.Tests.csproj --configuration Release --no-build
@@ -39,6 +53,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      - name: Cache Node modules
+        uses: actions/cache@v4
+        with:
+          path: SoftwareDeliveryPlanner.Web/node_modules
+          key: node-${{ runner.os }}-${{ hashFiles('SoftwareDeliveryPlanner.Web/package-lock.json') }}
+          restore-keys: |
+            node-${{ runner.os }}-
 
       - name: Install Playwright Dependencies
         working-directory: SoftwareDeliveryPlanner.Web

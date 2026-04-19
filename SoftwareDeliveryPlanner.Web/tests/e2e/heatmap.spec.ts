@@ -4,7 +4,7 @@ import { gotoPage, runSchedulerFromDashboard } from './helpers';
 test.describe('Workload Heatmap', () => {
   test('heatmap page loads and shows heading', async ({ page }) => {
     await gotoPage(page, '/heatmap');
-    await expect(page.getByRole('heading', { name: /Heatmap/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Resource Workload/ })).toBeVisible();
   });
 
   test('heatmap shows table after scheduler run', async ({ page }) => {

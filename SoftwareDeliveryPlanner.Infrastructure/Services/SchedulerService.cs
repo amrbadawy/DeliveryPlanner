@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using SoftwareDeliveryPlanner.Application.Abstractions;
@@ -9,6 +11,19 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Services;
 
 internal sealed class SchedulerService : ServiceBase, ISchedulerService
 {
+    // Meter for scheduling metrics — registered in Program.cs via AddMeter().
+    // Metrics are exported to the Aspire dashboard Metrics tab and any OTLP-compatible APM.
+    private static readonly Meter Meter = new("SoftwareDeliveryPlanner.Scheduling", "1.0.0");
+    private static readonly Histogram<double> RunDuration =
+        Meter.CreateHistogram<double>("scheduling.run.duration", unit: "ms",
+            description: "Duration of each scheduler run in milliseconds");
+    private static readonly Histogram<int> TasksScheduled =
+        Meter.CreateHistogram<int>("scheduling.tasks.scheduled",
+            description: "Number of tasks processed per scheduler run");
+    private static readonly Histogram<int> AtRiskCount =
+        Meter.CreateHistogram<int>("scheduling.risk.atrisk_count",
+            description: "Number of AtRisk + Late tasks after each scheduler run");
+
     public SchedulerService(
         IDbContextFactory<PlannerDbContext> dbFactory,
         IDbContextFactory<ReadOnlyPlannerDbContext> readOnlyDbFactory,
@@ -18,6 +33,8 @@ internal sealed class SchedulerService : ServiceBase, ISchedulerService
 
     public async Task<string> RunSchedulerAsync(CancellationToken cancellationToken = default)
     {
+        var sw = Stopwatch.StartNew();
+
         // Capture pre-run risk states for notification detection
         await using var db = await DbFactory.CreateDbContextAsync(cancellationToken);
         var preRunRisks = await db.Tasks
@@ -39,12 +56,13 @@ internal sealed class SchedulerService : ServiceBase, ISchedulerService
 
         // Record scheduler snapshot for risk trend
         var kpis = engine.GetDashboardKPIs();
-        var snapshot = SchedulerSnapshot.Create(
-            now,
-            onTrack: (int)kpis["on_track"],
-            atRisk: (int)kpis["at_risk"],
-            late: (int)kpis["late"],
-            total: (int)kpis["total_services"]);
+        var onTrack = (int)kpis["on_track"];
+        var atRisk = (int)kpis["at_risk"];
+        var late = (int)kpis["late"];
+        var total = (int)kpis["total_services"];
+
+        var snapshot = SchedulerSnapshot.Create(now,
+            onTrack: onTrack, atRisk: atRisk, late: late, total: total);
         db.SchedulerSnapshots.Add(snapshot);
 
         // Detect risk changes and create notifications
@@ -75,6 +93,12 @@ internal sealed class SchedulerService : ServiceBase, ISchedulerService
         }
 
         await db.SaveChangesAsync(cancellationToken);
+
+        // Record scheduling metrics for Aspire dashboard / APM
+        sw.Stop();
+        RunDuration.Record(sw.Elapsed.TotalMilliseconds);
+        TasksScheduled.Record(total);
+        AtRiskCount.Record(atRisk + late);
 
         return result;
     }

@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using SoftwareDeliveryPlanner.Application.Abstractions;
 using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Infrastructure.Extensions;
@@ -52,14 +53,43 @@ public static class DependencyInjection
         // (MediatR auto-scan only covers the Application assembly)
         services.AddTransient<INotificationHandler<DomainEventNotification>, DomainEventAuditHandler>();
 
+        // ---------------------------------------------------------------------------
         // Health checks
-        // "sqlserver" check is tagged "ready" (readiness probe) — not "live" (liveness probe).
-        // This allows /alive to return healthy even when the DB is briefly unreachable.
-        services.AddHealthChecks()
-            .AddSqlServer(
-                connectionString: connectionString,
-                name: "sqlserver",
-                tags: ["ready"]);
+        // Uses EF Core DbContextFactory checks (official Microsoft package) instead of
+        // raw SQL pings — catches misconfigured EF options, migration issues, and
+        // connection pool exhaustion that a bare SELECT 1 would miss.
+        //
+        // Tags:
+        //   "ready" — readiness probe (/health endpoint). DB must be up.
+        //   "live"  — liveness probe (/alive endpoint). No DB dependency — intentionally absent.
+        //
+        // Timeout: 5s per check — prevents a hung DB connection from blocking /health indefinitely.
+        // ---------------------------------------------------------------------------
+        var healthChecks = services.AddHealthChecks()
+            .AddDbContextCheck<PlannerDbContext>(
+                name: "ef-primary",
+                tags: ["ready"],
+                customTestQuery: (db, ct) => db.Settings.AnyAsync(ct));
+
+        // Only register the read-only check when its connection string is explicitly configured
+        // AND distinct from the primary. In Development both point to the same _Dev database,
+        // so only one check appears. In Production with a real AlwaysOn replica, both appear.
+        var readOnlyCs = configuration.GetConnectionString("PlannerDbReadOnly");
+        if (!string.IsNullOrEmpty(readOnlyCs) && readOnlyCs != connectionString)
+        {
+            healthChecks.AddDbContextCheck<ReadOnlyPlannerDbContext>(
+                name: "ef-readonly",
+                tags: ["ready"],
+                customTestQuery: (db, ct) => db.Settings.AnyAsync(ct));
+        }
+
+        // Health check publisher: controls how often background health checks are polled.
+        // Default is 30s delay + 30s period — too slow for Aspire dashboard real-time feedback.
+        services.Configure<HealthCheckPublisherOptions>(opts =>
+        {
+            opts.Delay = TimeSpan.FromSeconds(5);    // first check 5s after startup
+            opts.Period = TimeSpan.FromSeconds(15);  // re-check every 15s
+        });
 
         return services;
     }

@@ -7,24 +7,24 @@ test.describe('Activity / Audit Log', () => {
     await expect(page.getByRole('heading', { name: /Activity Log/ })).toBeVisible();
   });
 
-  test('audit log shows entries after CRUD operations', async ({ page }) => {
+  test('audit log shows feed or empty state after loading', async ({ page }) => {
     // Run scheduler to seed data and trigger domain events
     await runSchedulerFromDashboard(page);
     await gotoPage(page, '/audit-log');
 
-    // Click refresh
+    // Click refresh and wait for loading to complete
     const refreshBtn = page.getByTestId('audit-refresh');
     await expect(refreshBtn).toBeVisible();
     await refreshBtn.click();
 
-    // Check if feed has entries (may or may not depending on domain event registration)
+    // Wait for loading state to complete — poll until feed or empty state appears
     const feed = page.getByTestId('audit-feed');
     const empty = page.getByTestId('audit-empty');
 
-    // Either the feed is visible with entries, or the empty state is shown
-    const feedVisible = await feed.isVisible().catch(() => false);
-    const emptyVisible = await empty.isVisible().catch(() => false);
-    expect(feedVisible || emptyVisible).toBeTruthy();
+    await expect.poll(
+      async () => (await feed.isVisible()) || (await empty.isVisible()),
+      { timeout: 15_000 }
+    ).toBeTruthy();
   });
 
   test('refresh button reloads audit entries', async ({ page }) => {
