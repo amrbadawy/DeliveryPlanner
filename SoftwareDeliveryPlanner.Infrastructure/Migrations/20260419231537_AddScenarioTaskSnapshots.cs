@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -13,6 +13,12 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // ── Migrate existing resource data: old role codes → new codes ──
+            migrationBuilder.Sql("UPDATE [resource].[Resources] SET [Role] = 'DEV' WHERE [Role] = 'Developer';");
+            migrationBuilder.Sql("UPDATE [resource].[Resources] SET [Role] = 'DEV' WHERE [Role] = 'Senior Developer';");
+            migrationBuilder.Sql("UPDATE [resource].[Resources] SET [Role] = 'DEV' WHERE [Role] = 'Tech Lead';");
+
+            // ── Remove old Roles seed data ──
             migrationBuilder.DeleteData(
                 schema: "resource",
                 table: "Roles",
@@ -37,6 +43,38 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                 keyColumn: "Id",
                 keyValue: 4);
 
+            // ── Remove old LookupValues: ResourceRole (ids 16-19) + WorkingWeek (ids 20-21) ──
+            migrationBuilder.DeleteData(
+                table: "LookupValues",
+                keyColumn: "Id",
+                keyValue: 16);
+
+            migrationBuilder.DeleteData(
+                table: "LookupValues",
+                keyColumn: "Id",
+                keyValue: 17);
+
+            migrationBuilder.DeleteData(
+                table: "LookupValues",
+                keyColumn: "Id",
+                keyValue: 18);
+
+            migrationBuilder.DeleteData(
+                table: "LookupValues",
+                keyColumn: "Id",
+                keyValue: 19);
+
+            migrationBuilder.DeleteData(
+                table: "LookupValues",
+                keyColumn: "Id",
+                keyValue: 20);
+
+            migrationBuilder.DeleteData(
+                table: "LookupValues",
+                keyColumn: "Id",
+                keyValue: 21);
+
+            // ── Create ScenarioTaskSnapshots table ──
             migrationBuilder.CreateTable(
                 name: "ScenarioTaskSnapshots",
                 schema: "planning",
@@ -73,48 +111,21 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
-            migrationBuilder.UpdateData(
+            // ── Insert new ResourceRole LookupValues ──
+            migrationBuilder.InsertData(
                 table: "LookupValues",
-                keyColumn: "Id",
-                keyValue: 16,
-                column: "Code",
-                value: "DEV");
+                columns: new[] { "Id", "Category", "Code", "DisplayName", "IsActive", "SortOrder" },
+                values: new object[,]
+                {
+                    { 16, "ResourceRole", "DEV", "Developer", true, 1 },
+                    { 17, "ResourceRole", "QA", "Quality Assurance", true, 2 },
+                    { 18, "ResourceRole", "SA", "System Analyst", true, 3 },
+                    { 19, "ResourceRole", "BA", "Business Analyst", true, 4 },
+                    { 20, "ResourceRole", "UX", "UX Designer", true, 5 },
+                    { 21, "ResourceRole", "UI", "UI Designer", true, 6 }
+                });
 
-            migrationBuilder.UpdateData(
-                table: "LookupValues",
-                keyColumn: "Id",
-                keyValue: 17,
-                columns: new[] { "Code", "DisplayName" },
-                values: new object[] { "QA", "Quality Assurance" });
-
-            migrationBuilder.UpdateData(
-                table: "LookupValues",
-                keyColumn: "Id",
-                keyValue: 18,
-                columns: new[] { "Code", "DisplayName" },
-                values: new object[] { "SA", "System Analyst" });
-
-            migrationBuilder.UpdateData(
-                table: "LookupValues",
-                keyColumn: "Id",
-                keyValue: 19,
-                columns: new[] { "Code", "DisplayName" },
-                values: new object[] { "BA", "Business Analyst" });
-
-            migrationBuilder.UpdateData(
-                table: "LookupValues",
-                keyColumn: "Id",
-                keyValue: 20,
-                columns: new[] { "Category", "Code", "DisplayName", "SortOrder" },
-                values: new object[] { "ResourceRole", "UX", "UX Designer", 5 });
-
-            migrationBuilder.UpdateData(
-                table: "LookupValues",
-                keyColumn: "Id",
-                keyValue: 21,
-                columns: new[] { "Category", "Code", "DisplayName", "SortOrder" },
-                values: new object[] { "ResourceRole", "UI", "UI Designer", 6 });
-
+            // ── Insert new WorkingWeek LookupValues ──
             migrationBuilder.InsertData(
                 table: "LookupValues",
                 columns: new[] { "Id", "Category", "Code", "DisplayName", "IsActive", "SortOrder" },
@@ -124,6 +135,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     { 23, "WorkingWeek", "mon_fri", "Monday - Friday", true, 2 }
                 });
 
+            // ── Insert new Roles seed data ──
             migrationBuilder.InsertData(
                 schema: "resource",
                 table: "Roles",
@@ -152,6 +164,37 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                 name: "ScenarioTaskSnapshots",
                 schema: "planning");
 
+            // ── Remove new LookupValues ──
+            migrationBuilder.DeleteData(
+                table: "LookupValues",
+                keyColumn: "Id",
+                keyValue: 16);
+
+            migrationBuilder.DeleteData(
+                table: "LookupValues",
+                keyColumn: "Id",
+                keyValue: 17);
+
+            migrationBuilder.DeleteData(
+                table: "LookupValues",
+                keyColumn: "Id",
+                keyValue: 18);
+
+            migrationBuilder.DeleteData(
+                table: "LookupValues",
+                keyColumn: "Id",
+                keyValue: 19);
+
+            migrationBuilder.DeleteData(
+                table: "LookupValues",
+                keyColumn: "Id",
+                keyValue: 20);
+
+            migrationBuilder.DeleteData(
+                table: "LookupValues",
+                keyColumn: "Id",
+                keyValue: 21);
+
             migrationBuilder.DeleteData(
                 table: "LookupValues",
                 keyColumn: "Id",
@@ -162,6 +205,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                 keyColumn: "Id",
                 keyValue: 23);
 
+            // ── Remove new Roles ──
             migrationBuilder.DeleteData(
                 schema: "resource",
                 table: "Roles",
@@ -198,48 +242,21 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                 keyColumn: "Id",
                 keyValue: 6);
 
-            migrationBuilder.UpdateData(
+            // ── Restore original LookupValues ──
+            migrationBuilder.InsertData(
                 table: "LookupValues",
-                keyColumn: "Id",
-                keyValue: 16,
-                column: "Code",
-                value: "Developer");
+                columns: new[] { "Id", "Category", "Code", "DisplayName", "IsActive", "SortOrder" },
+                values: new object[,]
+                {
+                    { 16, "ResourceRole", "Developer", "Developer", true, 1 },
+                    { 17, "ResourceRole", "Senior Developer", "Senior Developer", true, 2 },
+                    { 18, "ResourceRole", "Tech Lead", "Tech Lead", true, 3 },
+                    { 19, "ResourceRole", "QA", "QA", true, 4 },
+                    { 20, "WorkingWeek", "sun_thu", "Sunday - Thursday", true, 1 },
+                    { 21, "WorkingWeek", "mon_fri", "Monday - Friday", true, 2 }
+                });
 
-            migrationBuilder.UpdateData(
-                table: "LookupValues",
-                keyColumn: "Id",
-                keyValue: 17,
-                columns: new[] { "Code", "DisplayName" },
-                values: new object[] { "Senior Developer", "Senior Developer" });
-
-            migrationBuilder.UpdateData(
-                table: "LookupValues",
-                keyColumn: "Id",
-                keyValue: 18,
-                columns: new[] { "Code", "DisplayName" },
-                values: new object[] { "Tech Lead", "Tech Lead" });
-
-            migrationBuilder.UpdateData(
-                table: "LookupValues",
-                keyColumn: "Id",
-                keyValue: 19,
-                columns: new[] { "Code", "DisplayName" },
-                values: new object[] { "QA", "QA" });
-
-            migrationBuilder.UpdateData(
-                table: "LookupValues",
-                keyColumn: "Id",
-                keyValue: 20,
-                columns: new[] { "Category", "Code", "DisplayName", "SortOrder" },
-                values: new object[] { "WorkingWeek", "sun_thu", "Sunday - Thursday", 1 });
-
-            migrationBuilder.UpdateData(
-                table: "LookupValues",
-                keyColumn: "Id",
-                keyValue: 21,
-                columns: new[] { "Category", "Code", "DisplayName", "SortOrder" },
-                values: new object[] { "WorkingWeek", "mon_fri", "Monday - Friday", 2 });
-
+            // ── Restore original Roles ──
             migrationBuilder.InsertData(
                 schema: "resource",
                 table: "Roles",
@@ -251,6 +268,9 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     { 3, "Tech Lead", "Tech Lead", true, 3 },
                     { 4, "QA", "QA", true, 4 }
                 });
+
+            // ── Revert resource data ──
+            migrationBuilder.Sql("UPDATE [resource].[Resources] SET [Role] = 'Developer' WHERE [Role] = 'DEV';");
         }
     }
 }
