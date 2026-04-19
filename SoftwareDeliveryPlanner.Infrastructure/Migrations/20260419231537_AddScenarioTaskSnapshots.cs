@@ -14,9 +14,15 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             // ── Migrate existing resource data: old role codes → new codes ──
-            migrationBuilder.Sql("UPDATE [resource].[Resources] SET [Role] = 'DEV' WHERE [Role] = 'Developer';");
-            migrationBuilder.Sql("UPDATE [resource].[Resources] SET [Role] = 'DEV' WHERE [Role] = 'Senior Developer';");
-            migrationBuilder.Sql("UPDATE [resource].[Resources] SET [Role] = 'DEV' WHERE [Role] = 'Tech Lead';");
+            // Guarded with IF EXISTS so migration is safe on fresh databases
+            migrationBuilder.Sql(@"
+                IF OBJECT_ID('[resource].[TeamMembers]', 'U') IS NOT NULL
+                BEGIN
+                    UPDATE [resource].[TeamMembers] SET [Role] = 'DEV' WHERE [Role] = 'Developer';
+                    UPDATE [resource].[TeamMembers] SET [Role] = 'DEV' WHERE [Role] = 'Senior Developer';
+                    UPDATE [resource].[TeamMembers] SET [Role] = 'DEV' WHERE [Role] = 'Tech Lead';
+                END
+            ");
 
             // ── Remove old Roles seed data ──
             migrationBuilder.DeleteData(
@@ -270,7 +276,12 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                 });
 
             // ── Revert resource data ──
-            migrationBuilder.Sql("UPDATE [resource].[Resources] SET [Role] = 'Developer' WHERE [Role] = 'DEV';");
+            migrationBuilder.Sql(@"
+                IF OBJECT_ID('[resource].[TeamMembers]', 'U') IS NOT NULL
+                BEGIN
+                    UPDATE [resource].[TeamMembers] SET [Role] = 'Developer' WHERE [Role] = 'DEV';
+                END
+            ");
         }
     }
 }
