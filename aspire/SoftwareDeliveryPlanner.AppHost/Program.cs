@@ -21,4 +21,4 @@ var plannerDb = builder.AddConnectionString("PlannerDb");
 builder.AddProject<Projects.SoftwareDeliveryPlanner_Web>("web")
     .WithReference(plannerDb);
 
-builder.Build().Run();
+await builder.Build().RunAsync();
