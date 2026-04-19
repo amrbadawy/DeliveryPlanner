@@ -22,6 +22,7 @@ public class SqlServerFixture : IAsyncLifetime
 {
     private const string EnvVarName = "TEST_SQL_CONNECTION";
     private const string DefaultConnectionString = "Server=.;Trusted_Connection=True;TrustServerCertificate=True;";
+    private const string SharedDatabaseName = "SoftwareDeliveryPlannerTest";
 
     private string _baseConnectionString = string.Empty;
     private readonly ConcurrentBag<string> _createdDatabases = new();
@@ -32,19 +33,20 @@ public class SqlServerFixture : IAsyncLifetime
     public string ConnectionString => _baseConnectionString;
 
     /// <summary>
-    /// Returns a connection string pointing to a new, uniquely named database
-    /// on the SQL Server instance. Each test class should call this once in
-    /// its constructor to get full isolation.
+    /// Returns a connection string pointing to the shared test database
+    /// on the SQL Server instance. The database is recreated for each call
+    /// to ensure a clean state between test fixtures.
     /// The database is pre-created with small initial file sizes (4 MB data /
-    /// 2 MB log, 1 MB growth) so that many concurrent test databases don't
-    /// exhaust limited disk space.
+    /// 2 MB log, 1 MB growth).
     /// </summary>
     public string CreateDatabaseConnectionString(string? databaseName = null)
     {
-        var dbName = databaseName ?? $"Test_{Guid.NewGuid():N}";
+        var dbName = string.IsNullOrWhiteSpace(databaseName)
+            ? SharedDatabaseName
+            : databaseName;
         _createdDatabases.Add(dbName);
 
-        PreCreateSmallDatabase(dbName);
+        RecreateSmallDatabase(dbName);
 
         var builder = new SqlConnectionStringBuilder(_baseConnectionString)
         {
@@ -55,12 +57,11 @@ public class SqlServerFixture : IAsyncLifetime
     }
 
     /// <summary>
-    /// Pre-creates the database with minimal file sizes so that EF Core's
+    /// Recreates the database with minimal file sizes so that EF Core's
     /// <c>Migrate()</c> call doesn't inherit the model database's potentially
-    /// large default filegrowth (e.g. 64 MB), which would exhaust disk space
-    /// when many test databases are created in parallel.
+    /// large default filegrowth.
     /// </summary>
-    private void PreCreateSmallDatabase(string dbName)
+    private void RecreateSmallDatabase(string dbName)
     {
         var masterBuilder = new SqlConnectionStringBuilder(_baseConnectionString)
         {
@@ -80,6 +81,12 @@ public class SqlServerFixture : IAsyncLifetime
 
         // dbName is a GUID — no injection risk.
         var sql = $"""
+            IF DB_ID(N'{dbName}') IS NOT NULL
+            BEGIN
+                ALTER DATABASE [{dbName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                DROP DATABASE [{dbName}];
+            END
+
             CREATE DATABASE [{dbName}]
             ON PRIMARY (
                 NAME = N'{dbName}',
@@ -165,8 +172,8 @@ public class SqlServerFixture : IAsyncLifetime
     }
 
     /// <summary>
-    /// Drops any <c>Test_*</c> databases left over from previous test runs
-    /// that crashed or timed out before <see cref="DisposeAsync"/> could execute.
+    /// Drops stale test databases left over from previous test runs that
+    /// crashed or timed out before <see cref="DisposeAsync"/> could execute.
     /// </summary>
     private async Task DropStaleTestDatabasesAsync()
     {
@@ -185,7 +192,7 @@ public class SqlServerFixture : IAsyncLifetime
                 DECLARE @sql NVARCHAR(MAX) = N'';
                 SELECT @sql += N'ALTER DATABASE [' + name + N'] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [' + name + N']; '
                 FROM sys.databases
-                WHERE name LIKE 'Test_%';
+                WHERE name = 'SoftwareDeliveryPlannerTest' OR name LIKE 'Test_%';
                 EXEC sp_executesql @sql;
                 """;
 

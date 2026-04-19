@@ -59,13 +59,10 @@ internal sealed class DatabaseSeeder : IDatabaseSeeder
     private static void SeedHolidays(PlannerDbContext db)
     {
         db.Holidays.AddRange(
-            Holiday.Create("عيد رأس السنة الميلادية", new DateTime(2026, 1, 1), DomainConstants.HolidayType.National),
             Holiday.Create("يوم التأسيس السعودي", new DateTime(2026, 2, 22), DomainConstants.HolidayType.National),
             Holiday.Create("عيد الفطر المبارك", new DateTime(2026, 3, 30), new DateTime(2026, 4, 2), DomainConstants.HolidayType.Religious),
             Holiday.Create("يوم عرفات وعيد الأضحى المبارك", new DateTime(2026, 5, 27), new DateTime(2026, 5, 30), DomainConstants.HolidayType.Religious),
-            Holiday.Create("يوم عاشوراء", new DateTime(2026, 9, 17), DomainConstants.HolidayType.Religious),
-            Holiday.Create("اليوم الوطني", new DateTime(2026, 9, 23), DomainConstants.HolidayType.National),
-            Holiday.Create("يوم العلم", new DateTime(2026, 3, 11), DomainConstants.HolidayType.National)
+            Holiday.Create("اليوم الوطني", new DateTime(2026, 9, 23), DomainConstants.HolidayType.National)
         );
     }
 
