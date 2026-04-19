@@ -19,6 +19,7 @@ internal class PlannerDbContext : DbContext
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<RiskNotification> RiskNotifications => Set<RiskNotification>();
     public DbSet<PlanScenario> PlanScenarios => Set<PlanScenario>();
+    public DbSet<ScenarioTaskSnapshot> ScenarioTaskSnapshots => Set<ScenarioTaskSnapshot>();
 
     public PlannerDbContext(DbContextOptions<PlannerDbContext> options) : base(options)
     {

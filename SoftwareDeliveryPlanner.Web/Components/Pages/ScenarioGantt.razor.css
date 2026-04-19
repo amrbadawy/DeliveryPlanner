@@ -1,0 +1,138 @@
+.gantt-container {
+    position: relative;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+}
+
+.gantt-header {
+    display: flex;
+    border-bottom: 2px solid var(--color-sidebar);
+    background: var(--color-sidebar);
+    color: var(--color-text-inverse);
+    font-size: var(--font-size-sm);
+    min-width: 800px;
+}
+
+.gantt-label-col {
+    min-width: 200px;
+    max-width: 200px;
+    padding: 6px 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-right: 1px solid var(--color-border);
+}
+
+.gantt-timeline-col {
+    flex: 1;
+    position: relative;
+    min-height: 32px;
+    padding: 4px 0;
+}
+
+.gantt-months {
+    display: flex;
+    position: relative;
+    height: 100%;
+}
+
+.gantt-month {
+    position: absolute;
+    text-align: center;
+    font-size: var(--font-size-xs);
+    padding: 4px 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.gantt-row {
+    display: flex;
+    border-bottom: 1px solid var(--color-border-light);
+    min-width: 800px;
+}
+
+.gantt-row:nth-child(even) {
+    background: var(--color-bg-secondary);
+}
+
+.gantt-row:hover {
+    background: var(--color-accent-light);
+}
+
+.gantt-task-id {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-right: 6px;
+}
+
+.gantt-task-name {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+}
+
+.gantt-bar {
+    position: absolute;
+    height: 20px;
+    top: 6px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-inverse);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    min-width: 2px;
+    box-shadow: var(--shadow-sm);
+}
+
+.gantt-bar-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 4px;
+}
+
+.gantt-strict-marker {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--color-danger);
+    z-index: 2;
+}
+
+.gantt-strict-marker::after {
+    content: "\25BC";
+    position: absolute;
+    top: -2px;
+    left: -5px;
+    font-size: var(--font-size-xs);
+    color: var(--color-danger);
+}
+
+.gantt-dep-indicator {
+    position: absolute;
+    right: 4px;
+    top: 8px;
+    font-size: var(--font-size-xs);
+}
+
+/* ── Gantt bar color classes ──────────────────────────────── */
+.gantt-bar-completed  { background: var(--color-success); }
+.gantt-bar-inprogress { background: var(--color-info); }
+.gantt-bar-notstarted { background: var(--color-neutral); }
+.gantt-bar-atrisk     { background: var(--color-warning); }
+.gantt-bar-late       { background: var(--color-danger); }
+
+/* ── Critical path highlight ─────────────────────────────── */
+.gantt-bar-critical {
+    outline: 2px solid var(--color-danger, #dc3545);
+    outline-offset: 1px;
+    animation: critical-pulse 2s ease-in-out infinite;
+}
+
+@keyframes critical-pulse {
+    0%, 100% { outline-color: var(--color-danger, #dc3545); }
+    50% { outline-color: transparent; }
+}

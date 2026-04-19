@@ -89,7 +89,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     public void GetDashboardKPIs_ResourceWithEndDateInPast_NotCountedAsActive()
     {
         // Add a resource whose EndDate has already passed
-        _db.Resources.Add(TeamMember.Create("RES-99", "Past Resource", "Developer", "Default", 100, 8, new DateTime(2020, 1, 1)));
+        _db.Resources.Add(TeamMember.Create("RES-99", "Past Resource", "DEV", "Default", 100, 8, new DateTime(2020, 1, 1)));
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
@@ -111,7 +111,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Resources.RemoveRange(_db.Resources);
         _db.SaveChanges();
 
-        _db.Resources.Add(TeamMember.Create("RES-10", "Expired", "Developer", "Default", 100, 8, new DateTime(2019, 1, 1), endDate: new DateTime(2020, 1, 1)));
+        _db.Resources.Add(TeamMember.Create("RES-10", "Expired", "DEV", "Default", 100, 8, new DateTime(2019, 1, 1), endDate: new DateTime(2020, 1, 1)));
         _db.Tasks.Add(TaskItem.Create("SV-102", "No Capacity Task", 5, 1, 5));
         _db.SaveChanges();
 
@@ -137,7 +137,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Resources.RemoveRange(_db.Resources);
         _db.SaveChanges();
 
-        _db.Resources.Add(TeamMember.Create("RES-11", "Adjustable", "Developer", "Default", 100, 8, new DateTime(2026, 1, 1)));
+        _db.Resources.Add(TeamMember.Create("RES-11", "Adjustable", "DEV", "Default", 100, 8, new DateTime(2026, 1, 1)));
         // Zero-capacity adjustment for the entire plan start month
         _db.Adjustments.Add(Adjustment.Create("RES-11", "Leave", 0, new DateTime(2026, 5, 1), new DateTime(2026, 5, 31), "Full leave"));
         _db.Tasks.Add(TaskItem.Create("SV-103", "Zero Adj Task", 3, 1, 5));
@@ -323,7 +323,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         // Add a single inactive resource
-        _db.Resources.Add(TeamMember.Create("RES-12", "Inactive Dev", "Developer", "Default", 100, 8, new DateTime(2026, 1, 1), active: "No"));
+        _db.Resources.Add(TeamMember.Create("RES-12", "Inactive Dev", "DEV", "Default", 100, 8, new DateTime(2026, 1, 1), active: "No"));
         _db.Tasks.Add(TaskItem.Create("SV-112", "Inactive Resources Task", 5, 1, 5));
         _db.SaveChanges();
 
@@ -710,7 +710,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Adjustments.RemoveRange(_db.Adjustments);
         _db.SaveChanges();
 
-        _db.Resources.Add(TeamMember.Create("RES-13", "Stack Test", "Developer", "Default", 100, 8, new DateTime(2026, 1, 1)));
+        _db.Resources.Add(TeamMember.Create("RES-13", "Stack Test", "DEV", "Default", 100, 8, new DateTime(2026, 1, 1)));
 
         // Two 50% adjustments stacking: 8 * (50/100) * (50/100) = 2
         _db.Adjustments.Add(Adjustment.Create("RES-13", "Training", 50, new DateTime(2026, 5, 1), new DateTime(2026, 5, 31)));
@@ -746,7 +746,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Resources.RemoveRange(_db.Resources);
         _db.SaveChanges();
 
-        _db.Resources.Add(TeamMember.Create("RES-14", "Future Dev", "Developer", "Default", 100, 8, new DateTime(2026, 8, 1)));
+        _db.Resources.Add(TeamMember.Create("RES-14", "Future Dev", "DEV", "Default", 100, 8, new DateTime(2026, 8, 1)));
         _db.Tasks.Add(TaskItem.Create("SV-119", "Future Resource Task", 3, 1, 5));
         _db.SaveChanges();
 

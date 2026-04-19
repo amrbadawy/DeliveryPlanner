@@ -9,12 +9,18 @@ internal sealed class SaveScenarioCommandHandler : IRequestHandler<SaveScenarioC
 {
     private readonly ISchedulerService _schedulerService;
     private readonly IScenarioOrchestrator _orchestrator;
+    private readonly ITaskOrchestrator _taskOrchestrator;
     private readonly TimeProvider _timeProvider;
 
-    public SaveScenarioCommandHandler(ISchedulerService schedulerService, IScenarioOrchestrator orchestrator, TimeProvider timeProvider)
+    public SaveScenarioCommandHandler(
+        ISchedulerService schedulerService,
+        IScenarioOrchestrator orchestrator,
+        ITaskOrchestrator taskOrchestrator,
+        TimeProvider timeProvider)
     {
         _schedulerService = schedulerService;
         _orchestrator = orchestrator;
+        _taskOrchestrator = taskOrchestrator;
         _timeProvider = timeProvider;
     }
 
@@ -34,7 +40,10 @@ internal sealed class SaveScenarioCommandHandler : IRequestHandler<SaveScenarioC
             request.Notes,
             _timeProvider.GetUtcNow().UtcDateTime);
 
-        await _orchestrator.SaveScenarioAsync(scenario);
+        // Snapshot all tasks for historical Gantt chart view
+        var tasks = await _taskOrchestrator.GetTasksAsync(cancellationToken);
+        await _orchestrator.SaveScenarioWithSnapshotsAsync(scenario, tasks);
+
         return Result.Success();
     }
 }

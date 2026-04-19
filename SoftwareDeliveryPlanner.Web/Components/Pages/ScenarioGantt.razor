@@ -1,0 +1,378 @@
+@page "/scenarios/{ScenarioId:int}/gantt"
+@using MediatR
+@using SoftwareDeliveryPlanner.Application.Scenarios.Queries
+@using SoftwareDeliveryPlanner.Domain.Models
+@using SoftwareDeliveryPlanner.Domain
+@inject IMediator Mediator
+@inject NavigationManager NavigationManager
+
+<PageTitle>Scenario Gantt Chart</PageTitle>
+
+@if (!isLoaded)
+{
+    <SkeletonLoader Variant="block" TestId="scenario-gantt-skeleton" />
+}
+else if (scenario is null)
+{
+    <div class="empty-state" data-testid="scenario-gantt-not-found">
+        <div class="empty-icon"><i class="bi bi-exclamation-triangle"></i></div>
+        <h5>Scenario not found</h5>
+        <p>The requested scenario does not exist or has been deleted.</p>
+        <button class="btn btn-outline-secondary" @onclick="GoBackToScenarios">
+            <i class="bi bi-arrow-left"></i> Back to Scenarios
+        </button>
+    </div>
+}
+else
+{
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-start mb-4 page-header">
+        <div>
+            <h3 class="mb-1" data-testid="scenario-gantt-title">
+                <i class="bi bi-bar-chart-steps me-2"></i>@scenario.ScenarioName
+            </h3>
+            <p class="page-subtitle">
+                Saved on @scenario.CreatedAt.ToString("MMM dd, yyyy HH:mm")
+                @if (!string.IsNullOrWhiteSpace(scenario.Notes))
+                {
+                    <span> &mdash; @scenario.Notes</span>
+                }
+            </p>
+        </div>
+        <div>
+            <button class="btn @(showCriticalPath ? "btn-danger" : "btn-outline-danger") me-2"
+                    @onclick="ToggleCriticalPath" data-testid="scenario-gantt-critical-path-toggle">
+                <i class="bi bi-lightning"></i> Critical Path
+            </button>
+            <button class="btn btn-outline-secondary" @onclick="GoBackToScenarios" data-testid="scenario-gantt-back">
+                <i class="bi bi-arrow-left"></i> Back to Scenarios
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI Summary Bar -->
+    <div class="row g-3 mb-4" data-testid="scenario-gantt-kpis">
+        <div class="col">
+            <div class="card border-0 shadow-sm text-center p-2">
+                <small class="text-muted">Total Tasks</small>
+                <div class="fw-bold">@scenario.TotalTasks</div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card border-0 shadow-sm text-center p-2">
+                <small class="text-muted">On Track</small>
+                <div class="fw-bold text-success">@scenario.OnTrackCount</div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card border-0 shadow-sm text-center p-2">
+                <small class="text-muted">At Risk</small>
+                <div class="fw-bold text-warning">@scenario.AtRiskCount</div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card border-0 shadow-sm text-center p-2">
+                <small class="text-muted">Late</small>
+                <div class="fw-bold text-danger">@scenario.LateCount</div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card border-0 shadow-sm text-center p-2">
+                <small class="text-muted">Latest Finish</small>
+                <div class="fw-bold">@(scenario.LatestFinish?.ToString("MMM dd, yyyy") ?? "—")</div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card border-0 shadow-sm text-center p-2">
+                <small class="text-muted">Total Est.</small>
+                <div class="fw-bold">@scenario.TotalEstimation.ToString("F1")</div>
+            </div>
+        </div>
+    </div>
+
+    @if (!scheduledTasks.Any())
+    {
+        <div class="empty-state" data-testid="scenario-gantt-empty">
+            <div class="empty-icon"><i class="bi bi-bar-chart-steps"></i></div>
+            <h5>No scheduled tasks in this snapshot</h5>
+            <p>This scenario was saved before the scheduler had assigned dates to any tasks.</p>
+            <button class="btn btn-outline-secondary" @onclick="GoBackToScenarios">
+                <i class="bi bi-arrow-left"></i> Back to Scenarios
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="mb-2 text-muted" data-testid="scenario-gantt-range">
+            Plan range: <strong>@planStart.ToString("yyyy-MM-dd")</strong> to <strong>@planEnd.ToString("yyyy-MM-dd")</strong>
+            (@totalDays days)
+        </div>
+
+        <!-- Legend -->
+        <div class="d-flex gap-3 mb-3" data-testid="scenario-gantt-legend">
+            <span><span class="badge gantt-bar-completed">&nbsp;&nbsp;</span> Completed</span>
+            <span><span class="badge gantt-bar-inprogress">&nbsp;&nbsp;</span> In Progress</span>
+            <span><span class="badge gantt-bar-notstarted">&nbsp;&nbsp;</span> Not Started</span>
+            <span><span class="badge gantt-bar-atrisk">&nbsp;&nbsp;</span> At Risk</span>
+            <span><span class="badge gantt-bar-late">&nbsp;&nbsp;</span> Late</span>
+            @if (showCriticalPath)
+            {
+                <span><span class="badge gantt-bar-critical">&nbsp;&nbsp;</span> Critical Path</span>
+            }
+        </div>
+
+        <!-- Gantt chart -->
+        <div class="gantt-container" data-testid="scenario-gantt-chart">
+            <div class="gantt-header">
+                <div class="gantt-label-col"><strong>Task</strong></div>
+                <div class="gantt-timeline-col">
+                    <div class="gantt-months">
+                        @foreach (var month in GetMonthMarkers())
+                        {
+                            <div class="gantt-month" style="left: @month.LeftPct%; width: @month.WidthPct%;">
+                                @month.Label
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @foreach (var task in scheduledTasks)
+            {
+                var barStyle = GetBarStyle(task);
+                var barClass = GetBarColorClass(task);
+                var tooltip = $"{task.TaskId}: {task.ServiceName}\n" +
+                              $"Start: {task.PlannedStart?.ToString("yyyy-MM-dd")}\n" +
+                              $"Finish: {task.PlannedFinish?.ToString("yyyy-MM-dd")}\n" +
+                              $"Duration: {task.Duration} days\n" +
+                              $"Status: {task.Status}\n" +
+                              $"Risk: {task.DeliveryRisk}";
+
+                <div class="gantt-row" data-testid="scenario-gantt-row-@task.TaskId">
+                    <div class="gantt-label-col" title="@task.ServiceName">
+                        <span class="gantt-task-id">@task.TaskId</span>
+                        <span class="gantt-task-name">@Truncate(task.ServiceName, 18)</span>
+                    </div>
+                    <div class="gantt-timeline-col">
+                        @if (task.PlannedStart.HasValue && task.PlannedFinish.HasValue)
+                        {
+                            <div class="gantt-bar @barClass @(IsCriticalTask(task) ? "gantt-bar-critical" : "")"
+                                 style="@barStyle" title="@tooltip"
+                                 data-testid="scenario-gantt-bar-@task.TaskId">
+                                <span class="gantt-bar-label">@task.Duration d</span>
+                            </div>
+
+                            @if (task.StrictDate.HasValue)
+                            {
+                                var strictPct = GetDatePercent(task.StrictDate.Value);
+                                <div class="gantt-strict-marker" style="left: @strictPct%;"
+                                     title="Strict: @task.StrictDate.Value.ToString("yyyy-MM-dd")"
+                                     data-testid="scenario-gantt-strict-@task.TaskId">
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(task.DependsOnTaskIds))
+                            {
+                                <span class="gantt-dep-indicator" title="Depends on: @task.DependsOnTaskIds">
+                                    <i class="bi bi-link-45deg"></i>
+                                </span>
+                            }
+                        }
+                        else
+                        {
+                            <span class="text-muted small">Not scheduled</span>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public int ScenarioId { get; set; }
+
+    private PlanScenario? scenario;
+    private List<ScenarioTaskSnapshot> scheduledTasks = new();
+    private DateTime planStart;
+    private DateTime planEnd;
+    private int totalDays;
+    private bool isLoaded;
+    private bool showCriticalPath;
+    private HashSet<string> criticalPathTaskIds = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Mediator.Send(new GetScenarioDetailQuery(ScenarioId));
+
+        if (result.IsSuccess)
+        {
+            scenario = result.Value;
+
+            scheduledTasks = scenario.TaskSnapshots
+                .Where(t => t.PlannedStart.HasValue && t.PlannedFinish.HasValue)
+                .OrderBy(t => t.PlannedStart)
+                .ThenBy(t => t.SchedulingRank)
+                .ToList();
+
+            if (scheduledTasks.Any())
+            {
+                planStart = scheduledTasks.Min(t => t.PlannedStart!.Value).Date;
+                planEnd = scheduledTasks.Max(t => t.PlannedFinish!.Value).Date;
+
+                // Include strict dates in range
+                var maxStrict = scenario.TaskSnapshots
+                    .Where(t => t.StrictDate.HasValue)
+                    .Select(t => t.StrictDate!.Value)
+                    .DefaultIfEmpty(planEnd)
+                    .Max();
+                if (maxStrict > planEnd)
+                    planEnd = maxStrict;
+
+                planStart = planStart.AddDays(-2);
+                planEnd = planEnd.AddDays(5);
+                totalDays = (int)(planEnd - planStart).TotalDays;
+                if (totalDays < 1) totalDays = 1;
+            }
+        }
+
+        isLoaded = true;
+    }
+
+    private double GetDatePercent(DateTime date)
+    {
+        if (totalDays <= 0) return 0;
+        var dayOffset = (date.Date - planStart).TotalDays;
+        return Math.Round(dayOffset / totalDays * 100, 2);
+    }
+
+    private string GetBarStyle(ScenarioTaskSnapshot task)
+    {
+        if (!task.PlannedStart.HasValue || !task.PlannedFinish.HasValue)
+            return "display: none;";
+
+        var leftPct = GetDatePercent(task.PlannedStart.Value);
+        var rightPct = GetDatePercent(task.PlannedFinish.Value);
+        var widthPct = Math.Max(rightPct - leftPct, 0.5);
+
+        return $"left: {leftPct}%; width: {widthPct}%;";
+    }
+
+    private string GetBarColorClass(ScenarioTaskSnapshot task)
+    {
+        if (task.DeliveryRisk == DomainConstants.DeliveryRisk.Late)
+            return "gantt-bar-late";
+        if (task.DeliveryRisk == DomainConstants.DeliveryRisk.AtRisk)
+            return "gantt-bar-atrisk";
+
+        return task.Status switch
+        {
+            var s when s == DomainConstants.TaskStatus.Completed => "gantt-bar-completed",
+            var s when s == DomainConstants.TaskStatus.InProgress => "gantt-bar-inprogress",
+            _ => "gantt-bar-notstarted"
+        };
+    }
+
+    private List<MonthMarker> GetMonthMarkers()
+    {
+        var markers = new List<MonthMarker>();
+        if (totalDays <= 0) return markers;
+
+        var current = new DateTime(planStart.Year, planStart.Month, 1);
+        while (current <= planEnd)
+        {
+            var monthEnd = current.AddMonths(1).AddDays(-1);
+            if (monthEnd > planEnd) monthEnd = planEnd;
+
+            var start = current < planStart ? planStart : current;
+            var leftPct = GetDatePercent(start);
+            var rightPct = GetDatePercent(monthEnd);
+
+            markers.Add(new MonthMarker
+            {
+                Label = current.ToString("MMM yyyy"),
+                LeftPct = Math.Round(leftPct, 2),
+                WidthPct = Math.Round(Math.Max(rightPct - leftPct, 1), 2)
+            });
+
+            current = current.AddMonths(1);
+        }
+
+        return markers;
+    }
+
+    private static string Truncate(string text, int maxLength)
+        => text.Length <= maxLength ? text : text[..(maxLength - 1)] + "\u2026";
+
+    private void GoBackToScenarios()
+    {
+        NavigationManager.NavigateTo("/scenarios");
+    }
+
+    private void ToggleCriticalPath()
+    {
+        showCriticalPath = !showCriticalPath;
+        if (showCriticalPath)
+            ComputeCriticalPath();
+    }
+
+    private void ComputeCriticalPath()
+    {
+        criticalPathTaskIds.Clear();
+        if (!scheduledTasks.Any()) return;
+
+        var taskMap = scheduledTasks.ToDictionary(t => t.TaskId);
+        var memo = new Dictionary<string, (int length, List<string> path)>();
+
+        (int length, List<string> path) GetLongestPath(string taskId)
+        {
+            if (memo.TryGetValue(taskId, out var cached)) return cached;
+
+            var task = taskMap.GetValueOrDefault(taskId);
+            if (task == null) return (0, new List<string>());
+
+            var deps = string.IsNullOrWhiteSpace(task.DependsOnTaskIds)
+                ? Array.Empty<string>()
+                : task.DependsOnTaskIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            int maxLen = 0;
+            var bestPath = new List<string>();
+
+            foreach (var dep in deps)
+            {
+                var (len, path) = GetLongestPath(dep);
+                if (len > maxLen)
+                {
+                    maxLen = len;
+                    bestPath = new List<string>(path);
+                }
+            }
+
+            bestPath.Add(taskId);
+            var taskDuration = (task.Duration ?? 0) > 0 ? task.Duration!.Value : (int)task.DevEstimation;
+            var result = (maxLen + taskDuration, bestPath);
+            memo[taskId] = result;
+            return result;
+        }
+
+        var longestPath = scheduledTasks
+            .Select(t => GetLongestPath(t.TaskId))
+            .OrderByDescending(r => r.length)
+            .FirstOrDefault();
+
+        criticalPathTaskIds = new HashSet<string>(longestPath.path);
+    }
+
+    private bool IsCriticalTask(ScenarioTaskSnapshot task)
+    {
+        return showCriticalPath && criticalPathTaskIds.Contains(task.TaskId);
+    }
+
+    private record MonthMarker
+    {
+        public string Label { get; init; } = "";
+        public double LeftPct { get; init; }
+        public double WidthPct { get; init; }
+    }
+}

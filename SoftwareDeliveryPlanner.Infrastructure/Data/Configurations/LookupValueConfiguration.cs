@@ -59,13 +59,15 @@ public sealed class LookupValueConfiguration : IEntityTypeConfiguration<LookupVa
 
             // ResourceRole
             Lk(16, DomainConstants.LookupCategory.ResourceRole, DomainConstants.ResourceRole.Developer, "Developer", 1),
-            Lk(17, DomainConstants.LookupCategory.ResourceRole, DomainConstants.ResourceRole.SeniorDeveloper, "Senior Developer", 2),
-            Lk(18, DomainConstants.LookupCategory.ResourceRole, DomainConstants.ResourceRole.TechLead, "Tech Lead", 3),
-            Lk(19, DomainConstants.LookupCategory.ResourceRole, DomainConstants.ResourceRole.QA, "QA", 4),
+            Lk(17, DomainConstants.LookupCategory.ResourceRole, DomainConstants.ResourceRole.QA, "Quality Assurance", 2),
+            Lk(18, DomainConstants.LookupCategory.ResourceRole, DomainConstants.ResourceRole.SA, "System Analyst", 3),
+            Lk(19, DomainConstants.LookupCategory.ResourceRole, DomainConstants.ResourceRole.BA, "Business Analyst", 4),
+            Lk(20, DomainConstants.LookupCategory.ResourceRole, DomainConstants.ResourceRole.UX, "UX Designer", 5),
+            Lk(21, DomainConstants.LookupCategory.ResourceRole, DomainConstants.ResourceRole.UI, "UI Designer", 6),
 
             // WorkingWeek
-            Lk(20, DomainConstants.LookupCategory.WorkingWeek, DomainConstants.WorkingWeek.SunThu, "Sunday - Thursday", 1),
-            Lk(21, DomainConstants.LookupCategory.WorkingWeek, DomainConstants.WorkingWeek.MonFri, "Monday - Friday", 2)
+            Lk(22, DomainConstants.LookupCategory.WorkingWeek, DomainConstants.WorkingWeek.SunThu, "Sunday - Thursday", 1),
+            Lk(23, DomainConstants.LookupCategory.WorkingWeek, DomainConstants.WorkingWeek.MonFri, "Monday - Friday", 2)
         );
     }
 

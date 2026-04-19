@@ -588,7 +588,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     {
 
 
-        await _resourceService.UpsertResourceAsync(0, "RES-100", "New Resource", "Developer", "Delivery", 100, 8, new DateTime(2026, 1, 1), "Yes", null, true);
+        await _resourceService.UpsertResourceAsync(0, "RES-100", "New Resource", "DEV", "Delivery", 100, 8, new DateTime(2026, 1, 1), "Yes", null, true);
 
         await using var db = await _factory.CreateDbContextAsync();
         var persisted = await db.Resources.FirstOrDefaultAsync(r => r.ResourceId == "RES-100");
@@ -604,7 +604,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         var existingId = existing.Id;
 
 
-        await _resourceService.UpsertResourceAsync(existingId, existing.ResourceId, "Updated Resource Name", "Senior Developer", "Delivery", 80, 6, existing.StartDate, "Yes", null, false);
+        await _resourceService.UpsertResourceAsync(existingId, existing.ResourceId, "Updated Resource Name", "DEV", "Delivery", 80, 6, existing.StartDate, "Yes", null, false);
 
         await using var verifyDb = await _factory.CreateDbContextAsync();
         var reloaded = await verifyDb.Resources.FirstOrDefaultAsync(r => r.Id == existingId);

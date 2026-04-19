@@ -158,12 +158,12 @@ public class TeamMemberDomainTests
     public void Create_ValidInputs_ReturnsPopulatedTeamMember()
     {
         var member = TeamMember.Create(
-            "DEV-001", "Alice", "Developer", "Delivery",
+            "DEV-001", "Alice", "DEV", "Delivery",
             100, 1.0, DateTime.Today);
 
         Assert.Equal("DEV-001", member.ResourceId);
         Assert.Equal("Alice", member.ResourceName);
-        Assert.Equal("Developer", member.Role);
+        Assert.Equal("DEV", member.Role);
         Assert.Equal(100, member.AvailabilityPct);
         Assert.Equal(1.0, member.DailyCapacity);
     }
@@ -171,7 +171,7 @@ public class TeamMemberDomainTests
     [Fact]
     public void Create_NormalizesResourceIdToUppercase()
     {
-        var member = TeamMember.Create("dev-001", "Bob", "Developer", "Delivery", 80, 1, DateTime.Today);
+        var member = TeamMember.Create("dev-001", "Bob", "DEV", "Delivery", 80, 1, DateTime.Today);
         Assert.Equal("DEV-001", member.ResourceId);
     }
 
@@ -182,7 +182,7 @@ public class TeamMemberDomainTests
     public void Create_InvalidResourceId_ThrowsDomainException(string id)
     {
         Assert.Throws<DomainException>(() =>
-            TeamMember.Create(id, "Alice", "Developer", "Delivery", 100, 1, DateTime.Today));
+            TeamMember.Create(id, "Alice", "DEV", "Delivery", 100, 1, DateTime.Today));
     }
 
     [Theory]
@@ -191,7 +191,7 @@ public class TeamMemberDomainTests
     public void Create_EmptyResourceName_ThrowsDomainException(string name)
     {
         Assert.Throws<DomainException>(() =>
-            TeamMember.Create("DEV-001", name, "Developer", "Delivery", 100, 1, DateTime.Today));
+            TeamMember.Create("DEV-001", name, "DEV", "Delivery", 100, 1, DateTime.Today));
     }
 
     [Theory]
@@ -200,7 +200,7 @@ public class TeamMemberDomainTests
     public void Create_InvalidAvailabilityPct_ThrowsDomainException(double pct)
     {
         Assert.Throws<DomainException>(() =>
-            TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", pct, 1, DateTime.Today));
+            TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", pct, 1, DateTime.Today));
     }
 
     [Theory]
@@ -209,48 +209,48 @@ public class TeamMemberDomainTests
     public void Create_ZeroOrNegativeCapacity_ThrowsDomainException(double cap)
     {
         Assert.Throws<DomainException>(() =>
-            TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, cap, DateTime.Today));
+            TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 100, cap, DateTime.Today));
     }
 
     [Fact]
     public void Create_TrimsResourceName()
     {
-        var member = TeamMember.Create("DEV-001", "  Alice  ", "Developer", "Delivery", 100, 1, DateTime.Today);
+        var member = TeamMember.Create("DEV-001", "  Alice  ", "DEV", "Delivery", 100, 1, DateTime.Today);
         Assert.Equal("Alice", member.ResourceName);
     }
 
     [Fact]
     public void Create_WithNotes_SetsNotes()
     {
-        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, DateTime.Today, active: "Yes", notes: "Note here");
+        var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 100, 1, DateTime.Today, active: "Yes", notes: "Note here");
         Assert.Equal("Note here", member.Notes);
     }
 
     [Fact]
     public void Create_BoundaryAvailability_ZeroPercent_DoesNotThrow()
     {
-        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 0, 1, DateTime.Today);
+        var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 0, 1, DateTime.Today);
         Assert.Equal(0, member.AvailabilityPct);
     }
 
     [Fact]
     public void Create_BoundaryAvailability_HundredPercent_DoesNotThrow()
     {
-        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, DateTime.Today);
+        var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 100, 1, DateTime.Today);
         Assert.Equal(100, member.AvailabilityPct);
     }
 
     [Fact]
     public void Create_WithNullNotes_SetsNull()
     {
-        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, DateTime.Today);
+        var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 100, 1, DateTime.Today);
         Assert.Null(member.Notes);
     }
 
     [Fact]
     public void Create_EndDate_DefaultsToNull()
     {
-        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, DateTime.Today);
+        var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 100, 1, DateTime.Today);
         Assert.Null(member.EndDate);
     }
 }
@@ -752,28 +752,28 @@ public class TeamMemberDomainAdditionalTests
     public void Create_NullResourceId_ThrowsDomainException()
     {
         Assert.Throws<DomainException>(() =>
-            TeamMember.Create(null!, "Alice", "Developer", "Delivery", 100, 1, DateTime.Today));
+            TeamMember.Create(null!, "Alice", "DEV", "Delivery", 100, 1, DateTime.Today));
     }
 
     [Fact]
     public void Create_NullResourceName_ThrowsDomainException()
     {
         Assert.Throws<DomainException>(() =>
-            TeamMember.Create("DEV-001", null!, "Developer", "Delivery", 100, 1, DateTime.Today));
+            TeamMember.Create("DEV-001", null!, "DEV", "Delivery", 100, 1, DateTime.Today));
     }
 
     [Fact]
     public void Create_DefaultActive_IsYes()
     {
         // active parameter defaults to "Yes" when not specified
-        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, DateTime.Today);
+        var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 100, 1, DateTime.Today);
         Assert.Equal(DomainConstants.ActiveStatus.Yes, member.Active);
     }
 
     [Fact]
     public void Create_SetsTeamCorrectly()
     {
-        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Platform", 100, 1, DateTime.Today);
+        var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Platform", 100, 1, DateTime.Today);
         Assert.Equal("Platform", member.Team);
     }
 
@@ -781,15 +781,15 @@ public class TeamMemberDomainAdditionalTests
     public void Create_SetsStartDateCorrectly()
     {
         var startDate = new DateTime(2026, 3, 15);
-        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, startDate);
+        var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 100, 1, startDate);
         Assert.Equal(startDate, member.StartDate);
     }
 
     [Fact]
     public void Create_PreservesRoleExactly()
     {
-        var member = TeamMember.Create("DEV-001", "Alice", "Senior Developer", "Delivery", 100, 1, DateTime.Today);
-        Assert.Equal("Senior Developer", member.Role);
+        var member = TeamMember.Create("DEV-001", "Alice", "QA", "Delivery", 100, 1, DateTime.Today);
+        Assert.Equal("QA", member.Role);
     }
 
     [Fact]
@@ -803,7 +803,7 @@ public class TeamMemberDomainAdditionalTests
     [Fact]
     public void Create_ArbitraryTeam_Accepted()
     {
-        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Any Team", 100, 1, DateTime.Today);
+        var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Any Team", 100, 1, DateTime.Today);
         Assert.Equal("Any Team", member.Team);
     }
 
@@ -811,7 +811,7 @@ public class TeamMemberDomainAdditionalTests
     public void Create_ArbitraryActive_Accepted()
     {
         // Active parameter has no validation — accepts any string
-        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, DateTime.Today, active: "Maybe");
+        var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 100, 1, DateTime.Today, active: "Maybe");
         Assert.Equal("Maybe", member.Active);
     }
 
@@ -821,7 +821,7 @@ public class TeamMemberDomainAdditionalTests
         // NaN <= 0 is false, so it passes the > 0 guard
         try
         {
-            var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, double.NaN, DateTime.Today);
+            var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 100, double.NaN, DateTime.Today);
             Assert.True(double.IsNaN(member.DailyCapacity));
         }
         catch (DomainException)
@@ -836,7 +836,7 @@ public class TeamMemberDomainAdditionalTests
         // Percentage.TryCreate(NaN) — NaN < 0 is false AND NaN > 100 is false → returns true
         try
         {
-            var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", double.NaN, 1, DateTime.Today);
+            var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", double.NaN, 1, DateTime.Today);
             Assert.True(double.IsNaN(member.AvailabilityPct));
         }
         catch (DomainException)
@@ -848,7 +848,7 @@ public class TeamMemberDomainAdditionalTests
     [Fact]
     public void Create_FractionalCapacity_Boundary()
     {
-        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 0.001, DateTime.Today);
+        var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 100, 0.001, DateTime.Today);
         Assert.Equal(0.001, member.DailyCapacity);
     }
 
@@ -856,7 +856,7 @@ public class TeamMemberDomainAdditionalTests
     public void Create_SetsCreatedAt()
     {
         var before = DateTime.Now.AddSeconds(-1);
-        var member = TeamMember.Create("DEV-001", "Alice", "Developer", "Delivery", 100, 1, DateTime.Today);
+        var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 100, 1, DateTime.Today);
         var after = DateTime.Now.AddSeconds(1);
         Assert.True(member.CreatedAt >= before && member.CreatedAt <= after);
     }

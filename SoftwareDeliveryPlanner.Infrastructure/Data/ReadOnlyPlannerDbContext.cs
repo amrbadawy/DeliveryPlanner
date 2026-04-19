@@ -22,6 +22,7 @@ internal class ReadOnlyPlannerDbContext : DbContext
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<RiskNotification> RiskNotifications => Set<RiskNotification>();
     public DbSet<PlanScenario> PlanScenarios => Set<PlanScenario>();
+    public DbSet<ScenarioTaskSnapshot> ScenarioTaskSnapshots => Set<ScenarioTaskSnapshot>();
 
     public ReadOnlyPlannerDbContext(DbContextOptions<ReadOnlyPlannerDbContext> options)
         : base(options)

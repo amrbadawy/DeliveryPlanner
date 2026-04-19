@@ -94,7 +94,9 @@ public interface IAuditService
 public interface IScenarioOrchestrator
 {
     Task<List<PlanScenario>> GetScenariosAsync();
+    Task<PlanScenario?> GetScenarioWithSnapshotsAsync(int id);
     Task SaveScenarioAsync(PlanScenario scenario);
+    Task SaveScenarioWithSnapshotsAsync(PlanScenario scenario, List<TaskItem> tasks);
     Task DeleteScenarioAsync(int id);
 }
 

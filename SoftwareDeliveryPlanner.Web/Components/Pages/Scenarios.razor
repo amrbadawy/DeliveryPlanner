@@ -4,6 +4,7 @@
 @using SoftwareDeliveryPlanner.Application.Scenarios.Queries
 @using SoftwareDeliveryPlanner.Domain.Models
 @inject IMediator Mediator
+@inject NavigationManager NavigationManager
 
 <PageTitle>What-If Scenarios</PageTitle>
 
@@ -109,6 +110,10 @@
                                 <td class="text-center">@(s.LatestFinish?.ToString("MMM dd, yyyy") ?? "—")</td>
                                 <td class="text-center">@s.TotalEstimation.ToString("F1")</td>
                                 <td>
+                                    <button class="btn btn-outline-primary btn-sm me-1" @onclick="() => ViewScenarioGantt(s.Id)" data-testid="scenarios-view-@s.Id"
+                                            title="View Gantt Chart">
+                                        <i class="bi bi-bar-chart-steps"></i>
+                                    </button>
                                     <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteScenario(s.Id)" data-testid="scenarios-delete-@s.Id">
                                         <i class="bi bi-trash"></i>
                                     </button>
@@ -287,6 +292,11 @@
     {
         await Mediator.Send(new DeleteScenarioCommand(id));
         await LoadScenarios();
+    }
+
+    private void ViewScenarioGantt(int id)
+    {
+        NavigationManager.NavigateTo($"/scenarios/{id}/gantt");
     }
 
     private static string FormatDelta(int delta) => delta switch

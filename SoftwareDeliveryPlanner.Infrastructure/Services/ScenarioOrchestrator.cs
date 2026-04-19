@@ -23,10 +23,52 @@ internal sealed class ScenarioOrchestrator : ServiceBase, IScenarioOrchestrator
             .ToListAsync();
     }
 
+    public async Task<PlanScenario?> GetScenarioWithSnapshotsAsync(int id)
+    {
+        await using var db = await ReadOnlyDbFactory.CreateDbContextAsync();
+        return await db.PlanScenarios
+            .Include(s => s.TaskSnapshots)
+            .FirstOrDefaultAsync(s => s.Id == id);
+    }
+
     public async Task SaveScenarioAsync(PlanScenario scenario)
     {
         await using var db = await DbFactory.CreateDbContextAsync();
         db.PlanScenarios.Add(scenario);
+        await db.SaveChangesAsync();
+    }
+
+    public async Task SaveScenarioWithSnapshotsAsync(PlanScenario scenario, List<TaskItem> tasks)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.PlanScenarios.Add(scenario);
+
+        // Must save first to get the scenario's auto-generated Id
+        await db.SaveChangesAsync();
+
+        foreach (var task in tasks)
+        {
+            var snapshot = ScenarioTaskSnapshot.Create(
+                scenario.Id,
+                task.TaskId,
+                task.ServiceName,
+                task.Priority,
+                task.SchedulingRank,
+                task.PlannedStart,
+                task.PlannedFinish,
+                task.Duration,
+                task.StrictDate,
+                task.AssignedResourceId,
+                task.AssignedDev,
+                task.DevEstimation,
+                task.MaxDev,
+                task.Status,
+                task.DeliveryRisk,
+                task.DependsOnTaskIds);
+
+            db.ScenarioTaskSnapshots.Add(snapshot);
+        }
+
         await db.SaveChangesAsync();
     }
 

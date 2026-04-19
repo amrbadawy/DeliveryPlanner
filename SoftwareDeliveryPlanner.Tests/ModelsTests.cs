@@ -60,7 +60,7 @@ public class ModelsTests
         
         Assert.Equal(string.Empty, member.ResourceId);
         Assert.Equal(string.Empty, member.ResourceName);
-        Assert.Equal("Developer", member.Role);
+        Assert.Equal("DEV", member.Role);
         Assert.Equal("Delivery", member.Team);
         Assert.Equal(100.0, member.AvailabilityPct);
         Assert.Equal(1.0, member.DailyCapacity);
@@ -70,11 +70,11 @@ public class ModelsTests
     [Fact]
     public void TeamMember_CanSetProperties()
     {
-        var member = TeamMember.Create("DEV-001", "Ahmed Al-Rashid", "Senior Developer", "Platform", 80.0, 0.8, new DateTime(2026, 1, 1), active: "No");
+        var member = TeamMember.Create("DEV-001", "Ahmed Al-Rashid", "DEV", "Platform", 80.0, 0.8, new DateTime(2026, 1, 1), active: "No");
 
         Assert.Equal("DEV-001", member.ResourceId);
         Assert.Equal("Ahmed Al-Rashid", member.ResourceName);
-        Assert.Equal("Senior Developer", member.Role);
+        Assert.Equal("DEV", member.Role);
         Assert.Equal("Platform", member.Team);
         Assert.Equal(80.0, member.AvailabilityPct);
         Assert.Equal(0.8, member.DailyCapacity);
@@ -85,7 +85,7 @@ public class ModelsTests
     [Fact]
     public void TeamMember_EndDate_IsNullable()
     {
-        var member = TeamMember.Create("DEV-002", "Test Dev", "Developer", "Default", 100, 8, new DateTime(2026, 1, 1));
+        var member = TeamMember.Create("DEV-002", "Test Dev", "DEV", "Default", 100, 8, new DateTime(2026, 1, 1));
         Assert.Null(member.EndDate);
     }
 

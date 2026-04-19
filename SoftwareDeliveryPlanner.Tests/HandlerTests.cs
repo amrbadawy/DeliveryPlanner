@@ -412,7 +412,7 @@ public class UpsertResourceCommandHandlerTests : OrchestratorFixture
             Id: 0,
             ResourceId: "DEV-099",
             ResourceName: "New Dev",
-            Role: "Developer",
+            Role: "DEV",
             Team: "Delivery",
             AvailabilityPct: 100,
             DailyCapacity: 1,
@@ -488,7 +488,7 @@ public class UpsertResourceCommandValidatorTests
     private sealed class StubRoleOrchestrator : IRoleOrchestrator
     {
         public Task<List<Role>> GetRolesAsync(bool includeInactive = true, CancellationToken cancellationToken = default)
-            => Task.FromResult<List<Role>>([new() { Id = 1, Code = "Developer", DisplayName = "Developer", IsActive = true, SortOrder = 1 }]);
+            => Task.FromResult<List<Role>>([new() { Id = 1, Code = "DEV", DisplayName = "Developer", IsActive = true, SortOrder = 1 }]);
 
         public Task UpsertRoleAsync(int id, string code, string displayName, bool isActive, int sortOrder, bool isNew, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
@@ -507,7 +507,7 @@ public class UpsertResourceCommandValidatorTests
 
     private static UpsertResourceCommand Valid() => new(
         Id: 0, ResourceId: "DEV-001", ResourceName: "Alice",
-        Role: "Developer", Team: "Delivery",
+        Role: "DEV", Team: "Delivery",
         AvailabilityPct: 100, DailyCapacity: 1,
         StartDate: DateTime.Today, Active: "Yes",
         Notes: null, IsNew: true);
@@ -1601,7 +1601,7 @@ public class UpsertResourceCommandValidatorAdditionalTests
     private sealed class StubRoleOrchestrator : IRoleOrchestrator
     {
         public Task<List<Role>> GetRolesAsync(bool includeInactive = true, CancellationToken cancellationToken = default)
-            => Task.FromResult<List<Role>>([new() { Id = 1, Code = "Developer", DisplayName = "Developer", IsActive = true, SortOrder = 1 }]);
+            => Task.FromResult<List<Role>>([new() { Id = 1, Code = "DEV", DisplayName = "Developer", IsActive = true, SortOrder = 1 }]);
 
         public Task UpsertRoleAsync(int id, string code, string displayName, bool isActive, int sortOrder, bool isNew, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
@@ -1620,7 +1620,7 @@ public class UpsertResourceCommandValidatorAdditionalTests
 
     private static UpsertResourceCommand Valid() => new(
         Id: 0, ResourceId: "DEV-001", ResourceName: "Alice",
-        Role: "Developer", Team: "Delivery",
+        Role: "DEV", Team: "Delivery",
         AvailabilityPct: 100, DailyCapacity: 1,
         StartDate: DateTime.Today, Active: "Yes",
         Notes: null, IsNew: true);
@@ -2205,7 +2205,7 @@ public class SaveScenarioCommandHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_SavesScenarioWithCurrentKpis()
     {
-        var handler = new SaveScenarioCommandHandler(SchedulerService, ScenarioOrchestrator, TestTimeProvider);
+        var handler = new SaveScenarioCommandHandler(SchedulerService, ScenarioOrchestrator, TaskOrchestrator, TestTimeProvider);
         var result = await handler.Handle(
             new SaveScenarioCommand("Test Scenario", "Integration test notes"), CancellationToken.None);
 
@@ -2219,12 +2219,28 @@ public class SaveScenarioCommandHandlerTests : OrchestratorFixture
     public async Task Handle_CapturesKpiValues()
     {
         await SchedulerService.RunSchedulerAsync();
-        var handler = new SaveScenarioCommandHandler(SchedulerService, ScenarioOrchestrator, TestTimeProvider);
+        var handler = new SaveScenarioCommandHandler(SchedulerService, ScenarioOrchestrator, TaskOrchestrator, TestTimeProvider);
         await handler.Handle(new SaveScenarioCommand("KPI Scenario", null), CancellationToken.None);
 
         var scenarios = await ScenarioOrchestrator.GetScenariosAsync();
         var saved = scenarios.First(s => s.ScenarioName == "KPI Scenario");
         Assert.True(saved.TotalTasks > 0);
+    }
+
+    [Fact]
+    public async Task Handle_SavesTaskSnapshotsWithScenario()
+    {
+        await SchedulerService.RunSchedulerAsync();
+        var handler = new SaveScenarioCommandHandler(SchedulerService, ScenarioOrchestrator, TaskOrchestrator, TestTimeProvider);
+        await handler.Handle(new SaveScenarioCommand("Snapshot Scenario", null), CancellationToken.None);
+
+        var scenarios = await ScenarioOrchestrator.GetScenariosAsync();
+        var saved = scenarios.First(s => s.ScenarioName == "Snapshot Scenario");
+
+        // Retrieve with snapshots
+        var detail = await ScenarioOrchestrator.GetScenarioWithSnapshotsAsync(saved.Id);
+        Assert.NotNull(detail);
+        Assert.True(detail!.TaskSnapshots.Count > 0, "Scenario should contain task snapshots");
     }
 }
 
@@ -2237,7 +2253,7 @@ public class DeleteScenarioCommandHandlerTests : OrchestratorFixture
     public async Task Handle_DeletesExistingScenario()
     {
         // Create a scenario first
-        var saveHandler = new SaveScenarioCommandHandler(SchedulerService, ScenarioOrchestrator, TestTimeProvider);
+        var saveHandler = new SaveScenarioCommandHandler(SchedulerService, ScenarioOrchestrator, TaskOrchestrator, TestTimeProvider);
         await saveHandler.Handle(new SaveScenarioCommand("Scenario to delete", null), CancellationToken.None);
 
         var scenarios = await ScenarioOrchestrator.GetScenariosAsync();
@@ -2250,6 +2266,40 @@ public class DeleteScenarioCommandHandlerTests : OrchestratorFixture
 
         var afterDelete = await ScenarioOrchestrator.GetScenariosAsync();
         Assert.DoesNotContain(afterDelete, s => s.Id == toDelete.Id);
+    }
+}
+
+[Collection(DatabaseCollection.Name)]
+public class GetScenarioDetailQueryHandlerTests : OrchestratorFixture
+{
+    public GetScenarioDetailQueryHandlerTests(SqlServerFixture fixture) : base(fixture) { }
+
+    [Fact]
+    public async Task Handle_ExistingScenario_ReturnsWithSnapshots()
+    {
+        await SchedulerService.RunSchedulerAsync();
+        var saveHandler = new SaveScenarioCommandHandler(SchedulerService, ScenarioOrchestrator, TaskOrchestrator, TestTimeProvider);
+        await saveHandler.Handle(new SaveScenarioCommand("Detail Query Scenario", "test"), CancellationToken.None);
+
+        var scenarios = await ScenarioOrchestrator.GetScenariosAsync();
+        var saved = scenarios.First(s => s.ScenarioName == "Detail Query Scenario");
+
+        var handler = new GetScenarioDetailQueryHandler(ScenarioOrchestrator);
+        var result = await handler.Handle(new GetScenarioDetailQuery(saved.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Detail Query Scenario", result.Value.ScenarioName);
+        Assert.True(result.Value.TaskSnapshots.Count > 0);
+    }
+
+    [Fact]
+    public async Task Handle_NonExistentScenario_ReturnsFailure()
+    {
+        var handler = new GetScenarioDetailQueryHandler(ScenarioOrchestrator);
+        var result = await handler.Handle(new GetScenarioDetailQuery(99999), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains("not found", result.Error.Message);
     }
 }
 

@@ -31,7 +31,7 @@ public class UpsertRoleCommandValidatorTests
     private static UpsertRoleCommand Valid(bool isNew = true) =>
         new(
             Id: isNew ? 0 : 1,
-            Code: "Developer",
+            Code: "DEV",
             DisplayName: "Developer",
             IsActive: true,
             SortOrder: 1,
@@ -53,7 +53,7 @@ public class UpsertRoleCommandValidatorTests
     {
         var orchestrator = new StubRoleOrchestrator
         {
-            Roles = [new Role { Id = 2, Code = "Developer", DisplayName = "Developer", IsActive = true, SortOrder = 1 }]
+            Roles = [new Role { Id = 2, Code = "DEV", DisplayName = "Developer", IsActive = true, SortOrder = 1 }]
         };
         var validator = new UpsertRoleCommandValidator(orchestrator);
 
@@ -67,7 +67,7 @@ public class UpsertRoleCommandValidatorTests
     {
         var orchestrator = new StubRoleOrchestrator
         {
-            InUse = ["Developer"]
+            InUse = ["DEV"]
         };
         var validator = new UpsertRoleCommandValidator(orchestrator);
 

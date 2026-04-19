@@ -36,5 +36,14 @@ public sealed class PlanScenarioConfiguration : IEntityTypeConfiguration<PlanSce
 
         builder.Property(s => s.Notes)
             .HasMaxLength(1000);
+
+        // Configure the one-to-many relationship with task snapshots
+        builder.HasMany(s => s.TaskSnapshots)
+            .WithOne(t => t.Scenario)
+            .HasForeignKey(t => t.PlanScenarioId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(s => s.TaskSnapshots)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

@@ -73,10 +73,12 @@ public static class DomainConstants
     /// <summary>Team member roles.</summary>
     public static class ResourceRole
     {
-        public const string Developer = "Developer";
-        public const string SeniorDeveloper = "Senior Developer";
-        public const string TechLead = "Tech Lead";
+        public const string Developer = "DEV";
         public const string QA = "QA";
+        public const string SA = "SA";
+        public const string BA = "BA";
+        public const string UX = "UX";
+        public const string UI = "UI";
     }
 
     /// <summary>Audit action types.</summary>

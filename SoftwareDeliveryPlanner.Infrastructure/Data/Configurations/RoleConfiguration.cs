@@ -26,9 +26,11 @@ public sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
 
         builder.HasData(
             new Role { Id = 1, Code = DomainConstants.ResourceRole.Developer, DisplayName = "Developer", IsActive = true, SortOrder = 1 },
-            new Role { Id = 2, Code = DomainConstants.ResourceRole.SeniorDeveloper, DisplayName = "Senior Developer", IsActive = true, SortOrder = 2 },
-            new Role { Id = 3, Code = DomainConstants.ResourceRole.TechLead, DisplayName = "Tech Lead", IsActive = true, SortOrder = 3 },
-            new Role { Id = 4, Code = DomainConstants.ResourceRole.QA, DisplayName = "QA", IsActive = true, SortOrder = 4 }
+            new Role { Id = 2, Code = DomainConstants.ResourceRole.QA, DisplayName = "Quality Assurance", IsActive = true, SortOrder = 2 },
+            new Role { Id = 3, Code = DomainConstants.ResourceRole.SA, DisplayName = "System Analyst", IsActive = true, SortOrder = 3 },
+            new Role { Id = 4, Code = DomainConstants.ResourceRole.BA, DisplayName = "Business Analyst", IsActive = true, SortOrder = 4 },
+            new Role { Id = 5, Code = DomainConstants.ResourceRole.UX, DisplayName = "UX Designer", IsActive = true, SortOrder = 5 },
+            new Role { Id = 6, Code = DomainConstants.ResourceRole.UI, DisplayName = "UI Designer", IsActive = true, SortOrder = 6 }
         );
     }
 }

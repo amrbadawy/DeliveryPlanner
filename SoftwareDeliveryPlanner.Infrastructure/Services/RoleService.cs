@@ -91,7 +91,8 @@ internal sealed class RoleService : ServiceBase, IRoleOrchestrator
     public async Task<bool> RoleCodeExistsAsync(string code, int? excludeId = null, CancellationToken cancellationToken = default)
     {
         await using var db = await ReadOnlyDbFactory.CreateDbContextAsync(cancellationToken);
-        var query = db.Roles.Where(r => r.Code == code);
+        var normalizedCode = code.Trim().ToUpperInvariant();
+        var query = db.Roles.Where(r => r.Code.ToUpper() == normalizedCode);
 
         if (excludeId.HasValue)
             query = query.Where(r => r.Id != excludeId.Value);

@@ -33,7 +33,7 @@ public class DeleteRoleCommandValidatorTests
     {
         var orchestrator = new StubRoleOrchestrator
         {
-            Roles = [new Role { Id = 1, Code = "Developer", DisplayName = "Developer", IsActive = true, SortOrder = 1 }]
+            Roles = [new Role { Id = 1, Code = "DEV", DisplayName = "Developer", IsActive = true, SortOrder = 1 }]
         };
 
         var validator = new DeleteRoleCommandValidator(orchestrator);
@@ -47,8 +47,8 @@ public class DeleteRoleCommandValidatorTests
     {
         var orchestrator = new StubRoleOrchestrator
         {
-            Roles = [new Role { Id = 1, Code = "Developer", DisplayName = "Developer", IsActive = true, SortOrder = 1 }],
-            InUse = ["Developer"]
+            Roles = [new Role { Id = 1, Code = "DEV", DisplayName = "Developer", IsActive = true, SortOrder = 1 }],
+            InUse = ["DEV"]
         };
 
         var validator = new DeleteRoleCommandValidator(orchestrator);

@@ -52,4 +52,38 @@ public class PlanScenarioDomainTests
         var scenario = PlanScenario.Create("  Trimmed  ", 0, 0, 0, 0, null, null, 0, null, TestTimestamp);
         Assert.Equal("Trimmed", scenario.ScenarioName);
     }
+
+    [Fact]
+    public void AddTaskSnapshot_AddsToCollection()
+    {
+        var scenario = PlanScenario.Create("Test", 1, 1, 0, 0, null, null, 5.0, null, TestTimestamp);
+        var snapshot = ScenarioTaskSnapshot.Create(
+            0, "TSK-001", "Service", 5, null, null, null, null, null, null, null, 5.0, 1.0, "NotStarted", "OnTrack", null);
+
+        scenario.AddTaskSnapshot(snapshot);
+
+        Assert.Single(scenario.TaskSnapshots);
+        Assert.Equal("TSK-001", scenario.TaskSnapshots.First().TaskId);
+    }
+
+    [Fact]
+    public void AddTaskSnapshot_NullSnapshot_ThrowsDomainException()
+    {
+        var scenario = PlanScenario.Create("Test", 0, 0, 0, 0, null, null, 0, null, TestTimestamp);
+
+        Assert.Throws<DomainException>(() => scenario.AddTaskSnapshot(null!));
+    }
+
+    [Fact]
+    public void AddTaskSnapshot_MultipleSnapshots_AllAdded()
+    {
+        var scenario = PlanScenario.Create("Multi", 2, 2, 0, 0, null, null, 10.0, null, TestTimestamp);
+
+        scenario.AddTaskSnapshot(ScenarioTaskSnapshot.Create(
+            0, "TSK-001", "Service A", 3, null, null, null, null, null, null, null, 5.0, 1.0, "NotStarted", "OnTrack", null));
+        scenario.AddTaskSnapshot(ScenarioTaskSnapshot.Create(
+            0, "TSK-002", "Service B", 5, null, null, null, null, null, null, null, 5.0, 1.0, "NotStarted", "OnTrack", null));
+
+        Assert.Equal(2, scenario.TaskSnapshots.Count);
+    }
 }
