@@ -107,14 +107,22 @@ SoftwareDeliveryPlanner.Web/tests/e2e/
 | `smoke.spec.ts` | App loads, critical navigation, modal entry points |
 | `navigation-and-dashboard.spec.ts` | All pages navigate, scheduler runs |
 | `tasks.spec.ts` | Tasks CRUD + edge cases |
+| `task-details.spec.ts` | Task detail page, notes CRUD, assigned resources |
+| `task-dependencies.spec.ts` | Dependency multi-select and badge display |
 | `resources.spec.ts` | Resources CRUD + edge cases |
 | `holidays.spec.ts` | Holidays CRUD, overlap validation, date logic |
 | `adjustments.spec.ts` | Adjustments CRUD + edge cases |
-| `task-dependencies.spec.ts` | Dependency multi-select and badge display |
+| `scenarios.spec.ts` | What-if scenarios save, view, compare, delete |
 | `gantt.spec.ts` | Gantt chart rendering, bars, legend, refresh |
+| `heatmap.spec.ts` | Workload heatmap table, legend after scheduler run |
 | `search-filter-sort.spec.ts` | Search, filter, sort for tasks and resources |
 | `validation.spec.ts` | Form validation across all entities |
 | `calendar-timeline-output.spec.ts` | Calendar, timeline, CSV export |
+| `dashboard-features.spec.ts` | Stale-plan warning, risk trend chart, KPI cards |
+| `layout-features.spec.ts` | Auto-schedule toggle, command palette, critical path |
+| `audit-log.spec.ts` | Activity/audit log page loads and refresh |
+| `bulk-import.spec.ts` | Bulk CSV import modal open/close |
+| `drag-drop-priority.spec.ts` | Drag-and-drop task priority reordering |
 
 ### Shared test utilities
 

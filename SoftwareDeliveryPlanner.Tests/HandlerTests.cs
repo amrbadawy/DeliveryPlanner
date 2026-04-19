@@ -92,7 +92,6 @@ public class GetTasksQueryHandlerTests : OrchestratorFixture
     {
         var handler = new GetTasksQueryHandler(TaskOrchestrator);
         var result = await handler.Handle(new GetTasksQuery(), CancellationToken.None);
-        Assert.NotNull(result);
         Assert.True(result.Value.Count > 0);
     }
 
@@ -374,7 +373,6 @@ public class GetResourcesQueryHandlerTests : OrchestratorFixture
     {
         var handler = new GetResourcesQueryHandler(ResourceOrchestrator);
         var result = await handler.Handle(new GetResourcesQuery(), CancellationToken.None);
-        Assert.NotNull(result);
         Assert.Equal(5, result.Value.Count); // 5 seeded
     }
 }
@@ -552,7 +550,6 @@ public class GetAdjustmentsQueryHandlerTests : OrchestratorFixture
     {
         var handler = new GetAdjustmentsQueryHandler(AdjustmentOrchestrator);
         var result = await handler.Handle(new GetAdjustmentsQuery(), CancellationToken.None);
-        Assert.NotNull(result);
         Assert.Empty(result.Value);
     }
 
@@ -725,7 +722,6 @@ public class GetHolidaysQueryHandlerTests : OrchestratorFixture
     {
         var handler = new GetHolidaysQueryHandler(HolidayOrchestrator);
         var result = await handler.Handle(new GetHolidaysQuery(), CancellationToken.None);
-        Assert.NotNull(result);
         Assert.Equal(7, result.Value.Count); // 7 seeded (consolidated)
     }
 
@@ -982,7 +978,6 @@ public class GetCalendarQueryHandlerTests : OrchestratorFixture
         var handler = new GetCalendarQueryHandler(PlanningQueryService);
         var result = await handler.Handle(new GetCalendarQuery(), CancellationToken.None);
 
-        Assert.NotNull(result);
         Assert.True(result.Value.Count > 0);
     }
 
@@ -1021,7 +1016,6 @@ public class GetTimelineQueryHandlerTests : OrchestratorFixture
             new GetTimelineQuery("DEV-001", start, end),
             CancellationToken.None);
 
-        Assert.NotNull(result);
         Assert.Equal(7, result.Value.Days.Count);
     }
 
@@ -1101,8 +1095,6 @@ public class GetOutputPlanQueryHandlerTests : OrchestratorFixture
     {
         var handler = new GetOutputPlanQueryHandler(PlanningQueryService);
         var result = await handler.Handle(new GetOutputPlanQuery(), CancellationToken.None);
-
-        Assert.NotNull(result);
     }
 
     [Fact]
@@ -1961,7 +1953,6 @@ public class HandlerEdgeCaseTests : OrchestratorFixture
     {
         var handler = new GetDashboardKpisQueryHandler(SchedulerService);
         var result = await handler.Handle(new GetDashboardKpisQuery(), CancellationToken.None);
-        Assert.NotNull(result);
         Assert.True(result.Value.TotalServices > 0);
         Assert.True(result.Value.ActiveResources > 0);
     }
