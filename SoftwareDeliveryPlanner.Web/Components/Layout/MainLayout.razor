@@ -73,11 +73,15 @@
         if (firstRender)
         {
             var theme = await JS.InvokeAsync<string>("localStorage.getItem", "sdp-theme");
-            isDark = theme == "dark";
-            if (isDark)
+            if (string.IsNullOrEmpty(theme))
             {
-                await JS.InvokeVoidAsync("setThemeAttribute", "dark");
+                isDark = await JS.InvokeAsync<bool>("eval", "window.matchMedia('(prefers-color-scheme:dark)').matches");
             }
+            else
+            {
+                isDark = theme == "dark";
+            }
+            await JS.InvokeVoidAsync("setThemeAttribute", isDark ? "dark" : "light");
             StateHasChanged();
         }
     }

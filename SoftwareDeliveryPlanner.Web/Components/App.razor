@@ -18,14 +18,16 @@
     <HeadOutlet @rendermode="InteractiveServer" />
     <title>Software Delivery Planner</title>
     <script>
-        // Prevent flash of wrong theme on load
-        (function(){var t=localStorage.getItem('sdp-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');})();
+        // Prevent flash of wrong theme on load (respects OS preference as fallback)
+        (function(){var t=localStorage.getItem('sdp-theme');var d=t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(d){document.documentElement.setAttribute('data-theme','dark');document.documentElement.setAttribute('data-bs-theme','dark');}})();
         // Theme helper for Blazor JS interop (avoids eval)
         function setThemeAttribute(theme) {
             if (theme === 'dark') {
                 document.documentElement.setAttribute('data-theme', 'dark');
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
             } else {
                 document.documentElement.removeAttribute('data-theme');
+                document.documentElement.removeAttribute('data-bs-theme');
             }
         }
     </script>

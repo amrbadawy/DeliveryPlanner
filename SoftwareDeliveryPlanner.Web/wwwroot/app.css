@@ -101,7 +101,7 @@
     /* ── Text ─────────────────────────────────────────────── */
     --color-text-primary: #cdd6f4;
     --color-text-secondary: #a6adc8;
-    --color-text-muted: #6c7086;
+    --color-text-muted: #9399b0;
     --color-text-inverse: #1e1e2e;
 
     /* ── Borders ──────────────────────────────────────────── */
@@ -285,6 +285,27 @@
     border-color: var(--color-accent);
 }
 
+/* ── Dark mode: selection, placeholder, form-check ───────── */
+[data-theme="dark"] ::selection {
+    background: rgba(137, 180, 250, 0.3);
+    color: var(--color-text-primary);
+}
+
+[data-theme="dark"] ::placeholder {
+    color: var(--color-text-muted);
+    opacity: 1;
+}
+
+[data-theme="dark"] .form-check-input {
+    background-color: var(--color-bg-tertiary);
+    border-color: var(--color-border-light);
+}
+
+[data-theme="dark"] .form-check-input:checked {
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
+}
+
 /* ══════════════════════════════════════════════════════════
    Global Reset & Typography
    ══════════════════════════════════════════════════════════ */
@@ -297,6 +318,7 @@ html, body {
     text-align: left;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 h1, h2, h3, h4, h5, h6 {
