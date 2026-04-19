@@ -91,4 +91,5 @@ public interface IPlanningQueryService
     Task<Planning.Queries.WorkloadHeatmapDto> GetWorkloadHeatmapAsync(CancellationToken cancellationToken = default);
     Task<List<Planning.Queries.RiskTrendPointDto>> GetRiskTrendAsync(int maxPoints);
     Task<List<Tasks.Queries.TaskAllocationDto>> GetTaskAllocationsAsync(string taskId, CancellationToken cancellationToken = default);
+    Task<DateTime?> GetLastSchedulerRunAsync(CancellationToken cancellationToken = default);
 }

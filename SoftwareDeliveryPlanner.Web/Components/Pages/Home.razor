@@ -217,13 +217,16 @@ else
     private string schedulerResult = "";
     private bool isLoaded = false;
     private bool isRunning = false;
-    private bool isPlanStale = true;
+    private bool isPlanStale = false;
     private List<RiskTrendPointDto> riskTrend = new();
     private List<RiskNotification> notifications = new();
 
     protected override async Task OnInitializedAsync()
     {
         await LoadKPIs();
+
+        var lastRunResult = await Mediator.Send(new GetLastSchedulerRunQuery());
+        isPlanStale = !lastRunResult.IsSuccess || lastRunResult.Value is null;
 
         var trendResult = await Mediator.Send(new GetRiskTrendQuery(10));
         if (trendResult.IsSuccess)

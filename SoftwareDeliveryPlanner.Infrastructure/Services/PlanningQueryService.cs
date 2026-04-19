@@ -250,4 +250,16 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
         // Task allocations are derived from the scheduling engine; return empty for now
         return System.Threading.Tasks.Task.FromResult(new List<TaskAllocationDto>());
     }
+
+    public async Task<DateTime?> GetLastSchedulerRunAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await ReadOnlyDbFactory.CreateDbContextAsync(cancellationToken);
+        var setting = await db.Settings
+            .FirstOrDefaultAsync(s => s.Key == DomainConstants.SettingKeys.LastSchedulerRun, cancellationToken);
+
+        if (setting?.Value is not null && DateTime.TryParse(setting.Value, out var lastRun))
+            return lastRun;
+
+        return null;
+    }
 }

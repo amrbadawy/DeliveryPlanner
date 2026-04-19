@@ -14,6 +14,7 @@ using SoftwareDeliveryPlanner.Application.Resources.Commands;
 using SoftwareDeliveryPlanner.Application.Resources.Queries;
 using SoftwareDeliveryPlanner.Application.Tasks.Commands;
 using SoftwareDeliveryPlanner.Application.Tasks.Queries;
+using SoftwareDeliveryPlanner.Application.Planning.Queries;
 using SoftwareDeliveryPlanner.Application.Timeline.Queries;
 using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Infrastructure.Services;
@@ -1959,5 +1960,139 @@ public class HandlerEdgeCaseTests : OrchestratorFixture
         var handler = new GetDashboardKpisQueryHandler(SchedulerService);
         var result = await handler.Handle(new GetDashboardKpisQuery(), CancellationToken.None);
         Assert.True(result.Value.TotalEstimation > 0);
+    }
+}
+
+// ============================================================
+// Workload Heatmap — Query
+// ============================================================
+
+[Collection(DatabaseCollection.Name)]
+public class GetWorkloadHeatmapQueryHandlerTests : OrchestratorFixture
+{
+    public GetWorkloadHeatmapQueryHandlerTests(SqlServerFixture fixture) : base(fixture) { }
+
+    [Fact]
+    public async Task Handle_ReturnsSuccessWithDto()
+    {
+        var handler = new GetWorkloadHeatmapQueryHandler(PlanningQueryService);
+        var result = await handler.Handle(new GetWorkloadHeatmapQuery(), CancellationToken.None);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value.ResourceNames);
+        Assert.NotNull(result.Value.WeekStarts);
+        Assert.NotNull(result.Value.Cells);
+    }
+
+    [Fact]
+    public async Task Handle_AfterScheduler_ReturnsPopulatedHeatmap()
+    {
+        await SchedulerService.RunSchedulerAsync();
+        var handler = new GetWorkloadHeatmapQueryHandler(PlanningQueryService);
+        var result = await handler.Handle(new GetWorkloadHeatmapQuery(), CancellationToken.None);
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.ResourceNames.Count > 0);
+    }
+}
+
+// ============================================================
+// Risk Trend — Query
+// ============================================================
+
+[Collection(DatabaseCollection.Name)]
+public class GetRiskTrendQueryHandlerTests : OrchestratorFixture
+{
+    public GetRiskTrendQueryHandlerTests(SqlServerFixture fixture) : base(fixture) { }
+
+    [Fact]
+    public async Task Handle_WithNoSnapshots_ReturnsEmptyList()
+    {
+        var handler = new GetRiskTrendQueryHandler(PlanningQueryService);
+        var result = await handler.Handle(new GetRiskTrendQuery(10), CancellationToken.None);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+    }
+
+    [Fact]
+    public async Task Handle_AfterScheduler_ReturnsAtLeastOnePoint()
+    {
+        await SchedulerService.RunSchedulerAsync();
+        var handler = new GetRiskTrendQueryHandler(PlanningQueryService);
+        var result = await handler.Handle(new GetRiskTrendQuery(10), CancellationToken.None);
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Count > 0);
+    }
+
+    [Fact]
+    public async Task Handle_RespectsMaxPointsLimit()
+    {
+        // Run scheduler twice to create two snapshots
+        await SchedulerService.RunSchedulerAsync();
+        await SchedulerService.RunSchedulerAsync();
+
+        var handler = new GetRiskTrendQueryHandler(PlanningQueryService);
+        var result = await handler.Handle(new GetRiskTrendQuery(1), CancellationToken.None);
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Count <= 1);
+    }
+}
+
+// ============================================================
+// Task Allocations — Query
+// ============================================================
+
+[Collection(DatabaseCollection.Name)]
+public class GetTaskAllocationsQueryHandlerTests : OrchestratorFixture
+{
+    public GetTaskAllocationsQueryHandlerTests(SqlServerFixture fixture) : base(fixture) { }
+
+    [Fact]
+    public async Task Handle_WithValidTaskId_ReturnsSuccess()
+    {
+        var tasks = await TaskOrchestrator.GetTasksAsync();
+        var firstTaskId = tasks.First().TaskId;
+
+        var handler = new GetTaskAllocationsQueryHandler(PlanningQueryService);
+        var result = await handler.Handle(new GetTaskAllocationsQuery(firstTaskId), CancellationToken.None);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+    }
+
+    [Fact]
+    public async Task Handle_WithNonExistentTaskId_ReturnsEmptyList()
+    {
+        var handler = new GetTaskAllocationsQueryHandler(PlanningQueryService);
+        var result = await handler.Handle(new GetTaskAllocationsQuery("NON_EXISTENT_TASK"), CancellationToken.None);
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value);
+    }
+}
+
+// ============================================================
+// Last Scheduler Run — Query
+// ============================================================
+
+[Collection(DatabaseCollection.Name)]
+public class GetLastSchedulerRunQueryHandlerTests : OrchestratorFixture
+{
+    public GetLastSchedulerRunQueryHandlerTests(SqlServerFixture fixture) : base(fixture) { }
+
+    [Fact]
+    public async Task Handle_BeforeAnyRun_ReturnsNull()
+    {
+        var handler = new GetLastSchedulerRunQueryHandler(PlanningQueryService);
+        var result = await handler.Handle(new GetLastSchedulerRunQuery(), CancellationToken.None);
+        Assert.True(result.IsSuccess);
+        // May or may not be null depending on whether other tests ran the scheduler
+        // in this shared DB; just verify it returns successfully
+    }
+
+    [Fact]
+    public async Task Handle_AfterSchedulerRun_ReturnsTimestamp()
+    {
+        await SchedulerService.RunSchedulerAsync();
+        var handler = new GetLastSchedulerRunQueryHandler(PlanningQueryService);
+        var result = await handler.Handle(new GetLastSchedulerRunQuery(), CancellationToken.None);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
     }
 }

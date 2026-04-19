@@ -1,8 +1,10 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SoftwareDeliveryPlanner.Application.Abstractions;
 using SoftwareDeliveryPlanner.Infrastructure.Data;
+using SoftwareDeliveryPlanner.Infrastructure.Extensions;
 using SoftwareDeliveryPlanner.Infrastructure.Services;
 
 namespace SoftwareDeliveryPlanner.Infrastructure;
@@ -45,6 +47,19 @@ public static class DependencyInjection
         services.AddScoped<INotificationOrchestrator, NotificationOrchestrator>();
         services.AddScoped<IScenarioOrchestrator, ScenarioOrchestrator>();
         services.AddScoped<IAuditService, AuditService>();
+
+        // MediatR notification handler — lives in Infrastructure, must be registered explicitly
+        // (MediatR auto-scan only covers the Application assembly)
+        services.AddTransient<INotificationHandler<DomainEventNotification>, DomainEventAuditHandler>();
+
+        // Health checks
+        // "sqlserver" check is tagged "ready" (readiness probe) — not "live" (liveness probe).
+        // This allows /alive to return healthy even when the DB is briefly unreachable.
+        services.AddHealthChecks()
+            .AddSqlServer(
+                connectionString: connectionString,
+                name: "sqlserver",
+                tags: ["ready"]);
 
         return services;
     }
