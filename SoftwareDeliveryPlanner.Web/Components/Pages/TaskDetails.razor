@@ -236,7 +236,10 @@ else
     }
 }
 
+<ToastNotification @ref="toast" TestId="task-details-toast" />
+
 @code {
+    private ToastNotification toast = null!;
     [Parameter]
     public string TaskId { get; set; } = string.Empty;
 
@@ -303,8 +306,12 @@ else
             if (notesResult.IsSuccess)
                 notes = notesResult.Value;
             newNoteText = string.Empty;
+            toast.Show("Note added successfully.");
         }
-        catch (ValidationException) { }
+        catch (ValidationException ex)
+        {
+            toast.Show(string.Join(" ", ex.Errors.Select(e => e.ErrorMessage)), "danger");
+        }
         finally
         {
             isAddingNote = false;
@@ -313,9 +320,17 @@ else
 
     private async Task DeleteNote(int noteId)
     {
-        await Mediator.Send(new DeleteTaskNoteCommand(noteId));
-        var notesResult = await Mediator.Send(new GetTaskNotesQuery(TaskId));
-        if (notesResult.IsSuccess)
-            notes = notesResult.Value;
+        try
+        {
+            await Mediator.Send(new DeleteTaskNoteCommand(noteId));
+            var notesResult = await Mediator.Send(new GetTaskNotesQuery(TaskId));
+            if (notesResult.IsSuccess)
+                notes = notesResult.Value;
+            toast.Show("Note deleted.");
+        }
+        catch (Exception ex)
+        {
+            toast.Show(ex.Message, "danger");
+        }
     }
 }

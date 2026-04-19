@@ -34,7 +34,7 @@
             </nav>
             <div class="d-flex align-items-center gap-2 ms-auto">
                 <div class="form-check form-switch" title="Auto-schedule after saves">
-                    <input class="form-check-input" type="checkbox" role="switch" checked="@autoSchedule.IsEnabled" @onchange="ToggleAutoSchedule" id="auto-schedule-toggle" />
+                    <input class="form-check-input" type="checkbox" role="switch" checked="@autoSchedule.IsEnabled" @onchange="ToggleAutoSchedule" id="auto-schedule-toggle" data-testid="auto-schedule-toggle" />
                     <label class="form-check-label small" for="auto-schedule-toggle">Auto</label>
                 </div>
                 <button class="theme-toggle" @onclick="ToggleTheme" title="Toggle dark mode" aria-label="Toggle dark mode">

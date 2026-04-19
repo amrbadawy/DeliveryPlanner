@@ -8,6 +8,7 @@ using SoftwareDeliveryPlanner.Application.Calendar.Queries;
 using SoftwareDeliveryPlanner.Application.DeliveryInsights.Queries;
 using SoftwareDeliveryPlanner.Application.Holidays.Commands;
 using SoftwareDeliveryPlanner.Application.Holidays.Queries;
+using SoftwareDeliveryPlanner.Application.Notifications.Commands;
 using SoftwareDeliveryPlanner.Application.Output.Queries;
 using SoftwareDeliveryPlanner.Application.Planning.Commands;
 using SoftwareDeliveryPlanner.Application.Resources.Commands;
@@ -15,6 +16,10 @@ using SoftwareDeliveryPlanner.Application.Resources.Queries;
 using SoftwareDeliveryPlanner.Application.Tasks.Commands;
 using SoftwareDeliveryPlanner.Application.Tasks.Queries;
 using SoftwareDeliveryPlanner.Application.Planning.Queries;
+using SoftwareDeliveryPlanner.Application.Scenarios.Commands;
+using SoftwareDeliveryPlanner.Application.Scenarios.Queries;
+using SoftwareDeliveryPlanner.Application.TaskNotes.Commands;
+using SoftwareDeliveryPlanner.Application.TaskNotes.Queries;
 using SoftwareDeliveryPlanner.Application.Timeline.Queries;
 using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Infrastructure.Services;
@@ -44,6 +49,10 @@ public abstract class OrchestratorFixture : IAsyncDisposable
     private protected readonly IHolidayOrchestrator HolidayOrchestrator;
     private protected readonly ISchedulerService SchedulerService;
     private protected readonly IPlanningQueryService PlanningQueryService;
+    private protected readonly ITaskNoteOrchestrator TaskNoteOrchestrator;
+    private protected readonly INotificationOrchestrator NotificationOrchestrator;
+    private protected readonly IScenarioOrchestrator ScenarioOrchestrator;
+    private protected readonly TimeProvider TestTimeProvider;
 
     protected OrchestratorFixture(SqlServerFixture fixture)
     {
@@ -60,6 +69,10 @@ public abstract class OrchestratorFixture : IAsyncDisposable
         HolidayOrchestrator = new HolidayService(Factory, readOnlyFactory, EngineFactory, publisher);
         SchedulerService = new SchedulerService(Factory, readOnlyFactory, EngineFactory, publisher);
         PlanningQueryService = new PlanningQueryService(Factory, readOnlyFactory, EngineFactory, publisher);
+        TaskNoteOrchestrator = new TaskNoteOrchestrator(Factory, readOnlyFactory, EngineFactory, publisher);
+        NotificationOrchestrator = new NotificationOrchestrator(Factory, readOnlyFactory, EngineFactory, publisher);
+        ScenarioOrchestrator = new ScenarioOrchestrator(Factory, readOnlyFactory, EngineFactory, publisher);
+        TestTimeProvider = TimeProvider.System;
     }
 
     public async ValueTask DisposeAsync() => await Task.CompletedTask;
@@ -2094,5 +2107,181 @@ public class GetLastSchedulerRunQueryHandlerTests : OrchestratorFixture
         var result = await handler.Handle(new GetLastSchedulerRunQuery(), CancellationToken.None);
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
+    }
+}
+
+// ============================================================
+// Task Notes — Commands
+// ============================================================
+
+[Collection(DatabaseCollection.Name)]
+public class AddTaskNoteCommandHandlerTests : OrchestratorFixture
+{
+    public AddTaskNoteCommandHandlerTests(SqlServerFixture fixture) : base(fixture) { }
+
+    [Fact]
+    public async Task Handle_AddsNoteAndReturnsSuccess()
+    {
+        var tasks = await TaskOrchestrator.GetTasksAsync();
+        var taskId = tasks.First().TaskId;
+
+        var handler = new AddTaskNoteCommandHandler(TaskNoteOrchestrator);
+        var result = await handler.Handle(
+            new AddTaskNoteCommand(taskId, "Integration test note", "TestUser"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var notes = await TaskNoteOrchestrator.GetNotesAsync(taskId);
+        Assert.Contains(notes, n => n.NoteText == "Integration test note" && n.Author == "TestUser");
+    }
+}
+
+[Collection(DatabaseCollection.Name)]
+public class DeleteTaskNoteCommandHandlerTests : OrchestratorFixture
+{
+    public DeleteTaskNoteCommandHandlerTests(SqlServerFixture fixture) : base(fixture) { }
+
+    [Fact]
+    public async Task Handle_DeletesExistingNote()
+    {
+        var tasks = await TaskOrchestrator.GetTasksAsync();
+        var taskId = tasks.First().TaskId;
+
+        // Create a note first
+        var note = Domain.Models.TaskNote.Create(taskId, "Note to delete", "TestUser");
+        await TaskNoteOrchestrator.AddNoteAsync(note);
+        var notesBefore = await TaskNoteOrchestrator.GetNotesAsync(taskId);
+        var createdNote = notesBefore.First(n => n.NoteText == "Note to delete");
+
+        // Delete it
+        var handler = new DeleteTaskNoteCommandHandler(TaskNoteOrchestrator);
+        var result = await handler.Handle(new DeleteTaskNoteCommand(createdNote.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var notesAfter = await TaskNoteOrchestrator.GetNotesAsync(taskId);
+        Assert.DoesNotContain(notesAfter, n => n.Id == createdNote.Id);
+    }
+}
+
+// ============================================================
+// Scenarios — Commands
+// ============================================================
+
+[Collection(DatabaseCollection.Name)]
+public class SaveScenarioCommandHandlerTests : OrchestratorFixture
+{
+    public SaveScenarioCommandHandlerTests(SqlServerFixture fixture) : base(fixture) { }
+
+    [Fact]
+    public async Task Handle_SavesScenarioWithCurrentKpis()
+    {
+        var handler = new SaveScenarioCommandHandler(SchedulerService, ScenarioOrchestrator, TestTimeProvider);
+        var result = await handler.Handle(
+            new SaveScenarioCommand("Test Scenario", "Integration test notes"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var scenarios = await ScenarioOrchestrator.GetScenariosAsync();
+        Assert.Contains(scenarios, s => s.ScenarioName == "Test Scenario" && s.Notes == "Integration test notes");
+    }
+
+    [Fact]
+    public async Task Handle_CapturesKpiValues()
+    {
+        await SchedulerService.RunSchedulerAsync();
+        var handler = new SaveScenarioCommandHandler(SchedulerService, ScenarioOrchestrator, TestTimeProvider);
+        await handler.Handle(new SaveScenarioCommand("KPI Scenario", null), CancellationToken.None);
+
+        var scenarios = await ScenarioOrchestrator.GetScenariosAsync();
+        var saved = scenarios.First(s => s.ScenarioName == "KPI Scenario");
+        Assert.True(saved.TotalTasks > 0);
+    }
+}
+
+[Collection(DatabaseCollection.Name)]
+public class DeleteScenarioCommandHandlerTests : OrchestratorFixture
+{
+    public DeleteScenarioCommandHandlerTests(SqlServerFixture fixture) : base(fixture) { }
+
+    [Fact]
+    public async Task Handle_DeletesExistingScenario()
+    {
+        // Create a scenario first
+        var saveHandler = new SaveScenarioCommandHandler(SchedulerService, ScenarioOrchestrator, TestTimeProvider);
+        await saveHandler.Handle(new SaveScenarioCommand("Scenario to delete", null), CancellationToken.None);
+
+        var scenarios = await ScenarioOrchestrator.GetScenariosAsync();
+        var toDelete = scenarios.First(s => s.ScenarioName == "Scenario to delete");
+
+        var handler = new DeleteScenarioCommandHandler(ScenarioOrchestrator);
+        var result = await handler.Handle(new DeleteScenarioCommand(toDelete.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var afterDelete = await ScenarioOrchestrator.GetScenariosAsync();
+        Assert.DoesNotContain(afterDelete, s => s.Id == toDelete.Id);
+    }
+}
+
+// ============================================================
+// Notifications — Commands
+// ============================================================
+
+[Collection(DatabaseCollection.Name)]
+public class MarkNotificationsReadCommandHandlerTests : OrchestratorFixture
+{
+    public MarkNotificationsReadCommandHandlerTests(SqlServerFixture fixture) : base(fixture) { }
+
+    [Fact]
+    public async Task Handle_ReturnsSuccess()
+    {
+        var handler = new MarkNotificationsReadCommandHandler(NotificationOrchestrator);
+        var result = await handler.Handle(new MarkNotificationsReadCommand(), CancellationToken.None);
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task Handle_MarksAllNotificationsAsRead()
+    {
+        // Call mark all as read
+        var handler = new MarkNotificationsReadCommandHandler(NotificationOrchestrator);
+        await handler.Handle(new MarkNotificationsReadCommand(), CancellationToken.None);
+
+        // Verify no unread notifications remain
+        var unread = await NotificationOrchestrator.GetNotificationsAsync(true);
+        Assert.Empty(unread);
+    }
+}
+
+// ============================================================
+// Holidays — Copy to Year
+// ============================================================
+
+[Collection(DatabaseCollection.Name)]
+public class CopyHolidaysToYearCommandHandlerTests : OrchestratorFixture
+{
+    public CopyHolidaysToYearCommandHandlerTests(SqlServerFixture fixture) : base(fixture) { }
+
+    [Fact]
+    public async Task Handle_CopiesHolidaysToTargetYear()
+    {
+        // Get existing holidays to find a source year
+        var holidays = await HolidayOrchestrator.GetHolidaysAsync();
+        if (!holidays.Any())
+        {
+            // Skip if no holidays to copy
+            return;
+        }
+
+        var sourceYear = holidays.First().StartDate.Year;
+        var targetYear = sourceYear + 5; // Use a far-future year to avoid collisions
+
+        var handler = new CopyHolidaysToYearCommandHandler(HolidayOrchestrator);
+        var result = await handler.Handle(
+            new CopyHolidaysToYearCommand(sourceYear, targetYear), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value >= 0);
     }
 }

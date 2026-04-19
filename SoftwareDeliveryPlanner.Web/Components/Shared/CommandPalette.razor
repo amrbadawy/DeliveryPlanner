@@ -4,14 +4,14 @@
 
 @if (isVisible)
 {
-    <div class="command-palette-backdrop" @onclick="Close">
-        <div class="command-palette" @onclick:stopPropagation="true">
+    <div class="command-palette-backdrop" @onclick="Close" data-testid="command-palette-backdrop">
+        <div class="command-palette" @onclick:stopPropagation="true" data-testid="command-palette">
             <div class="command-palette-input-wrapper">
                 <i class="bi bi-search"></i>
                 <input @ref="searchInput" class="command-palette-input"
                        placeholder="Type a command..."
                        @bind-value="searchText" @bind-value:event="oninput"
-                       @onkeydown="HandleKeyDown" />
+                       @onkeydown="HandleKeyDown" data-testid="command-palette-input" />
                 <kbd>ESC</kbd>
             </div>
             <div class="command-palette-results">
