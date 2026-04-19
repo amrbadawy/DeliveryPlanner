@@ -592,6 +592,8 @@ else
             }
             showDeleteConfirm = false;
             editingTask = null;
+            StateHasChanged();
+            await Task.Yield();
             await LoadTasks();
             await AutoScheduleIfEnabled();
         }

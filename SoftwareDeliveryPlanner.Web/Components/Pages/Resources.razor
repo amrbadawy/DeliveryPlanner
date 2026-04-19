@@ -483,6 +483,8 @@ else
             }
             showDeleteConfirm = false;
             editingResource = null;
+            StateHasChanged();
+            await Task.Yield();
             await LoadResources();
             await AutoScheduleIfEnabled();
         }

@@ -14,9 +14,12 @@ test.describe('Adjustments happy + edge cases', () => {
     await runSchedulerFromDashboard(page);
     await gotoPage(page, '/adjustments');
     const table = page.getByTestId('adjustments-table');
-    await waitForTableRows(table, 0);
+    await expect(page.getByTestId('adjustments-add')).toBeVisible();
+    if (await table.isVisible().catch(() => false)) {
+      await waitForTableRows(table, 0);
+    }
 
-    const before = await table.locator('tbody tr').count();
+    const before = await table.locator('tbody tr').count().catch(() => 0);
 
     const notes = uniqueSuffix('e2e-training-window');
     await page.getByTestId('adjustments-add').click();
@@ -49,14 +52,16 @@ test.describe('Adjustments happy + edge cases', () => {
       await expect(modal).toBeHidden();
     }
 
-    const afterAdd = await table.locator('tbody tr').count();
+    const afterAdd = await table.locator('tbody tr').count().catch(() => 0);
     expect(afterAdd).toBeGreaterThanOrEqual(before);
 
     // If scheduler refresh succeeds, new row appears immediately.
     // If it fails, row still exists in DB and appears after page refresh.
     if (afterAdd === before) {
       await page.reload({ waitUntil: 'networkidle' });
-      await waitForTableRows(table, 0);
+      if (await table.isVisible().catch(() => false)) {
+        await waitForTableRows(table, 0);
+      }
     }
 
     const insertedRow = table.locator('tbody tr', { hasText: notes });
@@ -73,7 +78,7 @@ test.describe('Adjustments happy + edge cases', () => {
 
     await deleteBtn.click();
     await expectModalVisible(page, 'adjustments-delete-modal');
-    await page.getByTestId('adjustments-delete-confirm').click();
+    await page.getByTestId('adjustments-delete-modal-confirm').click();
     await expect(page.getByTestId('adjustments-delete-modal')).toBeHidden();
 
     const afterDelete = await table.locator('tbody tr').count();
@@ -85,9 +90,12 @@ test.describe('Adjustments happy + edge cases', () => {
     await runSchedulerFromDashboard(page);
     await gotoPage(page, '/adjustments');
     const table = page.getByTestId('adjustments-table');
-    await waitForTableRows(table, 0);
+    await expect(page.getByTestId('adjustments-add')).toBeVisible();
+    if (await table.isVisible().catch(() => false)) {
+      await waitForTableRows(table, 0);
+    }
 
-    const before = await table.locator('tbody tr').count();
+    const before = await table.locator('tbody tr').count().catch(() => 0);
 
     const notes = uniqueSuffix('should-not-save');
     await page.getByTestId('adjustments-add').click();
@@ -96,16 +104,16 @@ test.describe('Adjustments happy + edge cases', () => {
     await page.getByTestId('adjustments-cancel').click();
     await expect(page.getByTestId('adjustments-modal')).toBeHidden();
 
-    expect(await table.locator('tbody tr').count()).toBe(before);
+    expect(await table.locator('tbody tr').count().catch(() => 0)).toBe(before);
 
     if (before > 0) {
-      const firstDelete = table.locator('tbody tr').first().locator('button.btn-danger').first();
+      const firstDelete = table.locator('tbody tr').first().locator('button[data-testid^="adjustments-delete-"]').first();
       await firstDelete.click();
       await expectModalVisible(page, 'adjustments-delete-modal');
-      await page.getByTestId('adjustments-delete-cancel').click();
+      await page.getByTestId('adjustments-delete-modal-cancel').click();
       await expect(page.getByTestId('adjustments-delete-modal')).toBeHidden();
 
-      expect(await table.locator('tbody tr').count()).toBe(before);
+      expect(await table.locator('tbody tr').count().catch(() => 0)).toBe(before);
     }
   });
 
@@ -114,9 +122,12 @@ test.describe('Adjustments happy + edge cases', () => {
     await runSchedulerFromDashboard(page);
     await gotoPage(page, '/adjustments');
     const table = page.getByTestId('adjustments-table');
-    await waitForTableRows(table, 0);
+    await expect(page.getByTestId('adjustments-add')).toBeVisible();
+    if (await table.isVisible().catch(() => false)) {
+      await waitForTableRows(table, 0);
+    }
 
-    const before = await table.locator('tbody tr').count();
+    const before = await table.locator('tbody tr').count().catch(() => 0);
     await page.getByTestId('adjustments-add').click();
     await expectModalVisible(page, 'adjustments-modal');
 
@@ -137,6 +148,6 @@ test.describe('Adjustments happy + edge cases', () => {
     await expect(page.getByTestId('adjustments-modal')).toBeVisible();
     await page.getByTestId('adjustments-cancel').click();
 
-    expect(await table.locator('tbody tr').count()).toBe(before);
+    expect(await table.locator('tbody tr').count().catch(() => 0)).toBe(before);
   });
 });

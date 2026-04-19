@@ -27,11 +27,16 @@ export async function fillInputByTestId(page: Page, testId: string, value: strin
 
   const tagName = await element.evaluate((el) => el.tagName.toLowerCase());
   if (tagName === 'select') {
-    await element.selectOption({ label: value });
+    await element.selectOption({ label: value }).catch(async () => {
+      await element.selectOption({ value });
+    });
+    await page.waitForTimeout(150);
     return;
   }
 
   await element.fill(value);
+  await element.blur();
+  await page.waitForTimeout(150);
 }
 
 export async function runSchedulerFromDashboard(page: Page): Promise<void> {

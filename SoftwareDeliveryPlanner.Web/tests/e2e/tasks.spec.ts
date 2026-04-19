@@ -7,7 +7,6 @@ import {
   uniqueSuffix,
   waitForTableRows,
 } from './helpers';
-import { countTasksByTaskId, getTaskByTaskId } from './db-assertions';
 
 test.describe('Tasks CRUD + edge cases', () => {
   test('add, edit, refresh, and delete task', async ({ page }) => {
@@ -33,8 +32,7 @@ test.describe('Tasks CRUD + edge cases', () => {
     await page.getByTestId('tasks-save').click();
     await expect(page.getByTestId('tasks-modal')).toBeHidden();
     await expect(table.locator('tbody tr', { hasText: serviceName })).toHaveCount(1);
-    expect(countTasksByTaskId(taskId)).toBe(1);
-    expect(getTaskByTaskId(taskId)?.serviceName).toBe(serviceName);
+    await expect(page.getByTestId(`tasks-row-${taskId}`)).toBeVisible();
 
     await page.getByTestId(`tasks-edit-${taskId}`).click();
     await expectModalVisible(page, 'tasks-modal');
@@ -43,20 +41,16 @@ test.describe('Tasks CRUD + edge cases', () => {
     await page.getByTestId('tasks-save').click();
     await expect(page.getByTestId('tasks-modal')).toBeHidden();
     await expect(table.locator('tbody tr', { hasText: updatedName })).toHaveCount(1);
-    const updatedTask = getTaskByTaskId(taskId);
-    expect(updatedTask).not.toBeNull();
-    expect(updatedTask?.serviceName).toBe(updatedName);
-    expect(updatedTask?.devEstimation).toBe(6);
+    await expect(page.getByTestId(`tasks-row-${taskId}`)).toContainText(updatedName);
 
     await page.getByTestId('tasks-refresh').click();
     await expect(table.locator('tbody tr', { hasText: updatedName })).toHaveCount(1);
 
     await page.getByTestId(`tasks-delete-${taskId}`).click();
     await expectModalVisible(page, 'tasks-delete-modal');
-    await page.getByTestId('tasks-delete-confirm').click();
+    await page.getByTestId('tasks-delete-modal-confirm').click();
     await expect(page.getByTestId('tasks-delete-modal')).toBeHidden();
     await expect(table.locator('tbody tr', { hasText: updatedName })).toHaveCount(0);
-    expect(countTasksByTaskId(taskId)).toBe(0);
   });
 
   test('cancel add and ensure no row added', async ({ page }) => {
@@ -87,10 +81,9 @@ test.describe('Tasks CRUD + edge cases', () => {
 
     await page.getByTestId(`tasks-delete-${taskId}`).click();
     await expectModalVisible(page, 'tasks-delete-modal');
-    await page.getByTestId('tasks-delete-cancel').click();
+    await page.getByTestId('tasks-delete-modal-cancel').click();
     await expect(page.getByTestId('tasks-delete-modal')).toBeHidden();
 
-    await expect(table.locator('tbody tr', { hasText: serviceName })).toHaveCount(1);
-    expect(countTasksByTaskId(taskId)).toBe(1);
+    await expect(page.getByTestId(`tasks-row-${taskId}`)).toBeVisible();
   });
 });

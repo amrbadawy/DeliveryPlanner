@@ -64,8 +64,8 @@ test.describe('Task dependencies', () => {
     // Cleanup: delete the test task
     await page.getByTestId(`tasks-delete-${taskId}`).click();
     await expectModalVisible(page, 'tasks-delete-modal');
-    await page.getByTestId('tasks-delete-confirm').click();
-    await expect(page.getByTestId('tasks-delete-modal')).toBeHidden();
+    await page.getByTestId('tasks-delete-modal-confirm').click();
+    await expect(page.getByTestId(`tasks-row-${taskId}`)).toHaveCount(0);
   });
 
   test('edit task to add dependency and verify persistence', async ({ page }) => {
@@ -111,7 +111,7 @@ test.describe('Task dependencies', () => {
     await depsSelect.selectOption({ value: depId });
 
     await page.getByTestId('tasks-save').click();
-    await expect(page.getByTestId('tasks-modal')).toBeHidden();
+    await expect(page.getByTestId('tasks-modal')).toBeHidden({ timeout: 10_000 });
 
     // Verify badge appears
     const targetRow = table.locator(`[data-testid="tasks-row-${targetTaskId}"]`);
@@ -174,7 +174,7 @@ test.describe('Task dependencies', () => {
     // Cleanup
     await page.getByTestId(`tasks-delete-${newTaskId}`).click();
     await expectModalVisible(page, 'tasks-delete-modal');
-    await page.getByTestId('tasks-delete-confirm').click();
+    await page.getByTestId('tasks-delete-modal-confirm').click();
     await expect(page.getByTestId('tasks-delete-modal')).toBeHidden();
   });
 });

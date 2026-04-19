@@ -435,6 +435,8 @@ else
             }
             showDeleteConfirm = false;
             editingAdjustment = null;
+            StateHasChanged();
+            await Task.Yield();
             await LoadData();
             await AutoScheduleIfEnabled();
         }
