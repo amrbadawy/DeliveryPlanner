@@ -54,6 +54,7 @@ public abstract class PipelineFixture : IAsyncDisposable
         services.AddScoped<ISchedulingEngineFactory, SchedulingEngineFactory>();
         services.AddScoped<ITaskOrchestrator, TaskService>();
         services.AddScoped<IResourceOrchestrator, ResourceService>();
+        services.AddScoped<IRoleOrchestrator, RoleService>();
         services.AddScoped<IAdjustmentOrchestrator, AdjustmentService>();
         services.AddScoped<IHolidayOrchestrator, HolidayService>();
         services.AddScoped<ISchedulerService, SchedulerService>();

@@ -61,6 +61,7 @@ public static class DependencyInjection
         // Focused service registrations — one class per interface
         services.AddScoped<ITaskOrchestrator, TaskService>();
         services.AddScoped<IResourceOrchestrator, ResourceService>();
+        services.AddScoped<IRoleOrchestrator, RoleService>();
         services.AddScoped<IAdjustmentOrchestrator, AdjustmentService>();
         services.AddScoped<IHolidayOrchestrator, HolidayService>();
         services.AddScoped<ISchedulerService, SchedulerService>();

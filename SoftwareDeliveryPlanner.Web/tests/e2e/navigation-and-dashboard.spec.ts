@@ -11,6 +11,10 @@ test.describe('Navigation and dashboard', () => {
     await expect(page).toHaveURL(/\/tasks$/);
     await expect(page.getByRole('heading', { name: /Task Register/ })).toBeVisible();
 
+    await page.getByTestId('nav-roles').click();
+    await expect(page).toHaveURL(/\/roles$/);
+    await expect(page.getByRole('heading', { name: /Roles/ })).toBeVisible();
+
     await page.getByTestId('nav-resources').click();
     await expect(page).toHaveURL(/\/resources$/);
     await expect(page.getByRole('heading', { name: /Resources/ })).toBeVisible();

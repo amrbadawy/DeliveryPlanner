@@ -3,6 +3,7 @@
 @using FluentValidation
 @using SoftwareDeliveryPlanner.Application.Resources.Queries
 @using SoftwareDeliveryPlanner.Application.Resources.Commands
+@using SoftwareDeliveryPlanner.Application.Roles.Queries
 @using SoftwareDeliveryPlanner.Application.Planning.Commands
 @using SoftwareDeliveryPlanner.Domain.Models
 @using SoftwareDeliveryPlanner.Domain
@@ -47,10 +48,10 @@
             <div class="col-md-2">
                 <select class="form-select form-select-sm" @bind="roleFilter" aria-label="Filter by role" data-testid="resources-filter-role">
                     <option value="">All Roles</option>
-                    <option value="@DomainConstants.ResourceRole.Developer">@DomainConstants.ResourceRole.Developer</option>
-                    <option value="@DomainConstants.ResourceRole.SeniorDeveloper">@DomainConstants.ResourceRole.SeniorDeveloper</option>
-                    <option value="@DomainConstants.ResourceRole.TechLead">@DomainConstants.ResourceRole.TechLead</option>
-                    <option value="@DomainConstants.ResourceRole.QA">@DomainConstants.ResourceRole.QA</option>
+                    @foreach (var role in activeRoles)
+                    {
+                        <option value="@role.Code">@role.DisplayName</option>
+                    }
                 </select>
             </div>
             <div class="col-md-2">
@@ -104,10 +105,10 @@
                         <div class="col-md-6 mb-2">
                             <label class="form-label">Role:</label>
                             <select class="form-select" @bind="resourceForm.Role" data-testid="resources-role">
-                                <option>Developer</option>
-                                <option>Senior Developer</option>
-                                <option>Tech Lead</option>
-                                <option>QA</option>
+                                @foreach (var role in activeRoles)
+                                {
+                                    <option value="@role.Code">@role.DisplayName</option>
+                                }
                             </select>
                         </div>
                         <div class="col-md-6 mb-2">
@@ -248,6 +249,8 @@ else
 
 @code {
     private List<TeamMember> resources = new();
+    private List<Role> allRoles = new();
+    private List<Role> activeRoles = new();
     private bool showModal = false;
     private bool showDeleteConfirm = false;
     private TeamMember? editingResource;
@@ -377,6 +380,19 @@ else
 
     private async Task LoadResources()
     {
+        var activeRolesResult = await Mediator.Send(new GetRolesQuery(false));
+        activeRoles = activeRolesResult.Value
+            .Where(r => r.IsActive)
+            .OrderBy(r => r.SortOrder)
+            .ThenBy(r => r.DisplayName)
+            .ToList();
+
+        var allRolesResult = await Mediator.Send(new GetRolesQuery(true));
+        allRoles = allRolesResult.Value
+            .OrderBy(r => r.SortOrder)
+            .ThenBy(r => r.DisplayName)
+            .ToList();
+
         var result = await Mediator.Send(new GetResourcesQuery());
         resources = result.Value;
     }
@@ -388,7 +404,7 @@ else
         resourceForm = new ResourceFormModel
         {
             ResourceId = $"DEV-{(count + 1):D3}",
-            Role = DomainConstants.ResourceRole.Developer,
+            Role = activeRoles.FirstOrDefault()?.Code ?? DomainConstants.ResourceRole.Developer,
             Team = DomainConstants.DefaultTeam,
             StartDate = DateTime.Today,
             Active = DomainConstants.ActiveStatus.Yes,
@@ -404,6 +420,13 @@ else
 
     private void EditResource(TeamMember r)
     {
+        if (!activeRoles.Any(role => role.Code == r.Role))
+        {
+            var inactiveRole = allRoles.FirstOrDefault(role => role.Code == r.Role);
+            if (inactiveRole is not null)
+                activeRoles = activeRoles.Concat([inactiveRole]).OrderBy(role => role.SortOrder).ThenBy(role => role.DisplayName).ToList();
+        }
+
         editingResource = r;
         resourceForm = new ResourceFormModel
         {

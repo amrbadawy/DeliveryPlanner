@@ -39,6 +39,12 @@ public sealed class TeamMemberConfiguration : IEntityTypeConfiguration<TeamMembe
         builder.HasIndex(r => r.ResourceId)
             .IsUnique();
 
+        builder.HasOne<Role>()
+            .WithMany()
+            .HasForeignKey(r => r.Role)
+            .HasPrincipalKey(r => r.Code)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Configure Adjustments navigation via backing field
         builder.HasMany(r => r.Adjustments)
             .WithOne()

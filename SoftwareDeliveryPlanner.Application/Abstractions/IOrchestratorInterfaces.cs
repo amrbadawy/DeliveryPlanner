@@ -27,6 +27,22 @@ public interface IResourceOrchestrator
     Task DeleteResourceAsync(int id, CancellationToken cancellationToken = default);
 }
 
+public interface IRoleOrchestrator
+{
+    Task<List<Role>> GetRolesAsync(bool includeInactive = true, CancellationToken cancellationToken = default);
+    Task UpsertRoleAsync(
+        int id,
+        string code,
+        string displayName,
+        bool isActive,
+        int sortOrder,
+        bool isNew,
+        CancellationToken cancellationToken = default);
+    Task DeleteRoleAsync(int id, CancellationToken cancellationToken = default);
+    Task<bool> RoleCodeExistsAsync(string code, int? excludeId = null, CancellationToken cancellationToken = default);
+    Task<bool> IsRoleInUseAsync(string code, CancellationToken cancellationToken = default);
+}
+
 public interface IAdjustmentOrchestrator
 {
     Task<List<Adjustment>> GetAdjustmentsAsync(CancellationToken cancellationToken = default);

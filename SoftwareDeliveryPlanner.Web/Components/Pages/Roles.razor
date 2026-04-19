@@ -1,0 +1,258 @@
+@page "/roles"
+@using MediatR
+@using FluentValidation
+@using SoftwareDeliveryPlanner.Application.Roles.Queries
+@using SoftwareDeliveryPlanner.Application.Roles.Commands
+@using SoftwareDeliveryPlanner.Domain.Models
+@inject IMediator Mediator
+<PageTitle>Roles</PageTitle>
+
+<div class="d-flex justify-content-between align-items-start mb-4 page-header">
+    <div>
+        <h3 class="mb-1"><i class="bi bi-person-badge me-2"></i>Roles</h3>
+        <p class="page-subtitle">Manage resource roles used across planning and scheduling</p>
+    </div>
+    <button class="btn btn-primary" @onclick="ShowAddModal" data-testid="roles-add">
+        <i class="bi bi-plus-lg"></i> Add Role
+    </button>
+</div>
+
+@if (showModal)
+{
+    <div class="modal d-block modal-backdrop-custom" role="dialog" aria-modal="true" aria-labelledby="roles-modal-title" data-testid="roles-modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="roles-modal-title">@(editingRole == null ? "Add Role" : "Edit Role")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(modalError))
+                    {
+                        <div class="alert alert-danger" data-testid="roles-error">@modalError</div>
+                    }
+                    <div class="mb-2">
+                        <label class="form-label">Code:<span class="required-indicator">*</span></label>
+                        <input class="form-control @(fieldErrors.ContainsKey("Code") ? "is-invalid" : "")" @bind="roleForm.Code" data-testid="roles-code" />
+                        @if (fieldErrors.ContainsKey("Code"))
+                        {
+                            <div class="invalid-feedback">@fieldErrors["Code"]</div>
+                        }
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Name:<span class="required-indicator">*</span></label>
+                        <input class="form-control @(fieldErrors.ContainsKey("DisplayName") ? "is-invalid" : "")" @bind="roleForm.DisplayName" data-testid="roles-display-name" />
+                        @if (fieldErrors.ContainsKey("DisplayName"))
+                        {
+                            <div class="invalid-feedback">@fieldErrors["DisplayName"]</div>
+                        }
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">Sort Order:</label>
+                            <input class="form-control @(fieldErrors.ContainsKey("SortOrder") ? "is-invalid" : "")" type="number" min="1" @bind="roleForm.SortOrder" data-testid="roles-sort-order" />
+                            @if (fieldErrors.ContainsKey("SortOrder"))
+                            {
+                                <div class="invalid-feedback">@fieldErrors["SortOrder"]</div>
+                            }
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">Active:</label>
+                            <select class="form-select" @bind="roleForm.IsActive" data-testid="roles-active">
+                                <option value="true">Yes</option>
+                                <option value="false">No</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" @onclick="SaveRole" disabled="@isSaving" data-testid="roles-save">Save</button>
+                    <button class="btn btn-secondary" @onclick="CloseModal" disabled="@isSaving" data-testid="roles-cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showDeleteConfirm)
+{
+    <ConfirmDialog
+        Visible="true"
+        TestId="roles-delete-modal"
+        Title="Confirm Delete"
+        Message="@($"Are you sure you want to delete role '{editingRole?.DisplayName}'?")"
+        IsProcessing="isDeleting"
+        OnConfirm="ConfirmDelete"
+        OnCancel="CloseDeleteModal" />
+}
+
+<ToastNotification @ref="toast" TestId="roles-toast" />
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-striped table-hover mb-0" data-testid="roles-table">
+            <thead class="table-light">
+                <tr>
+                    <th>Code</th>
+                    <th>Name</th>
+                    <th>Sort</th>
+                    <th>Active</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var role in roles)
+                {
+                    <tr data-testid="roles-row-@role.Code">
+                        <td>@role.Code</td>
+                        <td>@role.DisplayName</td>
+                        <td>@role.SortOrder</td>
+                        <td>
+                            <span class="badge bg-@(role.IsActive ? "success" : "secondary")">@(role.IsActive ? "Yes" : "No")</span>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-warning" @onclick="() => EditRole(role)" data-testid="roles-edit-@role.Code" aria-label="Edit @role.Code"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteRole(role)" data-testid="roles-delete-@role.Code" aria-label="Delete @role.Code"><i class="bi bi-trash"></i></button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private List<Role> roles = new();
+    private Role? editingRole;
+    private bool showModal;
+    private bool showDeleteConfirm;
+    private bool isSaving;
+    private bool isDeleting;
+    private string modalError = string.Empty;
+    private ToastNotification toast = default!;
+    private Dictionary<string, string> fieldErrors = new();
+
+    private RoleFormModel roleForm = new();
+
+    private class RoleFormModel
+    {
+        public int Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public bool IsActive { get; set; } = true;
+        public int SortOrder { get; set; } = 1;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRoles();
+    }
+
+    private async Task LoadRoles()
+    {
+        var result = await Mediator.Send(new GetRolesQuery(true));
+        roles = result.Value.OrderBy(r => r.SortOrder).ThenBy(r => r.DisplayName).ToList();
+    }
+
+    private void ShowAddModal()
+    {
+        roleForm = new RoleFormModel { IsActive = true, SortOrder = (roles.MaxBy(r => r.SortOrder)?.SortOrder ?? 0) + 1 };
+        editingRole = null;
+        modalError = string.Empty;
+        fieldErrors.Clear();
+        showModal = true;
+    }
+
+    private void EditRole(Role role)
+    {
+        editingRole = role;
+        roleForm = new RoleFormModel
+        {
+            Id = role.Id,
+            Code = role.Code,
+            DisplayName = role.DisplayName,
+            IsActive = role.IsActive,
+            SortOrder = role.SortOrder
+        };
+        modalError = string.Empty;
+        fieldErrors.Clear();
+        showModal = true;
+    }
+
+    private void DeleteRole(Role role)
+    {
+        editingRole = role;
+        showDeleteConfirm = true;
+    }
+
+    private async Task SaveRole()
+    {
+        modalError = string.Empty;
+        fieldErrors.Clear();
+        isSaving = true;
+        try
+        {
+            await Mediator.Send(new UpsertRoleCommand(
+                roleForm.Id,
+                roleForm.Code,
+                roleForm.DisplayName,
+                roleForm.IsActive,
+                roleForm.SortOrder,
+                editingRole == null));
+
+            await LoadRoles();
+            CloseModal();
+            toast.Show(editingRole == null ? "Role added successfully." : "Role updated successfully.");
+        }
+        catch (ValidationException ex)
+        {
+            foreach (var error in ex.Errors)
+                fieldErrors[error.PropertyName] = error.ErrorMessage;
+            modalError = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ConfirmDelete()
+    {
+        isDeleting = true;
+        modalError = string.Empty;
+        try
+        {
+            if (editingRole != null)
+            {
+                await Mediator.Send(new DeleteRoleCommand(editingRole.Id));
+                toast.Show($"Role '{editingRole.DisplayName}' deleted.");
+            }
+            showDeleteConfirm = false;
+            editingRole = null;
+            await LoadRoles();
+        }
+        catch (ValidationException ex)
+        {
+            modalError = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+            toast.Show(modalError, "error");
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        editingRole = null;
+        modalError = string.Empty;
+        fieldErrors.Clear();
+    }
+
+    private void CloseDeleteModal()
+    {
+        showDeleteConfirm = false;
+        editingRole = null;
+    }
+}

@@ -11,6 +11,8 @@ using SoftwareDeliveryPlanner.Application.Holidays.Queries;
 using SoftwareDeliveryPlanner.Application.Notifications.Commands;
 using SoftwareDeliveryPlanner.Application.Output.Queries;
 using SoftwareDeliveryPlanner.Application.Planning.Commands;
+using SoftwareDeliveryPlanner.Application.Roles.Commands;
+using SoftwareDeliveryPlanner.Application.Roles.Queries;
 using SoftwareDeliveryPlanner.Application.Resources.Commands;
 using SoftwareDeliveryPlanner.Application.Resources.Queries;
 using SoftwareDeliveryPlanner.Application.Tasks.Commands;
@@ -45,6 +47,7 @@ public abstract class OrchestratorFixture : IAsyncDisposable
     private protected readonly ISchedulingEngineFactory EngineFactory;
     private protected readonly ITaskOrchestrator TaskOrchestrator;
     private protected readonly IResourceOrchestrator ResourceOrchestrator;
+    private protected readonly IRoleOrchestrator RoleOrchestrator;
     private protected readonly IAdjustmentOrchestrator AdjustmentOrchestrator;
     private protected readonly IHolidayOrchestrator HolidayOrchestrator;
     private protected readonly ISchedulerService SchedulerService;
@@ -65,6 +68,7 @@ public abstract class OrchestratorFixture : IAsyncDisposable
 
         TaskOrchestrator = new TaskService(Factory, readOnlyFactory, EngineFactory, publisher);
         ResourceOrchestrator = new ResourceService(Factory, readOnlyFactory, EngineFactory, publisher);
+        RoleOrchestrator = new RoleService(Factory, readOnlyFactory, EngineFactory, publisher);
         AdjustmentOrchestrator = new AdjustmentService(Factory, readOnlyFactory, EngineFactory, publisher);
         HolidayOrchestrator = new HolidayService(Factory, readOnlyFactory, EngineFactory, publisher);
         SchedulerService = new SchedulerService(Factory, readOnlyFactory, EngineFactory, publisher);
@@ -481,7 +485,25 @@ public class DeleteResourceCommandHandlerTests : OrchestratorFixture
 
 public class UpsertResourceCommandValidatorTests
 {
-    private readonly UpsertResourceCommandValidator _validator = new();
+    private sealed class StubRoleOrchestrator : IRoleOrchestrator
+    {
+        public Task<List<Role>> GetRolesAsync(bool includeInactive = true, CancellationToken cancellationToken = default)
+            => Task.FromResult<List<Role>>([new() { Id = 1, Code = "Developer", DisplayName = "Developer", IsActive = true, SortOrder = 1 }]);
+
+        public Task UpsertRoleAsync(int id, string code, string displayName, bool isActive, int sortOrder, bool isNew, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task DeleteRoleAsync(int id, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task<bool> RoleCodeExistsAsync(string code, int? excludeId = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(false);
+
+        public Task<bool> IsRoleInUseAsync(string code, CancellationToken cancellationToken = default)
+            => Task.FromResult(false);
+    }
+
+    private readonly UpsertResourceCommandValidator _validator = new(new StubRoleOrchestrator());
 
     private static UpsertResourceCommand Valid() => new(
         Id: 0, ResourceId: "DEV-001", ResourceName: "Alice",
@@ -491,17 +513,17 @@ public class UpsertResourceCommandValidatorTests
         Notes: null, IsNew: true);
 
     [Fact]
-    public void Valid_Command_PassesValidation()
+    public async Task Valid_Command_PassesValidation()
     {
-        Assert.True(_validator.Validate(Valid()).IsValid);
+        Assert.True((await _validator.ValidateAsync(Valid())).IsValid);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("  ")]
-    public void EmptyResourceId_FailsValidation(string id)
+    public async Task EmptyResourceId_FailsValidation(string id)
     {
-        var result = _validator.Validate(Valid() with { ResourceId = id });
+        var result = await _validator.ValidateAsync(Valid() with { ResourceId = id });
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertResourceCommand.ResourceId));
     }
@@ -509,18 +531,18 @@ public class UpsertResourceCommandValidatorTests
     [Theory]
     [InlineData("")]
     [InlineData("  ")]
-    public void EmptyName_FailsValidation(string name)
+    public async Task EmptyName_FailsValidation(string name)
     {
-        var result = _validator.Validate(Valid() with { ResourceName = name });
+        var result = await _validator.ValidateAsync(Valid() with { ResourceName = name });
         Assert.False(result.IsValid);
     }
 
     [Theory]
     [InlineData(-1)]
     [InlineData(101)]
-    public void OutOfRangeAvailability_FailsValidation(double pct)
+    public async Task OutOfRangeAvailability_FailsValidation(double pct)
     {
-        var result = _validator.Validate(Valid() with { AvailabilityPct = pct });
+        var result = await _validator.ValidateAsync(Valid() with { AvailabilityPct = pct });
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertResourceCommand.AvailabilityPct));
     }
@@ -528,9 +550,9 @@ public class UpsertResourceCommandValidatorTests
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
-    public void ZeroOrNegativeCapacity_FailsValidation(double cap)
+    public async Task ZeroOrNegativeCapacity_FailsValidation(double cap)
     {
-        var result = _validator.Validate(Valid() with { DailyCapacity = cap });
+        var result = await _validator.ValidateAsync(Valid() with { DailyCapacity = cap });
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertResourceCommand.DailyCapacity));
     }
@@ -1576,7 +1598,25 @@ public class UpsertTaskCommandValidatorAdditionalTests
 
 public class UpsertResourceCommandValidatorAdditionalTests
 {
-    private readonly UpsertResourceCommandValidator _validator = new();
+    private sealed class StubRoleOrchestrator : IRoleOrchestrator
+    {
+        public Task<List<Role>> GetRolesAsync(bool includeInactive = true, CancellationToken cancellationToken = default)
+            => Task.FromResult<List<Role>>([new() { Id = 1, Code = "Developer", DisplayName = "Developer", IsActive = true, SortOrder = 1 }]);
+
+        public Task UpsertRoleAsync(int id, string code, string displayName, bool isActive, int sortOrder, bool isNew, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task DeleteRoleAsync(int id, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task<bool> RoleCodeExistsAsync(string code, int? excludeId = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(false);
+
+        public Task<bool> IsRoleInUseAsync(string code, CancellationToken cancellationToken = default)
+            => Task.FromResult(false);
+    }
+
+    private readonly UpsertResourceCommandValidator _validator = new(new StubRoleOrchestrator());
 
     private static UpsertResourceCommand Valid() => new(
         Id: 0, ResourceId: "DEV-001", ResourceName: "Alice",
@@ -1586,46 +1626,46 @@ public class UpsertResourceCommandValidatorAdditionalTests
         Notes: null, IsNew: true);
 
     [Fact]
-    public void NullResourceId_FailsValidation()
+    public async Task NullResourceId_FailsValidation()
     {
-        var result = _validator.Validate(Valid() with { ResourceId = null! });
+        var result = await _validator.ValidateAsync(Valid() with { ResourceId = null! });
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertResourceCommand.ResourceId));
     }
 
     [Fact]
-    public void NullResourceName_FailsValidation()
+    public async Task NullResourceName_FailsValidation()
     {
-        var result = _validator.Validate(Valid() with { ResourceName = null! });
+        var result = await _validator.ValidateAsync(Valid() with { ResourceName = null! });
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertResourceCommand.ResourceName));
     }
 
     [Fact]
-    public void BoundaryAvailability_Zero_PassesValidation()
+    public async Task BoundaryAvailability_Zero_PassesValidation()
     {
-        var result = _validator.Validate(Valid() with { AvailabilityPct = 0 });
+        var result = await _validator.ValidateAsync(Valid() with { AvailabilityPct = 0 });
         Assert.True(result.IsValid);
     }
 
     [Fact]
-    public void BoundaryAvailability_Hundred_PassesValidation()
+    public async Task BoundaryAvailability_Hundred_PassesValidation()
     {
-        var result = _validator.Validate(Valid() with { AvailabilityPct = 100 });
+        var result = await _validator.ValidateAsync(Valid() with { AvailabilityPct = 100 });
         Assert.True(result.IsValid);
     }
 
     [Fact]
-    public void BoundaryCapacity_SmallPositive_PassesValidation()
+    public async Task BoundaryCapacity_SmallPositive_PassesValidation()
     {
-        var result = _validator.Validate(Valid() with { DailyCapacity = 0.001 });
+        var result = await _validator.ValidateAsync(Valid() with { DailyCapacity = 0.001 });
         Assert.True(result.IsValid);
     }
 
     [Fact]
-    public void MultipleFailures_AllErrorsReturned()
+    public async Task MultipleFailures_AllErrorsReturned()
     {
-        var result = _validator.Validate(Valid() with
+        var result = await _validator.ValidateAsync(Valid() with
         {
             ResourceId = "",
             ResourceName = "",
@@ -1641,12 +1681,10 @@ public class UpsertResourceCommandValidatorAdditionalTests
     }
 
     [Fact]
-    public void UnconstrainedFields_AcceptAnyValue()
+    public async Task UnconstrainedFields_AcceptAnyValue()
     {
-        // Role, Team, Active, Notes, StartDate have no validation rules
-        var result = _validator.Validate(Valid() with
+        var result = await _validator.ValidateAsync(Valid() with
         {
-            Role = "",
             Team = "",
             Active = "Maybe",
             Notes = ""

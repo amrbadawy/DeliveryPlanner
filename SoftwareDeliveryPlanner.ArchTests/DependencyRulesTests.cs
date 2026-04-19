@@ -1432,7 +1432,7 @@ public class DependencyRulesTests
         var aggregateRootType = typeof(SoftwareDeliveryPlanner.SharedKernel.AggregateRoot);
 
         // These entities are NOT aggregate roots — they are value/child/infrastructure entities
-        var nonAggregateNames = new HashSet<string> { "CalendarDay", "Allocation", "Setting", "LookupValue", "Adjustment" };
+        var nonAggregateNames = new HashSet<string> { "CalendarDay", "Allocation", "Setting", "LookupValue", "Adjustment", "Role" };
 
         var violations = domainAssembly.GetTypes()
             .Where(t => t.IsClass && !t.IsAbstract && t.Namespace != null
@@ -1483,6 +1483,7 @@ public class DependencyRulesTests
     [InlineData("Allocation")]
     [InlineData("Setting")]
     [InlineData("LookupValue")]
+    [InlineData("Role")]
     public void Infrastructure_Entities_May_Have_Public_Setters(string entityName)
     {
         // Negative test: these non-aggregate entities are allowed to have public setters
