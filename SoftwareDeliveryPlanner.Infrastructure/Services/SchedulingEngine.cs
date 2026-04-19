@@ -73,9 +73,20 @@ internal class SchedulingEngine : ISchedulingEngine
 
     private int CalculateSchedulingRank(TaskItem task)
     {
-        int hasStrict = task.StrictDate.HasValue ? 1 : 0;
-        long strictVal = task.StrictDate.HasValue ? task.StrictDate.Value.Ticks : long.MaxValue;
-        return hasStrict * 10000000 + (int)(strictVal / 10000) + (11 - task.Priority) * 1000;
+        // Priority 10 = most important → smallest contribution; Priority 1 = least important → largest.
+        int priorityComponent = (11 - task.Priority) * 10;
+
+        if (!task.StrictDate.HasValue)
+        {
+            // Non-strict tasks are always scheduled after all strict-date tasks.
+            // int.MaxValue / 2 far exceeds any realistic day-based rank (max ~365k days by year 3000).
+            return int.MaxValue / 2 + priorityComponent;
+        }
+
+        // Days since 2000-01-01 avoids int overflow entirely.
+        // For 2026 dates: ~9600–9900; scaled by 100 so date always dominates priority (range 10–100).
+        int daysSinceRef = (int)(task.StrictDate.Value.Date - new DateTime(2000, 1, 1)).TotalDays;
+        return daysSinceRef * 100 + priorityComponent;
     }
 
     private double CalculateEffectiveCapacity(DateTime date, List<TeamMember> resources, List<Adjustment> adjustments)
@@ -248,11 +259,6 @@ internal class SchedulingEngine : ISchedulingEngine
                     alloc = 0.5 * Math.Floor(alloc / 0.5);
 
                 if (alloc < 0.5) continue;
-
-                // Check if higher priority task needs capacity
-                var higherRankExists = tasks.Any(t => t.SchedulingRank < task.SchedulingRank && !taskStartDate[t.TaskId].HasValue);
-                if (!taskStartDate[taskId].HasValue && higherRankExists && remainingCap >= 0.5)
-                    continue;
 
                 // Allocate
                 var allocId = $"ALLOC-{allocCounter++:D6}";

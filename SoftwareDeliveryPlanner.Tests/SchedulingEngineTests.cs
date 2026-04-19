@@ -320,7 +320,7 @@ public class SchedulingEngineTests : IDisposable
         var rank1 = GetPrivateRank(task1);
         var rank2 = GetPrivateRank(task2);
 
-        Assert.True(rank1 > rank2);
+        Assert.True(rank1 < rank2); // earlier deadline → lower rank → scheduled first
     }
 
     [Fact]
@@ -337,9 +337,11 @@ public class SchedulingEngineTests : IDisposable
 
     private int GetPrivateRank(TaskItem task)
     {
-        int hasStrict = task.StrictDate.HasValue ? 1 : 0;
-        long strictVal = task.StrictDate.HasValue ? task.StrictDate.Value.Ticks : long.MaxValue;
-        return hasStrict * 10000000 + (int)(strictVal / 10000) + (11 - task.Priority) * 1000;
+        int priorityComponent = (11 - task.Priority) * 10;
+        if (!task.StrictDate.HasValue)
+            return int.MaxValue / 2 + priorityComponent;
+        int daysSinceRef = (int)(task.StrictDate.Value.Date - new DateTime(2000, 1, 1)).TotalDays;
+        return daysSinceRef * 100 + priorityComponent;
     }
 
     #endregion
