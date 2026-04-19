@@ -117,13 +117,11 @@
     </div>
 }
 
-<!-- ── Loading State ───────────────────────────────────────── -->
 @if (isLoading)
 {
     <SkeletonLoader Variant="kpi" Columns="3" TestId="holidays-skeleton-kpi" />
     <SkeletonLoader Variant="table" Rows="5" Columns="6" TestId="holidays-skeleton-table" />
 }
-<!-- ── Empty State ─────────────────────────────────────────── -->
 else if (!holidays.Any())
 {
     <div class="empty-state">
@@ -135,7 +133,6 @@ else if (!holidays.Any())
         </button>
     </div>
 }
-<!-- ── Table ───────────────────────────────────────────────── -->
 else
 {
     <div class="card border-0 shadow-sm">
