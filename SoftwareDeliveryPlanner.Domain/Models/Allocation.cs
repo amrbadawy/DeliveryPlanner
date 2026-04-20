@@ -10,9 +10,9 @@ public class Allocation
     public int DateKey { get; set; }
     public DateTime CalendarDate { get; set; }
     public int? SchedRank { get; set; }
-    public double? MaxDev { get; set; }
+    public double? MaxResource { get; set; }
     public double? AvailableCapacity { get; set; }
-    public double AssignedDev { get; set; }
+    public double AssignedResource { get; set; }
     public double CumulativeEffort { get; set; }
     public bool IsComplete { get; set; }
     public string ServiceStatus { get; set; } = DomainConstants.TaskStatus.NotStarted;

@@ -18,7 +18,7 @@ public class TaskItemDomainTests
         Assert.Equal("SVC-001", task.TaskId);
         Assert.Equal("My Service", task.ServiceName);
         Assert.Equal(10, task.DevEstimation);
-        Assert.Equal(2, task.MaxDev);
+        Assert.Equal(2, task.MaxResource);
         Assert.Equal(5, task.Priority);
         Assert.Null(task.StrictDate);
     }
@@ -95,9 +95,9 @@ public class TaskItemDomainTests
     [Theory]
     [InlineData(0)]
     [InlineData(-0.5)]
-    public void Create_ZeroOrNegativeMaxDev_ThrowsDomainException(double maxDev)
+    public void Create_ZeroOrNegativeMaxResource_ThrowsDomainException(double maxResource)
     {
-        Assert.Throws<DomainException>(() => TaskItem.Create("SVC-001", "Service", 5, maxDev, 5));
+        Assert.Throws<DomainException>(() => TaskItem.Create("SVC-001", "Service", 5, maxResource, 5));
     }
 
     [Theory]
@@ -651,10 +651,10 @@ public class TaskItemDomainAdditionalTests
     }
 
     [Fact]
-    public void Create_Factory_AssignedDev_DefaultsToNull()
+    public void Create_Factory_AssignedResource_DefaultsToNull()
     {
         var task = TaskItem.Create("SVC-001", "Service", 5, 1, 5);
-        Assert.Null(task.AssignedDev);
+        Assert.Null(task.AssignedResource);
     }
 
     [Fact]
@@ -676,7 +676,7 @@ public class TaskItemDomainAdditionalTests
         Assert.Equal(strict, task.StrictDate);
         Assert.Equal("SVC-002,SVC-003", task.DependsOnTaskIds);
         Assert.Equal(0.001, task.DevEstimation);
-        Assert.Equal(0.5, task.MaxDev);
+        Assert.Equal(0.5, task.MaxResource);
     }
 
     [Fact]
@@ -697,12 +697,12 @@ public class TaskItemDomainAdditionalTests
     }
 
     [Fact]
-    public void Create_NaN_MaxDev_ThrowsDomainException()
+    public void Create_NaN_MaxResource_ThrowsDomainException()
     {
         try
         {
             var task = TaskItem.Create("SVC-001", "Service", 5, double.NaN, 5);
-            Assert.True(double.IsNaN(task.MaxDev));
+            Assert.True(double.IsNaN(task.MaxResource));
         }
         catch (DomainException)
         {
@@ -719,10 +719,10 @@ public class TaskItemDomainAdditionalTests
     }
 
     [Fact]
-    public void Create_MaxDev_FractionalBoundary_SmallestPositive()
+    public void Create_MaxResource_FractionalBoundary_SmallestPositive()
     {
         var task = TaskItem.Create("SVC-001", "Service", 5, 0.001, 5);
-        Assert.Equal(0.001, task.MaxDev);
+        Assert.Equal(0.001, task.MaxResource);
     }
 
     [Fact]

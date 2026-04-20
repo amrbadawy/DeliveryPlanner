@@ -23,7 +23,7 @@ internal sealed class BulkImportTasksCommandHandler : IRequestHandler<BulkImport
 
             await _orchestrator.UpsertTaskAsync(
                 id, row.TaskId, row.ServiceName,
-                row.DevEstimation, row.MaxDev, row.Priority,
+                row.DevEstimation, row.MaxResource, row.Priority,
                 row.StrictDate, row.DependsOnTaskIds, isNew,
                 cancellationToken);
 

@@ -26,7 +26,7 @@ public sealed class ScenarioTaskSnapshotConfiguration : IEntityTypeConfiguration
         builder.Property(s => s.DevEstimation)
             .IsRequired();
 
-        builder.Property(s => s.MaxDev)
+        builder.Property(s => s.MaxResource)
             .IsRequired();
 
         builder.Property(s => s.Status)

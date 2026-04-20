@@ -106,7 +106,7 @@ else
                         <th role="button" @onclick='() => ApplySort("Num")' aria-sort="@AriaSort("Num")" data-testid="output-sort-num"># @SortIndicator("Num")</th>
                         <th role="button" @onclick='() => ApplySort("TaskId")' aria-sort="@AriaSort("TaskId")" data-testid="output-sort-id">Task ID @SortIndicator("TaskId")</th>
                         <th role="button" @onclick='() => ApplySort("ServiceName")' aria-sort="@AriaSort("ServiceName")" data-testid="output-sort-name">Service @SortIndicator("ServiceName")</th>
-                        <th>Devs</th>
+                        <th>Resources</th>
                         <th role="button" @onclick='() => ApplySort("PlannedStart")' aria-sort="@AriaSort("PlannedStart")" data-testid="output-sort-start">Start @SortIndicator("PlannedStart")</th>
                         <th role="button" @onclick='() => ApplySort("PlannedFinish")' aria-sort="@AriaSort("PlannedFinish")" data-testid="output-sort-finish">Finish @SortIndicator("PlannedFinish")</th>
                         <th>Days</th>
@@ -123,7 +123,7 @@ else
                             <td>@item.Num</td>
                             <td>@item.TaskId</td>
                             <td>@item.ServiceName</td>
-                            <td>@item.AssignedDev</td>
+                            <td>@item.AssignedResource</td>
                             <td>@item.PlannedStart</td>
                             <td>@item.PlannedFinish</td>
                             <td>@item.Duration</td>
@@ -294,12 +294,12 @@ else
             }
 
             var csv = new System.Text.StringBuilder();
-            csv.AppendLine("Num,Task ID,Service,Dev,Start,Finish,Days,Est,Strict,Status,Risk");
+            csv.AppendLine("Num,Task ID,Service,Resource,Start,Finish,Days,Est,Strict,Status,Risk");
 
             foreach (var item in output)
             {
                 var service = item.ServiceName.Replace(",", ";").Replace("\r", " ").Replace("\n", " ");
-                csv.AppendLine($"{item.Num},{item.TaskId},{service},{item.AssignedDev?.ToString() ?? ""},{item.PlannedStart ?? ""},{item.PlannedFinish ?? ""},{item.Duration?.ToString() ?? ""},{item.DevEstimation},{item.StrictDate ?? ""},{item.Status},{item.DeliveryRisk}");
+                csv.AppendLine($"{item.Num},{item.TaskId},{service},{item.AssignedResource?.ToString() ?? ""},{item.PlannedStart ?? ""},{item.PlannedFinish ?? ""},{item.Duration?.ToString() ?? ""},{item.DevEstimation},{item.StrictDate ?? ""},{item.Status},{item.DeliveryRisk}");
             }
 
             var fileName = $"delivery_plan_{DateTime.Now:yyyyMMdd_HHmmss}.csv";

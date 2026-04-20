@@ -41,7 +41,7 @@ test.describe('Task dependencies', () => {
 
     await fillInputByTestId(page, 'tasks-service-name', serviceName);
     await fillInputByTestId(page, 'tasks-dev-estimation', '3');
-    await fillInputByTestId(page, 'tasks-max-dev', '1');
+    await fillInputByTestId(page, 'tasks-max-resource', '1');
     await fillInputByTestId(page, 'tasks-priority', '5');
 
     // Select the dependency
@@ -154,7 +154,7 @@ test.describe('Task dependencies', () => {
 
     await fillInputByTestId(page, 'tasks-service-name', serviceName);
     await fillInputByTestId(page, 'tasks-dev-estimation', '2');
-    await fillInputByTestId(page, 'tasks-max-dev', '1');
+    await fillInputByTestId(page, 'tasks-max-resource', '1');
     await fillInputByTestId(page, 'tasks-priority', '5');
 
     // Select two dependencies

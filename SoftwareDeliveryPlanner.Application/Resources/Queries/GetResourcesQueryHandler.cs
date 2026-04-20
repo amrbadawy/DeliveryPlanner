@@ -26,3 +26,14 @@ internal sealed class GetResourceCountQueryHandler : IRequestHandler<GetResource
     public async Task<Result<int>> Handle(GetResourceCountQuery request, CancellationToken cancellationToken)
         => await _orchestrator.GetResourceCountAsync(cancellationToken);
 }
+
+internal sealed class GetResourceByIdQueryHandler : IRequestHandler<GetResourceByIdQuery, Result<TeamMember?>>
+{
+    private readonly IResourceOrchestrator _orchestrator;
+
+    public GetResourceByIdQueryHandler(IResourceOrchestrator orchestrator)
+        => _orchestrator = orchestrator;
+
+    public async Task<Result<TeamMember?>> Handle(GetResourceByIdQuery request, CancellationToken cancellationToken)
+        => await _orchestrator.GetResourceByResourceIdAsync(request.ResourceId, cancellationToken);
+}

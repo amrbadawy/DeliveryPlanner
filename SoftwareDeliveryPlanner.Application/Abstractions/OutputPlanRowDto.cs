@@ -9,7 +9,7 @@ public sealed record OutputPlanRowDto(
     int Num,
     string TaskId,
     string ServiceName,
-    double? AssignedDev,
+    double? AssignedResource,
     string? PlannedStart,
     string? PlannedFinish,
     int? Duration,

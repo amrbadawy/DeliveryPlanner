@@ -54,19 +54,19 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     }
 
     // ------------------------------------------------------------------
-    // OverrideDev — scheduler uses the override developer allocation
+    // OverrideResource — scheduler uses the override resource allocation
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_OverrideDev_AllocationsUseOverrideDevValue()
+    public void RunScheduler_OverrideResource_AllocationsUseOverrideResourceValue()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        const double overrideDev = 0.5;
+        const double overrideResource = 0.5;
 
-        _db.Tasks.Add(TaskItem.Create("SV-101", "Override Dev Test", 3, 5, 5, overrideDev: overrideDev));
+        _db.Tasks.Add(TaskItem.Create("SV-101", "Override Dev Test", 3, 5, 5, overrideResource: overrideResource));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -75,10 +75,10 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
             .Where(a => a.TaskId == "SV-101")
             .ToList();
 
-        // Every allocation should have AssignedDev <= overrideDev
+        // Every allocation should have AssignedResource <= overrideResource
         Assert.All(allocations, a =>
-            Assert.True(a.AssignedDev <= overrideDev,
-                $"AssignedDev {a.AssignedDev} exceeds OverrideDev {overrideDev}"));
+            Assert.True(a.AssignedResource <= overrideResource,
+                $"AssignedResource {a.AssignedResource} exceeds OverrideResource {overrideResource}"));
     }
 
     // ------------------------------------------------------------------
@@ -288,11 +288,11 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     }
 
     // ------------------------------------------------------------------
-    // MaxDev exceeding capacity — capped at available capacity
+    // MaxResource exceeding capacity — capped at available capacity
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_TaskWithMaxDevGreaterThanCapacity_CapsAtCapacity()
+    public void RunScheduler_TaskWithMaxResourceGreaterThanCapacity_CapsAtCapacity()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -304,10 +304,10 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _engine.RunScheduler();
 
         var allocations = _db.Allocations.Where(a => a.TaskId == "SV-111").ToList();
-        // Each allocation's AssignedDev should not exceed the day's available capacity
+        // Each allocation's AssignedResource should not exceed the day's available capacity
         Assert.All(allocations, a =>
-            Assert.True(a.AssignedDev <= a.AvailableCapacity,
-                $"AssignedDev {a.AssignedDev} exceeds AvailableCapacity {a.AvailableCapacity}"));
+            Assert.True(a.AssignedResource <= a.AvailableCapacity,
+                $"AssignedResource {a.AssignedResource} exceeds AvailableCapacity {a.AvailableCapacity}"));
     }
 
     // ------------------------------------------------------------------
@@ -722,7 +722,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         var engine = new SchedulingEngine(_db, TimeProvider.System);
         engine.RunScheduler();
 
-        // Each allocation in May should have AssignedDev <= 2 (8 * 0.5 * 0.5)
+        // Each allocation in May should have AssignedResource <= 2 (8 * 0.5 * 0.5)
         var mayAllocations = _db.Allocations
             .Where(a => a.TaskId == "SV-118"
                 && a.CalendarDate.Month == 5 && a.CalendarDate.Year == 2026)
@@ -730,8 +730,8 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
 
         Assert.NotEmpty(mayAllocations);
         Assert.All(mayAllocations, a =>
-            Assert.True(a.AssignedDev <= 2.0,
-                $"Expected AssignedDev <= 2.0 (stacked adjustments) but got {a.AssignedDev}"));
+            Assert.True(a.AssignedResource <= 2.0,
+                $"Expected AssignedResource <= 2.0 (stacked adjustments) but got {a.AssignedResource}"));
     }
 
     // ------------------------------------------------------------------

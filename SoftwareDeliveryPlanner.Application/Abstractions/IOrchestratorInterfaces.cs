@@ -9,7 +9,7 @@ public interface ITaskOrchestrator
     Task<int> GetTaskCountAsync(CancellationToken cancellationToken = default);
     Task UpsertTaskAsync(
         int id, string taskId, string serviceName, double devEstimation,
-        double maxDev, int priority, DateTime? strictDate,
+        double maxResource, int priority, DateTime? strictDate,
         string? dependsOnTaskIds, bool isNew,
         CancellationToken cancellationToken = default);
     Task DeleteTaskAsync(int id, CancellationToken cancellationToken = default);
@@ -18,6 +18,7 @@ public interface ITaskOrchestrator
 public interface IResourceOrchestrator
 {
     Task<List<TeamMember>> GetResourcesAsync(CancellationToken cancellationToken = default);
+    Task<TeamMember?> GetResourceByResourceIdAsync(string resourceId, CancellationToken cancellationToken = default);
     Task<int> GetResourceCountAsync(CancellationToken cancellationToken = default);
     Task UpsertResourceAsync(
         int id, string resourceId, string resourceName, string role,

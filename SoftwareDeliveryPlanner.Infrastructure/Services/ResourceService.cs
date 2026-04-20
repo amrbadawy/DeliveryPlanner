@@ -21,6 +21,14 @@ internal sealed class ResourceService : ServiceBase, IResourceOrchestrator
         return await db.Resources.ToListAsync(cancellationToken);
     }
 
+    public async Task<TeamMember?> GetResourceByResourceIdAsync(string resourceId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await ReadOnlyDbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Resources
+            .Include(r => r.Adjustments)
+            .FirstOrDefaultAsync(r => r.ResourceId == resourceId, cancellationToken);
+    }
+
     public async Task<int> GetResourceCountAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await ReadOnlyDbFactory.CreateDbContextAsync(cancellationToken);

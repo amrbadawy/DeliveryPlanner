@@ -15,7 +15,7 @@ internal sealed class UpsertTaskCommandHandler : IRequestHandler<UpsertTaskComma
     {
         await _orchestrator.UpsertTaskAsync(
             request.Id, request.TaskId, request.ServiceName,
-            request.DevEstimation, request.MaxDev, request.Priority,
+            request.DevEstimation, request.MaxResource, request.Priority,
             request.StrictDate, request.DependsOnTaskIds, request.IsNew,
             cancellationToken);
 

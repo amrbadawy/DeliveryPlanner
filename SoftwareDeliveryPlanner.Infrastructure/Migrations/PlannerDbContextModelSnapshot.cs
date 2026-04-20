@@ -73,7 +73,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<double>("AssignedDev")
+                    b.Property<double>("AssignedResource")
                         .HasColumnType("float");
 
                     b.Property<double?>("AvailableCapacity")
@@ -91,7 +91,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.Property<bool>("IsComplete")
                         .HasColumnType("bit");
 
-                    b.Property<double?>("MaxDev")
+                    b.Property<double?>("MaxResource")
                         .HasColumnType("float");
 
                     b.Property<int?>("SchedRank")
@@ -675,7 +675,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<double?>("AssignedDev")
+                    b.Property<double?>("AssignedResource")
                         .HasColumnType("float");
 
                     b.Property<string>("AssignedResourceId")
@@ -697,7 +697,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.Property<int?>("Duration")
                         .HasColumnType("int");
 
-                    b.Property<double>("MaxDev")
+                    b.Property<double>("MaxResource")
                         .HasColumnType("float");
 
                     b.Property<int>("PlanScenarioId")
@@ -802,7 +802,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<double?>("AssignedDev")
+                    b.Property<double?>("AssignedResource")
                         .HasColumnType("float");
 
                     b.Property<string>("AssignedResourceId")
@@ -831,10 +831,10 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.Property<int?>("Duration")
                         .HasColumnType("int");
 
-                    b.Property<double>("MaxDev")
+                    b.Property<double>("MaxResource")
                         .HasColumnType("float");
 
-                    b.Property<double?>("OverrideDev")
+                    b.Property<double?>("OverrideResource")
                         .HasColumnType("float");
 
                     b.Property<DateTime?>("OverrideStart")

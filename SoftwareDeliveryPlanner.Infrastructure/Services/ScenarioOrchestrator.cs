@@ -59,9 +59,9 @@ internal sealed class ScenarioOrchestrator : ServiceBase, IScenarioOrchestrator
                 task.Duration,
                 task.StrictDate,
                 task.AssignedResourceId,
-                task.AssignedDev,
+                task.AssignedResource,
                 task.DevEstimation,
-                task.MaxDev,
+                task.MaxResource,
                 task.Status,
                 task.DeliveryRisk,
                 task.DependsOnTaskIds);

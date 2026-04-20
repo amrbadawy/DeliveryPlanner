@@ -13,7 +13,7 @@ public sealed class BulkImportTasksCommandValidator : AbstractValidator<BulkImpo
             row.RuleFor(r => r.TaskId).NotEmpty().WithMessage("Task ID is required.");
             row.RuleFor(r => r.ServiceName).NotEmpty().WithMessage("Service Name is required.");
             row.RuleFor(r => r.DevEstimation).GreaterThan(0).WithMessage("Estimation must be greater than zero.");
-            row.RuleFor(r => r.MaxDev).GreaterThanOrEqualTo(0).WithMessage("Max Developers must not be negative.");
+            row.RuleFor(r => r.MaxResource).GreaterThanOrEqualTo(0).WithMessage("Max Resources must not be negative.");
             row.RuleFor(r => r.Priority).GreaterThan(0).WithMessage("Priority must be greater than zero.");
         });
     }

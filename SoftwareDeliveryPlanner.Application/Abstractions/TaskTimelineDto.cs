@@ -1,11 +1,15 @@
 namespace SoftwareDeliveryPlanner.Application.Abstractions;
 
+public sealed record AssignedResourceInfo(
+    string ResourceId,
+    string ResourceName);
+
 public sealed record TaskAssignmentDayDto(
     DateTime Date,
     string DateDisplay,
     bool IsWorkingDay,
     string StatusText,
-    List<string> AssignedDevelopers);
+    List<AssignedResourceInfo> AssignedResources);
 
 public sealed record TaskTimelineDto(
     List<TaskAssignmentDayDto> Days);

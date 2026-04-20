@@ -115,11 +115,11 @@
                             }
                         </div>
                         <div class="col-md-6 mb-2">
-                            <label class="form-label">Max Developers:</label>
-                            <input class="form-control @(fieldErrors.ContainsKey("MaxDev") ? "is-invalid" : "")" type="number" min="0" step="0.5" @bind="taskForm.MaxDev" data-testid="tasks-max-dev" />
-                            @if (fieldErrors.ContainsKey("MaxDev"))
+                            <label class="form-label">Max Resources:</label>
+                            <input class="form-control @(fieldErrors.ContainsKey("MaxResource") ? "is-invalid" : "")" type="number" min="0" step="0.5" @bind="taskForm.MaxResource" data-testid="tasks-max-resource" />
+                            @if (fieldErrors.ContainsKey("MaxResource"))
                             {
-                                <div class="invalid-feedback">@fieldErrors["MaxDev"]</div>
+                                <div class="invalid-feedback">@fieldErrors["MaxResource"]</div>
                             }
                         </div>
                     </div>
@@ -186,7 +186,7 @@
                     {
                         <div class="alert alert-danger">@bulkError</div>
                     }
-                    <p class="text-muted small">Paste CSV with headers: <code>TaskId,ServiceName,DevEstimation,MaxDev,Priority,StrictDate,DependsOnTaskIds</code></p>
+                    <p class="text-muted small">Paste CSV with headers: <code>TaskId,ServiceName,DevEstimation,MaxResource,Priority,StrictDate,DependsOnTaskIds</code></p>
                     <textarea class="form-control font-monospace" rows="8" @bind="csvText" placeholder="SVC-010,Auth Service,15,2,3,,&#10;SVC-011,User API,20,3,5,2026-06-01,SVC-010" data-testid="bulk-import-csv"></textarea>
                     @if (parsedRows.Any())
                     {
@@ -202,7 +202,7 @@
                                         {
                                             <tr>
                                                 <td>@row.TaskId</td><td>@row.ServiceName</td><td>@row.DevEstimation</td>
-                                                <td>@row.MaxDev</td><td>@row.Priority</td>
+                                                <td>@row.MaxResource</td><td>@row.Priority</td>
                                                 <td>@(row.StrictDate?.ToString("yyyy-MM-dd") ?? "")</td><td>@(row.DependsOnTaskIds ?? "")</td>
                                             </tr>
                                         }
@@ -298,7 +298,7 @@ else
                             </td>
                             <td>@task.ServiceName</td>
                             <td>@task.DevEstimation</td>
-                            <td>@task.MaxDev</td>
+                            <td>@task.MaxResource</td>
                             <td>@task.Priority</td>
                             <td>@task.PlannedStart?.ToString("yyyy-MM-dd")</td>
                             <td>@task.PlannedFinish?.ToString("yyyy-MM-dd")</td>
@@ -382,7 +382,7 @@ else
         public string TaskId { get; set; } = string.Empty;
         public string ServiceName { get; set; } = string.Empty;
         public double DevEstimation { get; set; }
-        public double MaxDev { get; set; } = 1.0;
+        public double MaxResource { get; set; } = 1.0;
         public int Priority { get; set; } = 5;
         public DateTime? StrictDate { get; set; }
         public string? DependsOnTaskIds { get; set; }
@@ -501,7 +501,7 @@ else
         {
             TaskId = $"SVC-{(count + 1):D3}",
             Priority = 5,
-            MaxDev = 1
+            MaxResource = 1
         };
         strictDateValue = null;
         selectedDependencies = new();
@@ -520,7 +520,7 @@ else
             TaskId = task.TaskId,
             ServiceName = task.ServiceName,
             DevEstimation = task.DevEstimation,
-            MaxDev = task.MaxDev,
+            MaxResource = task.MaxResource,
             Priority = task.Priority,
             StrictDate = task.StrictDate,
             DependsOnTaskIds = task.DependsOnTaskIds
@@ -552,7 +552,7 @@ else
                 TaskId: taskForm.TaskId,
                 ServiceName: taskForm.ServiceName,
                 DevEstimation: taskForm.DevEstimation,
-                MaxDev: taskForm.MaxDev,
+                MaxResource: taskForm.MaxResource,
                 Priority: taskForm.Priority,
                 StrictDate: strictDateValue,
                 DependsOnTaskIds: selectedDependencies.Any() ? string.Join(",", selectedDependencies) : null,
@@ -682,7 +682,7 @@ else
                     TaskId: parts[0].Trim(),
                     ServiceName: parts[1].Trim(),
                     DevEstimation: double.TryParse(parts[2].Trim(), out var est) ? est : 0,
-                    MaxDev: parts.Length > 3 && double.TryParse(parts[3].Trim(), out var maxDev) ? maxDev : 1,
+                    MaxResource: parts.Length > 3 && double.TryParse(parts[3].Trim(), out var maxResource) ? maxResource : 1,
                     Priority: parts.Length > 4 && int.TryParse(parts[4].Trim(), out var pri) ? pri : 5,
                     StrictDate: parts.Length > 5 && DateTime.TryParse(parts[5].Trim(), out var sd) ? sd : null,
                     DependsOnTaskIds: parts.Length > 6 ? parts[6].Trim() : null
@@ -757,13 +757,13 @@ else
         {
             await Mediator.Send(new UpsertTaskCommand(
                 Id: draggedTask.Id, TaskId: draggedTask.TaskId, ServiceName: draggedTask.ServiceName,
-                DevEstimation: draggedTask.DevEstimation, MaxDev: draggedTask.MaxDev,
+                DevEstimation: draggedTask.DevEstimation, MaxResource: draggedTask.MaxResource,
                 Priority: targetPriority, StrictDate: draggedTask.StrictDate,
                 DependsOnTaskIds: draggedTask.DependsOnTaskIds, IsNew: false));
 
             await Mediator.Send(new UpsertTaskCommand(
                 Id: targetTask.Id, TaskId: targetTask.TaskId, ServiceName: targetTask.ServiceName,
-                DevEstimation: targetTask.DevEstimation, MaxDev: targetTask.MaxDev,
+                DevEstimation: targetTask.DevEstimation, MaxResource: targetTask.MaxResource,
                 Priority: dragPriority, StrictDate: targetTask.StrictDate,
                 DependsOnTaskIds: targetTask.DependsOnTaskIds, IsNew: false));
 

@@ -8,7 +8,7 @@ public sealed record UpsertTaskCommand(
     string TaskId,
     string ServiceName,
     double DevEstimation,
-    double MaxDev,
+    double MaxResource,
     int Priority,
     DateTime? StrictDate,
     string? DependsOnTaskIds,

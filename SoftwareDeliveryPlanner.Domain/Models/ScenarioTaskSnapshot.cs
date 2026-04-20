@@ -26,9 +26,9 @@ public class ScenarioTaskSnapshot
 
     // ── Allocation ───────────────────────────────────────────
     public string? AssignedResourceId { get; private set; }
-    public double? AssignedDev { get; private set; }
+    public double? AssignedResource { get; private set; }
     public double DevEstimation { get; private set; }
-    public double MaxDev { get; private set; }
+    public double MaxResource { get; private set; }
 
     // ── Status ───────────────────────────────────────────────
     public string Status { get; private set; } = string.Empty;
@@ -53,9 +53,9 @@ public class ScenarioTaskSnapshot
         int? duration,
         DateTime? strictDate,
         string? assignedResourceId,
-        double? assignedDev,
+        double? assignedResource,
         double devEstimation,
-        double maxDev,
+        double maxResource,
         string status,
         string deliveryRisk,
         string? dependsOnTaskIds)
@@ -75,9 +75,9 @@ public class ScenarioTaskSnapshot
             Duration = duration,
             StrictDate = strictDate,
             AssignedResourceId = assignedResourceId,
-            AssignedDev = assignedDev,
+            AssignedResource = assignedResource,
             DevEstimation = devEstimation,
-            MaxDev = maxDev,
+            MaxResource = maxResource,
             Status = status ?? string.Empty,
             DeliveryRisk = deliveryRisk ?? string.Empty,
             DependsOnTaskIds = dependsOnTaskIds

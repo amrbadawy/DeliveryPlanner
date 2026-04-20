@@ -22,7 +22,7 @@ test.describe('Tasks CRUD + edge cases', () => {
 
     await fillInputByTestId(page, 'tasks-service-name', serviceName);
     await fillInputByTestId(page, 'tasks-dev-estimation', '4');
-    await fillInputByTestId(page, 'tasks-max-dev', '2');
+    await fillInputByTestId(page, 'tasks-max-resource', '2');
     await fillInputByTestId(page, 'tasks-priority', '3');
     await fillInputByTestId(page, 'tasks-strict-date', '2026-12-10');
 

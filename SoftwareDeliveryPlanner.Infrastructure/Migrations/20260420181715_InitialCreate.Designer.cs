@@ -12,15 +12,15 @@ using SoftwareDeliveryPlanner.Infrastructure.Data;
 namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 {
     [DbContext(typeof(PlannerDbContext))]
-    [Migration("20260417151729_InitialCreate_WithSchemas")]
-    partial class InitialCreate_WithSchemas
+    [Migration("20260420181715_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.5")
+                .HasAnnotation("ProductVersion", "10.0.6")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -76,7 +76,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<double>("AssignedDev")
+                    b.Property<double>("AssignedResource")
                         .HasColumnType("float");
 
                     b.Property<double?>("AvailableCapacity")
@@ -94,7 +94,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.Property<bool>("IsComplete")
                         .HasColumnType("bit");
 
-                    b.Property<double?>("MaxDev")
+                    b.Property<double?>("MaxResource")
                         .HasColumnType("float");
 
                     b.Property<int?>("SchedRank")
@@ -115,6 +115,52 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.HasIndex("TaskId");
 
                     b.ToTable("Allocations", "scheduling");
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.AuditEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("NewValue")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("OldValue")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Timestamp");
+
+                    b.ToTable("AuditEntries", "audit");
                 });
 
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.CalendarDay", b =>
@@ -383,7 +429,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         {
                             Id = 16,
                             Category = "ResourceRole",
-                            Code = "Developer",
+                            Code = "DEV",
                             DisplayName = "Developer",
                             IsActive = true,
                             SortOrder = 1
@@ -392,8 +438,8 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         {
                             Id = 17,
                             Category = "ResourceRole",
-                            Code = "Senior Developer",
-                            DisplayName = "Senior Developer",
+                            Code = "QA",
+                            DisplayName = "Quality Assurance",
                             IsActive = true,
                             SortOrder = 2
                         },
@@ -401,8 +447,8 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         {
                             Id = 18,
                             Category = "ResourceRole",
-                            Code = "Tech Lead",
-                            DisplayName = "Tech Lead",
+                            Code = "SA",
+                            DisplayName = "System Analyst",
                             IsActive = true,
                             SortOrder = 3
                         },
@@ -410,14 +456,32 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         {
                             Id = 19,
                             Category = "ResourceRole",
-                            Code = "QA",
-                            DisplayName = "QA",
+                            Code = "BA",
+                            DisplayName = "Business Analyst",
                             IsActive = true,
                             SortOrder = 4
                         },
                         new
                         {
                             Id = 20,
+                            Category = "ResourceRole",
+                            Code = "UX",
+                            DisplayName = "UX Designer",
+                            IsActive = true,
+                            SortOrder = 5
+                        },
+                        new
+                        {
+                            Id = 21,
+                            Category = "ResourceRole",
+                            Code = "UI",
+                            DisplayName = "UI Designer",
+                            IsActive = true,
+                            SortOrder = 6
+                        },
+                        new
+                        {
+                            Id = 22,
                             Category = "WorkingWeek",
                             Code = "sun_thu",
                             DisplayName = "Sunday - Thursday",
@@ -426,13 +490,285 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = 21,
+                            Id = 23,
                             Category = "WorkingWeek",
                             Code = "mon_fri",
                             DisplayName = "Monday - Friday",
                             IsActive = true,
                             SortOrder = 2
                         });
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.PlanScenario", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AtRiskCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EarliestStart")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("LateCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("LatestFinish")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("OnTrackCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ScenarioName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<double>("TotalEstimation")
+                        .HasColumnType("float");
+
+                    b.Property<int>("TotalTasks")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PlanScenarios", "planning");
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.RiskNotification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CurrentRisk")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PreviousRisk")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("TaskId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsRead");
+
+                    b.HasIndex("TaskId");
+
+                    b.ToTable("RiskNotifications", "notification");
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.Role", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Roles", "resource");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Code = "DEV",
+                            DisplayName = "Developer",
+                            IsActive = true,
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Code = "QA",
+                            DisplayName = "Quality Assurance",
+                            IsActive = true,
+                            SortOrder = 2
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Code = "SA",
+                            DisplayName = "System Analyst",
+                            IsActive = true,
+                            SortOrder = 3
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Code = "BA",
+                            DisplayName = "Business Analyst",
+                            IsActive = true,
+                            SortOrder = 4
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Code = "UX",
+                            DisplayName = "UX Designer",
+                            IsActive = true,
+                            SortOrder = 5
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Code = "UI",
+                            DisplayName = "UI Designer",
+                            IsActive = true,
+                            SortOrder = 6
+                        });
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.ScenarioTaskSnapshot", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<double?>("AssignedResource")
+                        .HasColumnType("float");
+
+                    b.Property<string>("AssignedResourceId")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("DeliveryRisk")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("DependsOnTaskIds")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<double>("DevEstimation")
+                        .HasColumnType("float");
+
+                    b.Property<int?>("Duration")
+                        .HasColumnType("int");
+
+                    b.Property<double>("MaxResource")
+                        .HasColumnType("float");
+
+                    b.Property<int>("PlanScenarioId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("PlannedFinish")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("PlannedStart")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SchedulingRank")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("StrictDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TaskId")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlanScenarioId");
+
+                    b.ToTable("ScenarioTaskSnapshots", "planning");
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.SchedulerSnapshot", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AtRiskCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("LateCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OnTrackCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("RunTimestamp")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("TotalTasks")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SchedulerSnapshots", "planning");
                 });
 
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.Setting", b =>
@@ -469,7 +805,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<double?>("AssignedDev")
+                    b.Property<double?>("AssignedResource")
                         .HasColumnType("float");
 
                     b.Property<string>("AssignedResourceId")
@@ -498,10 +834,10 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.Property<int?>("Duration")
                         .HasColumnType("int");
 
-                    b.Property<double>("MaxDev")
+                    b.Property<double>("MaxResource")
                         .HasColumnType("float");
 
-                    b.Property<double?>("OverrideDev")
+                    b.Property<double?>("OverrideResource")
                         .HasColumnType("float");
 
                     b.Property<DateTime?>("OverrideStart")
@@ -546,6 +882,39 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("TaskItems", "task");
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TaskNote", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Author")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("NoteText")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("TaskId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TaskId");
+
+                    b.ToTable("TaskNotes", "task");
                 });
 
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TeamMember", b =>
@@ -605,19 +974,19 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.HasIndex("ResourceId")
                         .IsUnique();
 
+                    b.HasIndex("Role");
+
                     b.ToTable("TeamMembers", "resource");
                 });
 
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.Adjustment", b =>
                 {
-                    b.HasOne("SoftwareDeliveryPlanner.Domain.Models.TeamMember", "Resource")
-                        .WithMany()
+                    b.HasOne("SoftwareDeliveryPlanner.Domain.Models.TeamMember", null)
+                        .WithMany("Adjustments")
                         .HasForeignKey("ResourceId")
                         .HasPrincipalKey("ResourceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Resource");
                 });
 
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.Allocation", b =>
@@ -630,6 +999,37 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Task");
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.ScenarioTaskSnapshot", b =>
+                {
+                    b.HasOne("SoftwareDeliveryPlanner.Domain.Models.PlanScenario", "Scenario")
+                        .WithMany("TaskSnapshots")
+                        .HasForeignKey("PlanScenarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Scenario");
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TeamMember", b =>
+                {
+                    b.HasOne("SoftwareDeliveryPlanner.Domain.Models.Role", null)
+                        .WithMany()
+                        .HasForeignKey("Role")
+                        .HasPrincipalKey("Code")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.PlanScenario", b =>
+                {
+                    b.Navigation("TaskSnapshots");
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TeamMember", b =>
+                {
+                    b.Navigation("Adjustments");
                 });
 #pragma warning restore 612, 618
         }

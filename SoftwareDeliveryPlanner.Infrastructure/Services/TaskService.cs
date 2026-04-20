@@ -35,7 +35,7 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
 
     public async Task UpsertTaskAsync(
         int id, string taskId, string serviceName, double devEstimation,
-        double maxDev, int priority, DateTime? strictDate,
+        double maxResource, int priority, DateTime? strictDate,
         string? dependsOnTaskIds, bool isNew,
         CancellationToken cancellationToken = default)
     {
@@ -43,13 +43,13 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
 
         if (isNew)
         {
-            var task = TaskItem.Create(taskId, serviceName, devEstimation, maxDev, priority, strictDate, dependsOnTaskIds);
+            var task = TaskItem.Create(taskId, serviceName, devEstimation, maxResource, priority, strictDate, dependsOnTaskIds);
             db.Tasks.Add(task);
         }
         else
         {
             var existing = await db.Tasks.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
-            existing?.Update(serviceName, devEstimation, maxDev, priority, strictDate, dependsOnTaskIds);
+            existing?.Update(serviceName, devEstimation, maxResource, priority, strictDate, dependsOnTaskIds);
         }
 
         await SaveDispatchAndRescheduleAsync(db, cancellationToken);

@@ -45,8 +45,8 @@ else
                 <dt class="col-sm-3">Estimation (days)</dt>
                 <dd class="col-sm-9" data-testid="td-dev-estimation">@task.DevEstimation</dd>
 
-                <dt class="col-sm-3">Max Developers</dt>
-                <dd class="col-sm-9" data-testid="td-max-dev">@task.MaxDev</dd>
+                <dt class="col-sm-3">Max Resources</dt>
+                <dd class="col-sm-9" data-testid="td-max-resource">@task.MaxResource</dd>
 
                 <dt class="col-sm-3">Priority</dt>
                 <dd class="col-sm-9" data-testid="td-priority">@task.Priority</dd>
@@ -114,7 +114,7 @@ else
                             <div class="d-flex align-items-center gap-2 mb-2">
                                 <i class="bi bi-person-circle fs-4 text-primary"></i>
                                 <div>
-                                    <strong>@alloc.ResourceName</strong>
+                                    <a href="/resources/@alloc.ResourceId" class="fw-bold text-decoration-none" data-testid="alloc-link-@alloc.ResourceId">@alloc.ResourceName</a>
                                     <div class="small text-muted">@alloc.Role · @alloc.Team</div>
                                 </div>
                             </div>
@@ -154,7 +154,7 @@ else
                         <tr>
                             <th style="width: 15%">Date</th>
                             <th style="width: 20%">Status</th>
-                            <th style="width: 65%">Assigned Developers</th>
+                            <th style="width: 65%">Assigned Resources</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -164,11 +164,11 @@ else
                                 <td>@day.DateDisplay</td>
                                 <td>@day.StatusText</td>
                                 <td>
-                                    @if (day.AssignedDevelopers.Any())
+                                    @if (day.AssignedResources.Any())
                                     {
-                                        @foreach (var dev in day.AssignedDevelopers)
+                                        @foreach (var res in day.AssignedResources)
                                         {
-                                            <span class="badge bg-primary me-1">@dev</span>
+                                            <a href="/resources/@res.ResourceId" class="badge bg-primary me-1 text-decoration-none" data-testid="timeline-res-@res.ResourceId">@res.ResourceName</a>
                                         }
                                     }
                                     else if (day.IsWorkingDay)

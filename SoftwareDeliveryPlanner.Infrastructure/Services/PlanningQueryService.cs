@@ -70,15 +70,17 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
             else if (isHoliday) statusText = "Holiday";
 
             var dayAllocs = allocations.Where(a => a.CalendarDate.Date == current.Date).ToList();
-            double dayCapacity = dayAllocs.Sum(a => a.AssignedDev);
+            double dayCapacity = dayAllocs.Sum(a => a.AssignedResource);
 
-            var assignedDevs = new List<string>();
+            var assignedResources = new List<AssignedResourceInfo>();
             if (dayCapacity > 0)
             {
-                int numDevs = (int)Math.Ceiling(dayCapacity);
-                for (int i = 0; i < Math.Min(numDevs, resourcesList.Count); i++)
+                int numResources = (int)Math.Ceiling(dayCapacity);
+                for (int i = 0; i < Math.Min(numResources, resourcesList.Count); i++)
                 {
-                    assignedDevs.Add(resourcesList[i].ResourceName);
+                    assignedResources.Add(new AssignedResourceInfo(
+                        resourcesList[i].ResourceId,
+                        resourcesList[i].ResourceName));
                 }
             }
 
@@ -87,7 +89,7 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
                 DateDisplay: $"{current.Day} {current:ddd}",
                 IsWorkingDay: !isWeekend && !isHoliday,
                 StatusText: statusText,
-                AssignedDevelopers: assignedDevs));
+                AssignedResources: assignedResources));
 
             current = current.AddDays(1);
         }
@@ -138,8 +140,8 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
             {
                 foreach (var task in tasks)
                 {
-                    if (task.AssignedDev.HasValue &&
-                        Math.Floor(task.AssignedDev.Value) >= devIndex &&
+                    if (task.AssignedResource.HasValue &&
+                        Math.Floor(task.AssignedResource.Value) >= devIndex &&
                         task.PlannedStart.HasValue && task.PlannedFinish.HasValue &&
                         current.Date >= task.PlannedStart.Value.Date &&
                         current.Date <= task.PlannedFinish.Value.Date)
@@ -222,7 +224,7 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
                 var weekEnd = weekStart.AddDays(7);
                 var weekAllocs = allocations
                     .Where(a => a.CalendarDate >= weekStart && a.CalendarDate < weekEnd)
-                    .Sum(a => a.AssignedDev);
+                    .Sum(a => a.AssignedResource);
                 cells.Add(new WorkloadCellDto(resource.ResourceId, resource.ResourceName, weekStart, weekAllocs));
             }
         }
@@ -245,10 +247,45 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
             .ToList();
     }
 
-    public Task<List<TaskAllocationDto>> GetTaskAllocationsAsync(string taskId, CancellationToken cancellationToken = default)
+    public async Task<List<TaskAllocationDto>> GetTaskAllocationsAsync(string taskId, CancellationToken cancellationToken = default)
     {
-        // Task allocations are derived from the scheduling engine; return empty for now
-        return System.Threading.Tasks.Task.FromResult(new List<TaskAllocationDto>());
+        await using var db = await ReadOnlyDbFactory.CreateDbContextAsync(cancellationToken);
+
+        var task = await db.Tasks.FirstOrDefaultAsync(t => t.TaskId == taskId, cancellationToken);
+        if (task == null || !task.PlannedStart.HasValue || !task.PlannedFinish.HasValue)
+            return new List<TaskAllocationDto>();
+
+        var allocations = await db.Allocations
+            .Where(a => a.TaskId == taskId)
+            .ToListAsync(cancellationToken);
+
+        if (!allocations.Any())
+            return new List<TaskAllocationDto>();
+
+        var resourcesList = await db.Resources
+            .Where(r => r.Active == DomainConstants.ActiveStatus.Yes)
+            .OrderBy(r => r.ResourceName)
+            .ToListAsync(cancellationToken);
+
+        // Determine peak capacity to figure out how many resources are assigned
+        double peakCapacity = allocations.Max(a => a.AssignedResource);
+        int numResources = (int)Math.Ceiling(peakCapacity);
+
+        var result = new List<TaskAllocationDto>();
+        for (int i = 0; i < Math.Min(numResources, resourcesList.Count); i++)
+        {
+            var res = resourcesList[i];
+            result.Add(new TaskAllocationDto(
+                ResourceId: res.ResourceId,
+                ResourceName: res.ResourceName,
+                Role: res.Role,
+                Team: res.Team,
+                AvailabilityPct: res.AvailabilityPct,
+                StartDate: task.PlannedStart,
+                EndDate: task.PlannedFinish));
+        }
+
+        return result;
     }
 
     public async Task<DateTime?> GetLastSchedulerRunAsync(CancellationToken cancellationToken = default)

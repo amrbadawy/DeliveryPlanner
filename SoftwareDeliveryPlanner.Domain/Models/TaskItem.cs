@@ -12,11 +12,11 @@ public class TaskItem : AggregateRoot
     public string TaskId { get; private set; } = string.Empty;
     public string ServiceName { get; private set; } = string.Empty;
     public double DevEstimation { get; private set; }
-    public double MaxDev { get; private set; } = 1.0;
+    public double MaxResource { get; private set; } = 1.0;
     public DateTime? StrictDate { get; private set; }
     public int Priority { get; private set; } = 5;
     public int? SchedulingRank { get; private set; }
-    public double? AssignedDev { get; private set; }
+    public double? AssignedResource { get; private set; }
     public string? AssignedResourceId { get; private set; }
     public DateTime? PlannedStart { get; private set; }
     public DateTime? PlannedFinish { get; private set; }
@@ -24,7 +24,7 @@ public class TaskItem : AggregateRoot
     public string Status { get; private set; } = DomainConstants.TaskStatus.NotStarted;
     public string DeliveryRisk { get; private set; } = DomainConstants.DeliveryRisk.OnTrack;
     public DateTime? OverrideStart { get; private set; }
-    public double? OverrideDev { get; private set; }
+    public double? OverrideResource { get; private set; }
     public string? DependsOnTaskIds { get; private set; }
     public string? Comments { get; private set; }
     public DateTime CreatedAt { get; private set; } = TimeProvider.System.GetLocalNow().DateTime;
@@ -39,12 +39,12 @@ public class TaskItem : AggregateRoot
         string taskId,
         string serviceName,
         double devEstimation,
-        double maxDev,
+        double maxResource,
         int priority,
         DateTime? strictDate = null,
         string? dependsOnTaskIds = null,
         DateTime? overrideStart = null,
-        double? overrideDev = null)
+        double? overrideResource = null)
     {
         if (!TaskIdVO.TryCreate(taskId, out _))
             throw new DomainException($"Invalid Task ID '{taskId}'. Expected format: AAA-000.");
@@ -55,8 +55,8 @@ public class TaskItem : AggregateRoot
         if (devEstimation < 0)
             throw new DomainException("Dev estimation must not be negative.");
 
-        if (maxDev <= 0)
-            throw new DomainException("Max developers must be greater than zero.");
+        if (maxResource <= 0)
+            throw new DomainException("Max resources must be greater than zero.");
 
         if (priority < 1 || priority > 10)
             throw new DomainException("Priority must be between 1 and 10.");
@@ -66,12 +66,12 @@ public class TaskItem : AggregateRoot
             TaskId = taskId.Trim().ToUpperInvariant(),
             ServiceName = serviceName.Trim(),
             DevEstimation = devEstimation,
-            MaxDev = maxDev,
+            MaxResource = maxResource,
             Priority = priority,
             StrictDate = strictDate,
             DependsOnTaskIds = string.IsNullOrWhiteSpace(dependsOnTaskIds) ? null : dependsOnTaskIds.Trim(),
             OverrideStart = overrideStart,
-            OverrideDev = overrideDev
+            OverrideResource = overrideResource
         };
 
         task.RaiseDomainEvent(new TaskCreatedEvent(task.TaskId, task.ServiceName));
@@ -85,7 +85,7 @@ public class TaskItem : AggregateRoot
     public void Update(
         string serviceName,
         double devEstimation,
-        double maxDev,
+        double maxResource,
         int priority,
         DateTime? strictDate = null,
         string? dependsOnTaskIds = null)
@@ -96,15 +96,15 @@ public class TaskItem : AggregateRoot
         if (devEstimation < 0)
             throw new DomainException("Dev estimation must not be negative.");
 
-        if (maxDev <= 0)
-            throw new DomainException("Max developers must be greater than zero.");
+        if (maxResource <= 0)
+            throw new DomainException("Max resources must be greater than zero.");
 
         if (priority < 1 || priority > 10)
             throw new DomainException("Priority must be between 1 and 10.");
 
         ServiceName = serviceName.Trim();
         DevEstimation = devEstimation;
-        MaxDev = maxDev;
+        MaxResource = maxResource;
         Priority = priority;
         StrictDate = strictDate;
         DependsOnTaskIds = string.IsNullOrWhiteSpace(dependsOnTaskIds) ? null : dependsOnTaskIds.Trim();
@@ -128,7 +128,7 @@ public class TaskItem : AggregateRoot
     /// Parameters are nullable because tasks with no allocations have no planned dates.
     /// </summary>
     public void ApplySchedulingResult(
-        double assignedDev,
+        double assignedResource,
         DateTime? plannedStart,
         DateTime? plannedFinish,
         int duration,
@@ -136,7 +136,7 @@ public class TaskItem : AggregateRoot
         string deliveryRisk,
         string? assignedResourceId = null)
     {
-        AssignedDev = assignedDev;
+        AssignedResource = assignedResource;
         PlannedStart = plannedStart;
         PlannedFinish = plannedFinish;
         Duration = duration;

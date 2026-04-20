@@ -23,9 +23,9 @@ public class ScenarioTaskSnapshotDomainTests
             duration: 10,
             strictDate: strict,
             assignedResourceId: "DEV-001",
-            assignedDev: 1.0,
+            assignedResource: 1.0,
             devEstimation: 8.0,
-            maxDev: 2.0,
+            maxResource: 2.0,
             status: "InProgress",
             deliveryRisk: "OnTrack",
             dependsOnTaskIds: "TSK-000");
@@ -40,9 +40,9 @@ public class ScenarioTaskSnapshotDomainTests
         Assert.Equal(10, snapshot.Duration);
         Assert.Equal(strict, snapshot.StrictDate);
         Assert.Equal("DEV-001", snapshot.AssignedResourceId);
-        Assert.Equal(1.0, snapshot.AssignedDev);
+        Assert.Equal(1.0, snapshot.AssignedResource);
         Assert.Equal(8.0, snapshot.DevEstimation);
-        Assert.Equal(2.0, snapshot.MaxDev);
+        Assert.Equal(2.0, snapshot.MaxResource);
         Assert.Equal("InProgress", snapshot.Status);
         Assert.Equal("OnTrack", snapshot.DeliveryRisk);
         Assert.Equal("TSK-000", snapshot.DependsOnTaskIds);
@@ -62,9 +62,9 @@ public class ScenarioTaskSnapshotDomainTests
             duration: null,
             strictDate: null,
             assignedResourceId: null,
-            assignedDev: null,
+            assignedResource: null,
             devEstimation: 5.0,
-            maxDev: 1.0,
+            maxResource: 1.0,
             status: "NotStarted",
             deliveryRisk: "OnTrack",
             dependsOnTaskIds: null);
@@ -75,7 +75,7 @@ public class ScenarioTaskSnapshotDomainTests
         Assert.Null(snapshot.Duration);
         Assert.Null(snapshot.StrictDate);
         Assert.Null(snapshot.AssignedResourceId);
-        Assert.Null(snapshot.AssignedDev);
+        Assert.Null(snapshot.AssignedResource);
         Assert.Null(snapshot.DependsOnTaskIds);
     }
 

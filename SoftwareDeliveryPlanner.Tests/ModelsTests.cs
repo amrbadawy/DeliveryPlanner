@@ -14,7 +14,7 @@ public class ModelsTests
         Assert.Equal(string.Empty, task.TaskId);
         Assert.Equal(string.Empty, task.ServiceName);
         Assert.Equal(0, task.DevEstimation);
-        Assert.Equal(1.0, task.MaxDev);
+        Assert.Equal(1.0, task.MaxResource);
         Assert.Equal(5, task.Priority);
         Assert.Equal("Not Started", task.Status);
         Assert.Equal("On Track", task.DeliveryRisk);
@@ -31,7 +31,7 @@ public class ModelsTests
         Assert.Equal("TST-01", task.TaskId);
         Assert.Equal("API Development", task.ServiceName);
         Assert.Equal(10, task.DevEstimation);
-        Assert.Equal(2, task.MaxDev);
+        Assert.Equal(2, task.MaxResource);
         Assert.Equal(1, task.Priority);
         Assert.Equal(new DateTime(2026, 6, 1), task.StrictDate);
         Assert.Equal("Not Started", task.Status);
@@ -201,12 +201,12 @@ public class ModelsTests
         
         Assert.Equal(string.Empty, alloc.AllocationId);
         Assert.Equal(string.Empty, alloc.TaskId);
-        Assert.Equal(0, alloc.AssignedDev);
+        Assert.Equal(0, alloc.AssignedResource);
         Assert.Equal(0, alloc.CumulativeEffort);
         Assert.False(alloc.IsComplete);
         Assert.Equal("Not Started", alloc.ServiceStatus);
         Assert.Null(alloc.SchedRank);
-        Assert.Null(alloc.MaxDev);
+        Assert.Null(alloc.MaxResource);
         Assert.Null(alloc.AvailableCapacity);
         Assert.Null(alloc.Task);
     }
@@ -221,9 +221,9 @@ public class ModelsTests
             DateKey = 1,
             CalendarDate = new DateTime(2026, 5, 4),
             SchedRank = 1000000,
-            MaxDev = 2.0,
+            MaxResource = 2.0,
             AvailableCapacity = 4.0,
-            AssignedDev = 1.0,
+            AssignedResource = 1.0,
             CumulativeEffort = 1.0,
             IsComplete = false,
             ServiceStatus = "In Progress"
@@ -234,9 +234,9 @@ public class ModelsTests
         Assert.Equal(1, alloc.DateKey);
         Assert.Equal(new DateTime(2026, 5, 4), alloc.CalendarDate);
         Assert.Equal(1000000, alloc.SchedRank);
-        Assert.Equal(2.0, alloc.MaxDev);
+        Assert.Equal(2.0, alloc.MaxResource);
         Assert.Equal(4.0, alloc.AvailableCapacity);
-        Assert.Equal(1.0, alloc.AssignedDev);
+        Assert.Equal(1.0, alloc.AssignedResource);
         Assert.Equal(1.0, alloc.CumulativeEffort);
         Assert.False(alloc.IsComplete);
         Assert.Equal("In Progress", alloc.ServiceStatus);

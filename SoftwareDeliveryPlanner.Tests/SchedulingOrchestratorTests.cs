@@ -526,7 +526,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         var existingId = existing.Id;
 
 
-        await _taskService.UpsertTaskAsync(existingId, existing.TaskId, "Updated Task Name", 99, existing.MaxDev, 3, null, null, false);
+        await _taskService.UpsertTaskAsync(existingId, existing.TaskId, "Updated Task Name", 99, existing.MaxResource, 3, null, null, false);
 
         await using var verifyDb = await _factory.CreateDbContextAsync();
         var reloaded = await verifyDb.Tasks.FirstOrDefaultAsync(t => t.Id == existingId);

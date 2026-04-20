@@ -9,7 +9,7 @@ test.describe('Validation and exceptional flows', () => {
 
     await fillInputByTestId(page, 'tasks-service-name', '');
     await fillInputByTestId(page, 'tasks-dev-estimation', '0');
-    await fillInputByTestId(page, 'tasks-max-dev', '0');
+    await fillInputByTestId(page, 'tasks-max-resource', '0');
     await fillInputByTestId(page, 'tasks-priority', '11');
     await page.getByTestId('tasks-save').click();
 
@@ -72,7 +72,7 @@ test.describe('Validation and exceptional flows', () => {
 
     await fillInputByTestId(page, 'tasks-service-name', 'Negative Test');
     await fillInputByTestId(page, 'tasks-dev-estimation', '-5');
-    await fillInputByTestId(page, 'tasks-max-dev', '1');
+    await fillInputByTestId(page, 'tasks-max-resource', '1');
     await fillInputByTestId(page, 'tasks-priority', '5');
     await page.getByTestId('tasks-save').click();
 
@@ -88,7 +88,7 @@ test.describe('Validation and exceptional flows', () => {
 
     await fillInputByTestId(page, 'tasks-service-name', 'Priority Zero');
     await fillInputByTestId(page, 'tasks-dev-estimation', '5');
-    await fillInputByTestId(page, 'tasks-max-dev', '1');
+    await fillInputByTestId(page, 'tasks-max-resource', '1');
     await fillInputByTestId(page, 'tasks-priority', '0');
     await page.getByTestId('tasks-save').click();
 
@@ -169,7 +169,7 @@ test.describe('Validation and exceptional flows', () => {
 
     await fillInputByTestId(page, 'tasks-service-name', 'Valid Task E2E');
     await fillInputByTestId(page, 'tasks-dev-estimation', '5');
-    await fillInputByTestId(page, 'tasks-max-dev', '2');
+    await fillInputByTestId(page, 'tasks-max-resource', '2');
     await fillInputByTestId(page, 'tasks-priority', '5');
     await page.getByTestId('tasks-save').click();
 

@@ -225,10 +225,10 @@ internal class SchedulingEngine : ISchedulingEngine
             foreach (var task in tasks)
             {
                 var taskId = task.TaskId;
-                var maxDev = task.MaxDev;
+                var maxResource = task.MaxResource;
                 var estimation = task.DevEstimation;
                 var overrideStart = task.OverrideStart;
-                var overrideDev = task.OverrideDev;
+                var overrideResource = task.OverrideResource;
 
                 // Check override constraints
                 if (overrideStart.HasValue && calDate < overrideStart.Value.Date)
@@ -249,10 +249,10 @@ internal class SchedulingEngine : ISchedulingEngine
                 if (remainingEffort <= 0) continue;
 
                 double alloc;
-                if (overrideDev.HasValue)
-                    alloc = Math.Min(overrideDev.Value, Math.Min(maxDev, remainingCap));
+                if (overrideResource.HasValue)
+                    alloc = Math.Min(overrideResource.Value, Math.Min(maxResource, remainingCap));
                 else
-                    alloc = Math.Min(maxDev, Math.Min(remainingCap, remainingEffort));
+                    alloc = Math.Min(maxResource, Math.Min(remainingCap, remainingEffort));
 
                 // Apply minimum increment (0.5)
                 if (alloc >= 0.5)
@@ -269,9 +269,9 @@ internal class SchedulingEngine : ISchedulingEngine
                     DateKey = calDateKey,
                     CalendarDate = calDate,
                     SchedRank = task.SchedulingRank,
-                    MaxDev = maxDev,
+                    MaxResource = maxResource,
                     AvailableCapacity = remainingCap,
-                    AssignedDev = alloc,
+                    AssignedResource = alloc,
                     CumulativeEffort = taskEffort[taskId] + alloc,
                     IsComplete = (taskEffort[taskId] + alloc) >= estimation,
                     ServiceStatus = (taskEffort[taskId] + alloc) >= estimation ? DomainConstants.TaskStatus.Completed : DomainConstants.TaskStatus.InProgress
@@ -299,8 +299,8 @@ internal class SchedulingEngine : ISchedulingEngine
             var taskAllocs = taskAllocations[taskId];
 
             DateTime? plannedStart = taskAllocs.FirstOrDefault()?.CalendarDate;
-            DateTime? plannedFinish = taskAllocs.LastOrDefault(a => a.AssignedDev > 0)?.CalendarDate;
-            double peakDev = taskPeakDevs[taskId];
+            DateTime? plannedFinish = taskAllocs.LastOrDefault(a => a.AssignedResource > 0)?.CalendarDate;
+            double peakResource = taskPeakDevs[taskId];
 
             int duration = 0;
             if (plannedStart.HasValue && plannedFinish.HasValue)
@@ -317,7 +317,7 @@ internal class SchedulingEngine : ISchedulingEngine
             string risk = CalculateRisk(plannedFinish, task.StrictDate);
 
             task.ApplySchedulingResult(
-                assignedDev: peakDev,
+                assignedResource: peakResource,
                 plannedStart: plannedStart,
                 plannedFinish: plannedFinish,
                 duration: duration,
@@ -329,7 +329,7 @@ internal class SchedulingEngine : ISchedulingEngine
         foreach (var calRow in calendar)
         {
             var dayAllocs = allocations.Where(a => a.CalendarDate.Date == calRow.CalendarDate.Date).ToList();
-            var reserved = dayAllocs.Sum(a => a.AssignedDev);
+            var reserved = dayAllocs.Sum(a => a.AssignedResource);
             calRow.ReservedCapacity = reserved;
             calRow.RemainingCapacity = calRow.EffectiveCapacity - reserved;
 
@@ -368,8 +368,8 @@ internal class SchedulingEngine : ISchedulingEngine
         var atRisk = tasks.Count(t => t.DeliveryRisk == DomainConstants.DeliveryRisk.AtRisk);
         var late = tasks.Count(t => t.DeliveryRisk == DomainConstants.DeliveryRisk.Late);
 
-        var assignedDevs = tasks.Where(t => t.AssignedDev.HasValue && t.AssignedDev > 0).Select(t => t.AssignedDev!.Value).ToList();
-        var avgAssigned = assignedDevs.Any() ? assignedDevs.Average() : 0;
+        var assignedResources = tasks.Where(t => t.AssignedResource.HasValue && t.AssignedResource > 0).Select(t => t.AssignedResource!.Value).ToList();
+        var avgAssigned = assignedResources.Any() ? assignedResources.Average() : 0;
 
         var today = _timeProvider.GetLocalNow().LocalDateTime.Date;
         var upcomingStrict = tasks.Where(t => t.StrictDate.HasValue && t.StrictDate >= today)
@@ -405,7 +405,7 @@ internal class SchedulingEngine : ISchedulingEngine
                 Num: i + 1,
                 TaskId: task.TaskId,
                 ServiceName: task.ServiceName,
-                AssignedDev: task.AssignedDev,
+                AssignedResource: task.AssignedResource,
                 PlannedStart: task.PlannedStart?.ToString("yyyy-MM-dd"),
                 PlannedFinish: task.PlannedFinish?.ToString("yyyy-MM-dd"),
                 Duration: task.Duration,

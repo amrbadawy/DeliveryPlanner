@@ -1,0 +1,228 @@
+@page "/resources/{ResourceId}"
+@using MediatR
+@using SoftwareDeliveryPlanner.Application.Resources.Queries
+@using SoftwareDeliveryPlanner.Application.Abstractions
+@using SoftwareDeliveryPlanner.Domain.Models
+@using SoftwareDeliveryPlanner.Domain
+@inject IMediator Mediator
+@inject NavigationManager NavigationManager
+
+<PageTitle>Resource Details - @ResourceId</PageTitle>
+
+@if (isLoading)
+{
+    <SkeletonLoader Variant="block" TestId="resource-details-skeleton" />
+}
+else if (resource == null)
+{
+    <div class="empty-state">
+        <div class="empty-icon"><i class="bi bi-person-x"></i></div>
+        <h5>Resource not found</h5>
+        <p>The resource "@ResourceId" does not exist or may have been deleted.</p>
+        <button class="btn btn-secondary" @onclick="GoBack" data-testid="resource-details-back">
+            <i class="bi bi-arrow-left me-1"></i> Back to Resources
+        </button>
+    </div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-start mb-4 page-header">
+        <div>
+            <h3 class="mb-1"><i class="bi bi-person-circle me-2"></i>@resource.ResourceName</h3>
+            <p class="page-subtitle">@ResourceId</p>
+        </div>
+        <button class="btn btn-secondary" @onclick="GoBack" data-testid="resource-details-back">
+            <i class="bi bi-arrow-left me-1"></i> Back to Resources
+        </button>
+    </div>
+
+    <!-- Resource Details Card -->
+    <div class="card border-0 shadow-sm" data-testid="resource-details-card">
+        <div class="card-body">
+            <dl class="row">
+                <dt class="col-sm-3">Resource Name</dt>
+                <dd class="col-sm-9" data-testid="rd-resource-name">@resource.ResourceName</dd>
+
+                <dt class="col-sm-3">Role</dt>
+                <dd class="col-sm-9" data-testid="rd-role">@resource.Role</dd>
+
+                <dt class="col-sm-3">Team</dt>
+                <dd class="col-sm-9" data-testid="rd-team">@resource.Team</dd>
+
+                <dt class="col-sm-3">Availability</dt>
+                <dd class="col-sm-9" data-testid="rd-availability">@resource.AvailabilityPct.ToString("F0")%</dd>
+
+                <dt class="col-sm-3">Daily Capacity</dt>
+                <dd class="col-sm-9" data-testid="rd-daily-capacity">@resource.DailyCapacity</dd>
+
+                <dt class="col-sm-3">Start Date</dt>
+                <dd class="col-sm-9" data-testid="rd-start-date">@resource.StartDate.ToString("yyyy-MM-dd")</dd>
+
+                <dt class="col-sm-3">End Date</dt>
+                <dd class="col-sm-9" data-testid="rd-end-date">@(resource.EndDate?.ToString("yyyy-MM-dd") ?? "N/A")</dd>
+
+                <dt class="col-sm-3">Active</dt>
+                <dd class="col-sm-9" data-testid="rd-active">
+                    <span class="badge bg-@(resource.Active == DomainConstants.ActiveStatus.Yes ? "success" : "secondary")">
+                        @resource.Active
+                    </span>
+                </dd>
+
+                <dt class="col-sm-3">Notes</dt>
+                <dd class="col-sm-9" data-testid="rd-notes">@(string.IsNullOrWhiteSpace(resource.Notes) ? "None" : resource.Notes)</dd>
+            </dl>
+        </div>
+        <div class="card-footer">
+            <button class="btn btn-secondary" @onclick="GoBack" data-testid="resource-details-back-bottom"><i class="bi bi-arrow-left me-1"></i> Back to Resources</button>
+        </div>
+    </div>
+
+    <!-- Adjustments Section -->
+    <h4 class="mt-4 mb-3"><i class="bi bi-calendar-event me-2"></i>Adjustments</h4>
+    @if (!resource.Adjustments.Any())
+    {
+        <div class="text-center py-3">
+            <i class="bi bi-calendar-check display-6 text-muted"></i>
+            <p class="text-muted mt-2">No adjustments for this resource.</p>
+        </div>
+    }
+    else
+    {
+        <div class="card border-0 shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm mb-0" data-testid="resource-adjustments-table">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Type</th>
+                            <th>Start</th>
+                            <th>End</th>
+                            <th>Availability</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var adj in resource.Adjustments.OrderBy(a => a.AdjStart))
+                        {
+                            <tr>
+                                <td>@adj.AdjType</td>
+                                <td>@adj.AdjStart.ToString("yyyy-MM-dd")</td>
+                                <td>@adj.AdjEnd.ToString("yyyy-MM-dd")</td>
+                                <td>@adj.AvailabilityPct.ToString("F0")%</td>
+                                <td>@(adj.Notes ?? "")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <!-- Allocated Tasks Section -->
+    <h4 class="mt-4 mb-3"><i class="bi bi-list-task me-2"></i>Allocated Tasks</h4>
+    @if (isTasksLoading)
+    {
+        <div class="text-center py-3">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Loading tasks...</span>
+            </div>
+        </div>
+    }
+    else if (!allocatedTasks.Any())
+    {
+        <div class="text-center py-3">
+            <i class="bi bi-list-task display-6 text-muted"></i>
+            <p class="text-muted mt-2">No tasks currently allocated to this resource.</p>
+        </div>
+    }
+    else
+    {
+        <div class="card border-0 shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm mb-0" data-testid="resource-tasks-table">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Task ID</th>
+                            <th>Service</th>
+                            <th>Status</th>
+                            <th>Planned Start</th>
+                            <th>Planned Finish</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var task in allocatedTasks)
+                        {
+                            <tr>
+                                <td><a href="/tasks/@task.TaskId" class="text-decoration-none" data-testid="task-link-@task.TaskId">@task.TaskId</a></td>
+                                <td>@task.ServiceName</td>
+                                <td>
+                                    <span class="badge bg-@(task.Status == DomainConstants.TaskStatus.Completed ? "success" : task.Status == DomainConstants.TaskStatus.InProgress ? "info" : "secondary")">
+                                        @task.Status
+                                    </span>
+                                </td>
+                                <td>@(task.PlannedStart?.ToString("yyyy-MM-dd") ?? "N/A")</td>
+                                <td>@(task.PlannedFinish?.ToString("yyyy-MM-dd") ?? "N/A")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public string ResourceId { get; set; } = string.Empty;
+
+    private TeamMember? resource;
+    private List<TaskItem> allocatedTasks = new();
+    private bool isLoading = true;
+    private bool isTasksLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Mediator.Send(new GetResourceByIdQuery(ResourceId));
+        if (result.IsSuccess)
+        {
+            resource = result.Value;
+        }
+        isLoading = false;
+
+        if (resource != null)
+        {
+            await LoadAllocatedTasks();
+        }
+        isTasksLoading = false;
+    }
+
+    private async Task LoadAllocatedTasks()
+    {
+        // Get the resource index in the sorted active resources list
+        var resourcesResult = await Mediator.Send(new GetResourcesQuery());
+        if (!resourcesResult.IsSuccess) return;
+
+        var activeResources = resourcesResult.Value
+            .Where(r => r.Active == DomainConstants.ActiveStatus.Yes)
+            .OrderBy(r => r.ResourceName)
+            .ToList();
+
+        var resourceIndex = activeResources.FindIndex(r => r.ResourceId == ResourceId);
+        if (resourceIndex < 0) return;
+
+        // Get all tasks and filter to those where this resource would be assigned
+        var tasksResult = await Mediator.Send(new Application.Tasks.Queries.GetTasksQuery());
+        if (tasksResult.IsSuccess)
+        {
+            allocatedTasks = tasksResult.Value
+                .Where(t => t.AssignedResource.HasValue &&
+                            Math.Floor(t.AssignedResource.Value) >= resourceIndex + 1 &&
+                            t.PlannedStart.HasValue)
+                .OrderBy(t => t.PlannedStart)
+                .ToList();
+        }
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/resources");
+    }
+}

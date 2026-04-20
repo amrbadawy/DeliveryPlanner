@@ -153,7 +153,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             TaskId: "NEW-01",
             ServiceName: "New Service",
             DevEstimation: 10,
-            MaxDev: 2,
+            MaxResource: 2,
             Priority: 3,
             StrictDate: null,
             DependsOnTaskIds: null,
@@ -178,7 +178,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             TaskId: existing.TaskId,
             ServiceName: "Updated Service Name",
             DevEstimation: existing.DevEstimation,
-            MaxDev: existing.MaxDev,
+            MaxResource: existing.MaxResource,
             Priority: existing.Priority,
             StrictDate: null,
             DependsOnTaskIds: null,
@@ -201,7 +201,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             TaskId: "STR-01",
             ServiceName: "Strict Task",
             DevEstimation: 5,
-            MaxDev: 1,
+            MaxResource: 1,
             Priority: 1,
             StrictDate: strictDate,
             DependsOnTaskIds: null,
@@ -221,7 +221,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             TaskId: "DEP-01",
             ServiceName: "Dependent Task",
             DevEstimation: 5,
-            MaxDev: 1,
+            MaxResource: 1,
             Priority: 1,
             StrictDate: null,
             DependsOnTaskIds: "SVC-001,SVC-002",
@@ -241,7 +241,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             TaskId: "NDP-01",
             ServiceName: "No Deps Task",
             DevEstimation: 3,
-            MaxDev: 1,
+            MaxResource: 1,
             Priority: 1,
             StrictDate: null,
             DependsOnTaskIds: null,
@@ -291,7 +291,7 @@ public class UpsertTaskCommandValidatorTests
 
     private static UpsertTaskCommand Valid() => new(
         Id: 0, TaskId: "SVC-001", ServiceName: "My Service",
-        DevEstimation: 5, MaxDev: 2, Priority: 5,
+        DevEstimation: 5, MaxResource: 2, Priority: 5,
         StrictDate: null, DependsOnTaskIds: null, IsNew: true);
 
     [Fact]
@@ -334,11 +334,11 @@ public class UpsertTaskCommandValidatorTests
     [Theory]
     [InlineData(0)]
     [InlineData(-0.5)]
-    public void ZeroOrNegativeMaxDev_FailsValidation(double maxDev)
+    public void ZeroOrNegativeMaxResource_FailsValidation(double maxResource)
     {
-        var result = _validator.Validate(Valid() with { MaxDev = maxDev });
+        var result = _validator.Validate(Valid() with { MaxResource = maxResource });
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.MaxDev));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.MaxResource));
     }
 
     [Theory]
@@ -1507,7 +1507,7 @@ public class UpsertTaskCommandValidatorAdditionalTests
 
     private static UpsertTaskCommand Valid() => new(
         Id: 0, TaskId: "SVC-001", ServiceName: "My Service",
-        DevEstimation: 5, MaxDev: 2, Priority: 5,
+        DevEstimation: 5, MaxResource: 2, Priority: 5,
         StrictDate: null, DependsOnTaskIds: null, IsNew: true);
 
     [Fact]
@@ -1534,9 +1534,9 @@ public class UpsertTaskCommandValidatorAdditionalTests
     }
 
     [Fact]
-    public void BoundaryMaxDev_SmallPositive_PassesValidation()
+    public void BoundaryMaxResource_SmallPositive_PassesValidation()
     {
-        var result = _validator.Validate(Valid() with { MaxDev = 0.001 });
+        var result = _validator.Validate(Valid() with { MaxResource = 0.001 });
         Assert.True(result.IsValid);
     }
 
@@ -1548,7 +1548,7 @@ public class UpsertTaskCommandValidatorAdditionalTests
             TaskId = "",
             ServiceName = "",
             DevEstimation = 0,
-            MaxDev = -1,
+            MaxResource = -1,
             Priority = 0
         });
         Assert.False(result.IsValid);
@@ -1556,7 +1556,7 @@ public class UpsertTaskCommandValidatorAdditionalTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.TaskId));
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.ServiceName));
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.DevEstimation));
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.MaxDev));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.MaxResource));
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.Priority));
     }
 
