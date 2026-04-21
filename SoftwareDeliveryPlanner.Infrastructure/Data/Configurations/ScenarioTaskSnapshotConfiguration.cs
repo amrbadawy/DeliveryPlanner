@@ -23,11 +23,11 @@ public sealed class ScenarioTaskSnapshotConfiguration : IEntityTypeConfiguration
         builder.Property(s => s.Priority)
             .IsRequired();
 
-        builder.Property(s => s.DevEstimation)
-            .IsRequired();
-
         builder.Property(s => s.MaxResource)
             .IsRequired();
+
+        builder.Property(s => s.Phase)
+            .HasMaxLength(50);
 
         builder.Property(s => s.Status)
             .IsRequired()
@@ -38,9 +38,16 @@ public sealed class ScenarioTaskSnapshotConfiguration : IEntityTypeConfiguration
             .HasMaxLength(50);
 
         builder.Property(s => s.AssignedResourceId)
-            .HasMaxLength(20);
+            .HasMaxLength(500);
 
         builder.Property(s => s.DependsOnTaskIds)
             .HasMaxLength(1000);
+
+        builder.HasMany(s => s.EffortSnapshots)
+            .WithOne(e => e.TaskSnapshot)
+            .HasForeignKey(e => e.ScenarioTaskSnapshotId);
+
+        builder.Metadata.FindNavigation("EffortSnapshots")!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
     }
 }

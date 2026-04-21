@@ -20,6 +20,16 @@ public sealed class AllocationConfiguration : IEntityTypeConfiguration<Allocatio
             .IsRequired()
             .HasMaxLength(20);
 
+        builder.Property(a => a.ResourceId)
+            .IsRequired()
+            .HasMaxLength(20);
+
+        builder.Property(a => a.Role)
+            .IsRequired()
+            .HasMaxLength(10);
+
+        builder.Property(a => a.HoursAllocated);
+
         builder.Property(a => a.ServiceStatus)
             .IsRequired()
             .HasMaxLength(30);

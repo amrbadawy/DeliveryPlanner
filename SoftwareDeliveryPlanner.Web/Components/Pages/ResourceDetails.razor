@@ -196,26 +196,13 @@ else
 
     private async Task LoadAllocatedTasks()
     {
-        // Get the resource index in the sorted active resources list
-        var resourcesResult = await Mediator.Send(new GetResourcesQuery());
-        if (!resourcesResult.IsSuccess) return;
-
-        var activeResources = resourcesResult.Value
-            .Where(r => r.Active == DomainConstants.ActiveStatus.Yes)
-            .OrderBy(r => r.ResourceName)
-            .ToList();
-
-        var resourceIndex = activeResources.FindIndex(r => r.ResourceId == ResourceId);
-        if (resourceIndex < 0) return;
-
-        // Get all tasks and filter to those where this resource would be assigned
         var tasksResult = await Mediator.Send(new Application.Tasks.Queries.GetTasksQuery());
         if (tasksResult.IsSuccess)
         {
             allocatedTasks = tasksResult.Value
-                .Where(t => t.AssignedResource.HasValue &&
-                            Math.Floor(t.AssignedResource.Value) >= resourceIndex + 1 &&
-                            t.PlannedStart.HasValue)
+                .Where(t => !string.IsNullOrEmpty(t.AssignedResourceId) &&
+                            t.AssignedResourceId.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                .Contains(ResourceId, StringComparer.OrdinalIgnoreCase))
                 .OrderBy(t => t.PlannedStart)
                 .ToList();
         }

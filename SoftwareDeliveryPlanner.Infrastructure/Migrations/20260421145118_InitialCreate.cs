@@ -212,22 +212,22 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     TaskId = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
                     ServiceName = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: false),
-                    DevEstimation = table.Column<double>(type: "float", nullable: false),
                     MaxResource = table.Column<double>(type: "float", nullable: false),
                     StrictDate = table.Column<DateTime>(type: "datetime2", nullable: true),
                     Priority = table.Column<int>(type: "int", nullable: false),
                     SchedulingRank = table.Column<int>(type: "int", nullable: true),
                     AssignedResource = table.Column<double>(type: "float", nullable: true),
-                    AssignedResourceId = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    AssignedResourceId = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     PlannedStart = table.Column<DateTime>(type: "datetime2", nullable: true),
                     PlannedFinish = table.Column<DateTime>(type: "datetime2", nullable: true),
                     Duration = table.Column<int>(type: "int", nullable: true),
                     Status = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
                     DeliveryRisk = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
                     OverrideStart = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    OverrideResource = table.Column<double>(type: "float", nullable: true),
                     DependsOnTaskIds = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     Comments = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    Phase = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    PreferredResourceIds = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
@@ -266,13 +266,13 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     ServiceName = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
                     Priority = table.Column<int>(type: "int", nullable: false),
                     SchedulingRank = table.Column<int>(type: "int", nullable: true),
+                    Phase = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
                     PlannedStart = table.Column<DateTime>(type: "datetime2", nullable: true),
                     PlannedFinish = table.Column<DateTime>(type: "datetime2", nullable: true),
                     Duration = table.Column<int>(type: "int", nullable: true),
                     StrictDate = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    AssignedResourceId = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    AssignedResourceId = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     AssignedResource = table.Column<double>(type: "float", nullable: true),
-                    DevEstimation = table.Column<double>(type: "float", nullable: false),
                     MaxResource = table.Column<double>(type: "float", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     DeliveryRisk = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
@@ -331,12 +331,12 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     AllocationId = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     TaskId = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    ResourceId = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    Role = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     DateKey = table.Column<int>(type: "int", nullable: false),
                     CalendarDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     SchedRank = table.Column<int>(type: "int", nullable: true),
-                    MaxResource = table.Column<double>(type: "float", nullable: true),
-                    AvailableCapacity = table.Column<double>(type: "float", nullable: true),
-                    AssignedResource = table.Column<double>(type: "float", nullable: false),
+                    HoursAllocated = table.Column<double>(type: "float", nullable: false),
                     CumulativeEffort = table.Column<double>(type: "float", nullable: false),
                     IsComplete = table.Column<bool>(type: "bit", nullable: false),
                     ServiceStatus = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false)
@@ -350,6 +350,55 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         principalSchema: "task",
                         principalTable: "TaskItems",
                         principalColumn: "TaskId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "TaskEffortBreakdowns",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    TaskId = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    Role = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
+                    EstimationDays = table.Column<double>(type: "float", nullable: false),
+                    OverlapPct = table.Column<double>(type: "float", nullable: false),
+                    SortOrder = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TaskEffortBreakdowns", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_TaskEffortBreakdowns_TaskItems_TaskId",
+                        column: x => x.TaskId,
+                        principalSchema: "task",
+                        principalTable: "TaskItems",
+                        principalColumn: "TaskId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ScenarioEffortSnapshots",
+                schema: "planning",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ScenarioTaskSnapshotId = table.Column<int>(type: "int", nullable: false),
+                    Role = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
+                    EstimationDays = table.Column<double>(type: "float", nullable: false),
+                    OverlapPct = table.Column<double>(type: "float", nullable: false),
+                    SortOrder = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ScenarioEffortSnapshots", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ScenarioEffortSnapshots_ScenarioTaskSnapshots_ScenarioTaskSnapshotId",
+                        column: x => x.ScenarioTaskSnapshotId,
+                        principalSchema: "planning",
+                        principalTable: "ScenarioTaskSnapshots",
+                        principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -491,6 +540,12 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_ScenarioEffortSnapshots_ScenarioTaskSnapshotId",
+                schema: "planning",
+                table: "ScenarioEffortSnapshots",
+                column: "ScenarioTaskSnapshotId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ScenarioTaskSnapshots_PlanScenarioId",
                 schema: "planning",
                 table: "ScenarioTaskSnapshots",
@@ -502,6 +557,11 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                 table: "Settings",
                 column: "Key",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TaskEffortBreakdowns_TaskId",
+                table: "TaskEffortBreakdowns",
+                column: "TaskId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_TaskItems_TaskId",
@@ -561,7 +621,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                 schema: "notification");
 
             migrationBuilder.DropTable(
-                name: "ScenarioTaskSnapshots",
+                name: "ScenarioEffortSnapshots",
                 schema: "planning");
 
             migrationBuilder.DropTable(
@@ -573,6 +633,9 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                 schema: "scheduling");
 
             migrationBuilder.DropTable(
+                name: "TaskEffortBreakdowns");
+
+            migrationBuilder.DropTable(
                 name: "TaskNotes",
                 schema: "task");
 
@@ -581,16 +644,20 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                 schema: "resource");
 
             migrationBuilder.DropTable(
+                name: "ScenarioTaskSnapshots",
+                schema: "planning");
+
+            migrationBuilder.DropTable(
                 name: "TaskItems",
                 schema: "task");
 
             migrationBuilder.DropTable(
-                name: "PlanScenarios",
-                schema: "planning");
-
-            migrationBuilder.DropTable(
                 name: "Roles",
                 schema: "resource");
+
+            migrationBuilder.DropTable(
+                name: "PlanScenarios",
+                schema: "planning");
         }
     }
 }

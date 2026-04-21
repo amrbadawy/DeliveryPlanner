@@ -10,6 +10,7 @@ public sealed record TaskAllocationDto(
     string Role,
     string Team,
     double AvailabilityPct,
+    double HoursAllocated,
     DateTime? StartDate,
     DateTime? EndDate);
 

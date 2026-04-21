@@ -73,12 +73,6 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<double>("AssignedResource")
-                        .HasColumnType("float");
-
-                    b.Property<double?>("AvailableCapacity")
-                        .HasColumnType("float");
-
                     b.Property<DateTime>("CalendarDate")
                         .HasColumnType("datetime2");
 
@@ -88,11 +82,21 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.Property<int>("DateKey")
                         .HasColumnType("int");
 
+                    b.Property<double>("HoursAllocated")
+                        .HasColumnType("float");
+
                     b.Property<bool>("IsComplete")
                         .HasColumnType("bit");
 
-                    b.Property<double?>("MaxResource")
-                        .HasColumnType("float");
+                    b.Property<string>("ResourceId")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
 
                     b.Property<int?>("SchedRank")
                         .HasColumnType("int");
@@ -667,6 +671,38 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.ScenarioEffortSnapshot", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<double>("EstimationDays")
+                        .HasColumnType("float");
+
+                    b.Property<double>("OverlapPct")
+                        .HasColumnType("float");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int>("ScenarioTaskSnapshotId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScenarioTaskSnapshotId");
+
+                    b.ToTable("ScenarioEffortSnapshots", "planning");
+                });
+
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.ScenarioTaskSnapshot", b =>
                 {
                     b.Property<int>("Id")
@@ -679,8 +715,8 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .HasColumnType("float");
 
                     b.Property<string>("AssignedResourceId")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("DeliveryRisk")
                         .IsRequired()
@@ -691,14 +727,15 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<double>("DevEstimation")
-                        .HasColumnType("float");
-
                     b.Property<int?>("Duration")
                         .HasColumnType("int");
 
                     b.Property<double>("MaxResource")
                         .HasColumnType("float");
+
+                    b.Property<string>("Phase")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<int>("PlanScenarioId")
                         .HasColumnType("int");
@@ -794,6 +831,40 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.ToTable("Settings", "scheduling");
                 });
 
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TaskEffortBreakdown", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<double>("EstimationDays")
+                        .HasColumnType("float");
+
+                    b.Property<double>("OverlapPct")
+                        .HasColumnType("float");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TaskId")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TaskId");
+
+                    b.ToTable("TaskEffortBreakdowns");
+                });
+
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TaskItem", b =>
                 {
                     b.Property<int>("Id")
@@ -806,8 +877,8 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .HasColumnType("float");
 
                     b.Property<string>("AssignedResourceId")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("Comments")
                         .HasMaxLength(1000)
@@ -825,26 +896,28 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<double>("DevEstimation")
-                        .HasColumnType("float");
-
                     b.Property<int?>("Duration")
                         .HasColumnType("int");
 
                     b.Property<double>("MaxResource")
                         .HasColumnType("float");
 
-                    b.Property<double?>("OverrideResource")
-                        .HasColumnType("float");
-
                     b.Property<DateTime?>("OverrideStart")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Phase")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime?>("PlannedFinish")
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("PlannedStart")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("PreferredResourceIds")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<int>("Priority")
                         .HasColumnType("int");
@@ -998,6 +1071,17 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.Navigation("Task");
                 });
 
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.ScenarioEffortSnapshot", b =>
+                {
+                    b.HasOne("SoftwareDeliveryPlanner.Domain.Models.ScenarioTaskSnapshot", "TaskSnapshot")
+                        .WithMany("EffortSnapshots")
+                        .HasForeignKey("ScenarioTaskSnapshotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TaskSnapshot");
+                });
+
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.ScenarioTaskSnapshot", b =>
                 {
                     b.HasOne("SoftwareDeliveryPlanner.Domain.Models.PlanScenario", "Scenario")
@@ -1007,6 +1091,18 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Scenario");
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TaskEffortBreakdown", b =>
+                {
+                    b.HasOne("SoftwareDeliveryPlanner.Domain.Models.TaskItem", "Task")
+                        .WithMany("EffortBreakdown")
+                        .HasForeignKey("TaskId")
+                        .HasPrincipalKey("TaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Task");
                 });
 
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TeamMember", b =>
@@ -1022,6 +1118,16 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.PlanScenario", b =>
                 {
                     b.Navigation("TaskSnapshots");
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.ScenarioTaskSnapshot", b =>
+                {
+                    b.Navigation("EffortSnapshots");
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TaskItem", b =>
+                {
+                    b.Navigation("EffortBreakdown");
                 });
 
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TeamMember", b =>

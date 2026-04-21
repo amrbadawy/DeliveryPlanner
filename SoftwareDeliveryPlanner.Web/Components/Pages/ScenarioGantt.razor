@@ -350,7 +350,7 @@ else
             }
 
             bestPath.Add(taskId);
-            var taskDuration = (task.Duration ?? 0) > 0 ? task.Duration!.Value : (int)task.DevEstimation;
+            var taskDuration = (task.Duration ?? 0) > 0 ? task.Duration!.Value : (int)task.EffortSnapshots.Sum(e => e.EstimationDays);
             var result = (maxLen + taskDuration, bestPath);
             memo[taskId] = result;
             return result;

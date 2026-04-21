@@ -2,7 +2,8 @@ namespace SoftwareDeliveryPlanner.Application.Abstractions;
 
 public sealed record AssignedResourceInfo(
     string ResourceId,
-    string ResourceName);
+    string ResourceName,
+    string Role);
 
 public sealed record TaskAssignmentDayDto(
     DateTime Date,

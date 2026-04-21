@@ -106,15 +106,7 @@
                         }
                     </div>
                     <div class="row">
-                        <div class="col-md-6 mb-2">
-                            <label class="form-label">Estimation (days): <span class="required-indicator">*</span></label>
-                            <input class="form-control @(fieldErrors.ContainsKey("DevEstimation") ? "is-invalid" : "")" type="number" min="0" @bind="taskForm.DevEstimation" data-testid="tasks-dev-estimation" />
-                            @if (fieldErrors.ContainsKey("DevEstimation"))
-                            {
-                                <div class="invalid-feedback">@fieldErrors["DevEstimation"]</div>
-                            }
-                        </div>
-                        <div class="col-md-6 mb-2">
+                        <div class="col-md-4 mb-2">
                             <label class="form-label">Max Resources:</label>
                             <input class="form-control @(fieldErrors.ContainsKey("MaxResource") ? "is-invalid" : "")" type="number" min="0" step="0.5" @bind="taskForm.MaxResource" data-testid="tasks-max-resource" />
                             @if (fieldErrors.ContainsKey("MaxResource"))
@@ -122,9 +114,7 @@
                                 <div class="invalid-feedback">@fieldErrors["MaxResource"]</div>
                             }
                         </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-2">
+                        <div class="col-md-4 mb-2">
                             <label class="form-label">Priority (1-10):</label>
                             <input class="form-control @(fieldErrors.ContainsKey("Priority") ? "is-invalid" : "")" type="number" min="1" max="10" @bind="taskForm.Priority" data-testid="tasks-priority" />
                             @if (fieldErrors.ContainsKey("Priority"))
@@ -132,7 +122,7 @@
                                 <div class="invalid-feedback">@fieldErrors["Priority"]</div>
                             }
                         </div>
-                        <div class="col-md-6 mb-2">
+                        <div class="col-md-4 mb-2">
                             <label class="form-label">Strict Date:</label>
                             <input class="form-control @(fieldErrors.ContainsKey("StrictDate") ? "is-invalid" : "")" type="date" @bind="strictDateValue" data-testid="tasks-strict-date" />
                             @if (fieldErrors.ContainsKey("StrictDate"))
@@ -140,6 +130,67 @@
                                 <div class="invalid-feedback">@fieldErrors["StrictDate"]</div>
                             }
                         </div>
+                    </div>
+                    <div class="mb-3" data-testid="effort-breakdown-section">
+                        <label class="form-label fw-semibold">Effort Breakdown <span class="text-danger">*</span></label>
+                        <table class="table table-sm table-bordered mb-2">
+                            <thead class="table-light">
+                                <tr><th>Role</th><th style="width:120px">Days</th><th style="width:120px">Overlap %</th><th style="width:50px"></th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var entry in effortEntries)
+                                {
+                                    var isRequired = DomainConstants.ResourceRole.RequiredRoles.Contains(entry.Role);
+                                    var isFirst = effortEntries.IndexOf(entry) == 0;
+                                    <tr data-testid="effort-row-@entry.Role">
+                                        <td>
+                                            <span class="badge bg-primary me-1">@entry.Role</span>
+                                            <small class="text-muted">@DomainConstants.ResourceRole.GetDisplayName(entry.Role)</small>
+                                            @if (isRequired) { <span class="text-danger ms-1">*</span> }
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm" min="0.5" step="0.5"
+                                                   @bind="entry.EstimationDays" data-testid="effort-days-@entry.Role" />
+                                        </td>
+                                        <td>
+                                            @if (isFirst)
+                                            { <span class="text-muted">&mdash;</span> }
+                                            else
+                                            { <input type="number" class="form-control form-control-sm" min="0" max="100" step="5"
+                                                     @bind="entry.OverlapPct" data-testid="effort-overlap-@entry.Role" /> }
+                                        </td>
+                                        <td>
+                                            @if (!isRequired)
+                                            { <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => RemoveEffortEntry(entry)"
+                                                      data-testid="effort-remove-@entry.Role"><i class="bi bi-x"></i></button> }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        @{ var availableRoles = DomainConstants.ResourceRole.PipelineOrder.Where(r => !effortEntries.Any(e => e.Role == r)).ToList(); }
+                        @if (availableRoles.Any())
+                        {
+                            <div class="d-flex gap-2 align-items-center">
+                                <select class="form-select form-select-sm" style="width:auto" @bind="selectedRoleToAdd" data-testid="effort-add-role-select">
+                                    <option value="">Add role...</option>
+                                    @foreach (var role in availableRoles)
+                                    { <option value="@role">@role &mdash; @DomainConstants.ResourceRole.GetDisplayName(role)</option> }
+                                </select>
+                                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddEffortEntry"
+                                        disabled="@string.IsNullOrEmpty(selectedRoleToAdd)" data-testid="effort-add-btn">
+                                    <i class="bi bi-plus me-1"></i>Add
+                                </button>
+                            </div>
+                        }
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phase</label>
+                        <input type="text" class="form-control" @bind="editPhase" placeholder="e.g. Phase 1" data-testid="tasks-phase" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Preferred Resources <small class="text-muted">(optional)</small></label>
+                        <input type="text" class="form-control" @bind="editPreferredResourceIds" placeholder="e.g. DEV-001, DEV-003" data-testid="tasks-preferred-resources" />
                     </div>
                     <div class="mb-2">
                         <label class="form-label">Depends On:</label>
@@ -186,7 +237,7 @@
                     {
                         <div class="alert alert-danger">@bulkError</div>
                     }
-                    <p class="text-muted small">Paste CSV with headers: <code>TaskId,ServiceName,DevEstimation,MaxResource,Priority,StrictDate,DependsOnTaskIds</code></p>
+                    <p class="text-muted small">Paste CSV with headers: <code>TaskId,ServiceName,DevEstDEV,DevEstQA,MaxResource,Priority,StrictDate,DependsOnTaskIds</code></p>
                     <textarea class="form-control font-monospace" rows="8" @bind="csvText" placeholder="SVC-010,Auth Service,15,2,3,,&#10;SVC-011,User API,20,3,5,2026-06-01,SVC-010" data-testid="bulk-import-csv"></textarea>
                     @if (parsedRows.Any())
                     {
@@ -195,13 +246,15 @@
                             <div class="table-responsive" style="max-height: 200px;">
                                 <table class="table table-sm table-bordered mb-0">
                                     <thead class="table-light">
-                                        <tr><th>ID</th><th>Name</th><th>Est</th><th>Max Dev</th><th>Priority</th><th>Strict</th><th>Deps</th></tr>
+                                         <tr><th>ID</th><th>Name</th><th>DEV</th><th>QA</th><th>Max Res</th><th>Priority</th><th>Strict</th><th>Deps</th></tr>
                                     </thead>
                                     <tbody>
                                         @foreach (var row in parsedRows)
                                         {
                                             <tr>
-                                                <td>@row.TaskId</td><td>@row.ServiceName</td><td>@row.DevEstimation</td>
+                                                <td>@row.TaskId</td><td>@row.ServiceName</td>
+                                                <td>@row.EffortBreakdown.FirstOrDefault(e => e.Role == "DEV")?.EstimationDays</td>
+                                                <td>@row.EffortBreakdown.FirstOrDefault(e => e.Role == "QA")?.EstimationDays</td>
                                                 <td>@row.MaxResource</td><td>@row.Priority</td>
                                                 <td>@(row.StrictDate?.ToString("yyyy-MM-dd") ?? "")</td><td>@(row.DependsOnTaskIds ?? "")</td>
                                             </tr>
@@ -268,8 +321,9 @@ else
                     <tr>
                         <th role="button" @onclick='() => ApplySort("TaskId")' aria-sort="@AriaSort("TaskId")" data-testid="tasks-sort-id">ID @SortIndicator("TaskId")</th>
                         <th role="button" @onclick='() => ApplySort("ServiceName")' aria-sort="@AriaSort("ServiceName")" data-testid="tasks-sort-name">Service @SortIndicator("ServiceName")</th>
-                        <th role="button" @onclick='() => ApplySort("DevEstimation")' aria-sort="@AriaSort("DevEstimation")" data-testid="tasks-sort-est">Est @SortIndicator("DevEstimation")</th>
-                        <th>Max Dev</th>
+                        <th role="button" @onclick='() => ApplySort("TotalEstimationDays")' aria-sort="@AriaSort("TotalEstimationDays")" data-testid="tasks-sort-est">Total Est. @SortIndicator("TotalEstimationDays")</th>
+                        <th>Phase</th>
+                        <th>Max Res.</th>
                         <th role="button" @onclick='() => ApplySort("Priority")' aria-sort="@AriaSort("Priority")" data-testid="tasks-sort-priority">Priority @SortIndicator("Priority")</th>
                         <th role="button" @onclick='() => ApplySort("PlannedStart")' aria-sort="@AriaSort("PlannedStart")" data-testid="tasks-sort-start">Start @SortIndicator("PlannedStart")</th>
                         <th role="button" @onclick='() => ApplySort("PlannedFinish")' aria-sort="@AriaSort("PlannedFinish")" data-testid="tasks-sort-finish">Finish @SortIndicator("PlannedFinish")</th>
@@ -297,7 +351,8 @@ else
                                 <a href="/tasks/@task.TaskId" @onclick:stopPropagation data-testid="tasks-details-link-@task.TaskId">@task.TaskId</a>
                             </td>
                             <td>@task.ServiceName</td>
-                            <td>@task.DevEstimation</td>
+                            <td>@task.TotalEstimationDays</td>
+                            <td>@(task.Phase ?? "")</td>
                             <td>@task.MaxResource</td>
                             <td>@task.Priority</td>
                             <td>@task.PlannedStart?.ToString("yyyy-MM-dd")</td>
@@ -376,16 +431,43 @@ else
     private string? dragTaskId;
     private string? dragOverTaskId;
 
+    private List<EffortEntryModel> effortEntries = new();
+    private string selectedRoleToAdd = "";
+    private string editPhase = "";
+    private string editPreferredResourceIds = "";
+
+    private class EffortEntryModel
+    {
+        public string Role { get; set; } = "";
+        public double EstimationDays { get; set; }
+        public double OverlapPct { get; set; }
+    }
+
     private class TaskFormModel
     {
         public int Id { get; set; }
         public string TaskId { get; set; } = string.Empty;
         public string ServiceName { get; set; } = string.Empty;
-        public double DevEstimation { get; set; }
         public double MaxResource { get; set; } = 1.0;
         public int Priority { get; set; } = 5;
         public DateTime? StrictDate { get; set; }
         public string? DependsOnTaskIds { get; set; }
+    }
+
+    private void AddEffortEntry()
+    {
+        if (!string.IsNullOrEmpty(selectedRoleToAdd) && !effortEntries.Any(e => e.Role == selectedRoleToAdd))
+        {
+            effortEntries.Add(new EffortEntryModel { Role = selectedRoleToAdd, EstimationDays = 1, OverlapPct = 0 });
+            effortEntries = effortEntries.OrderBy(e => DomainConstants.ResourceRole.GetPipelineSortOrder(e.Role)).ToList();
+            selectedRoleToAdd = "";
+        }
+    }
+
+    private void RemoveEffortEntry(EffortEntryModel entry)
+    {
+        if (!DomainConstants.ResourceRole.RequiredRoles.Contains(entry.Role))
+            effortEntries.Remove(entry);
     }
 
     private IReadOnlyList<TaskItem> FilteredTasks
@@ -418,7 +500,7 @@ else
                 {
                     "TaskId" => sortAscending ? result.OrderBy(t => t.TaskId) : result.OrderByDescending(t => t.TaskId),
                     "ServiceName" => sortAscending ? result.OrderBy(t => t.ServiceName) : result.OrderByDescending(t => t.ServiceName),
-                    "DevEstimation" => sortAscending ? result.OrderBy(t => t.DevEstimation) : result.OrderByDescending(t => t.DevEstimation),
+                    "TotalEstimationDays" => sortAscending ? result.OrderBy(t => t.TotalEstimationDays) : result.OrderByDescending(t => t.TotalEstimationDays),
                     "Priority" => sortAscending ? result.OrderBy(t => t.Priority) : result.OrderByDescending(t => t.Priority),
                     "PlannedStart" => sortAscending ? result.OrderBy(t => t.PlannedStart) : result.OrderByDescending(t => t.PlannedStart),
                     "PlannedFinish" => sortAscending ? result.OrderBy(t => t.PlannedFinish) : result.OrderByDescending(t => t.PlannedFinish),
@@ -508,6 +590,14 @@ else
         editingTask = null;
         modalError = string.Empty;
         fieldErrors.Clear();
+        effortEntries = new List<EffortEntryModel>
+        {
+            new() { Role = "DEV", EstimationDays = 1, OverlapPct = 0 },
+            new() { Role = "QA", EstimationDays = 1, OverlapPct = 0 }
+        };
+        editPhase = "";
+        editPreferredResourceIds = "";
+        selectedRoleToAdd = "";
         showModal = true;
     }
 
@@ -519,7 +609,6 @@ else
             Id = task.Id,
             TaskId = task.TaskId,
             ServiceName = task.ServiceName,
-            DevEstimation = task.DevEstimation,
             MaxResource = task.MaxResource,
             Priority = task.Priority,
             StrictDate = task.StrictDate,
@@ -529,6 +618,15 @@ else
         selectedDependencies = string.IsNullOrWhiteSpace(task.DependsOnTaskIds)
             ? new HashSet<string>()
             : new HashSet<string>(task.DependsOnTaskIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        effortEntries = task.EffortBreakdown.Select(e => new EffortEntryModel
+        {
+            Role = e.Role,
+            EstimationDays = e.EstimationDays,
+            OverlapPct = e.OverlapPct
+        }).OrderBy(e => DomainConstants.ResourceRole.GetPipelineSortOrder(e.Role)).ToList();
+        editPhase = task.Phase ?? "";
+        editPreferredResourceIds = task.PreferredResourceIds ?? "";
+        selectedRoleToAdd = "";
         modalError = string.Empty;
         fieldErrors.Clear();
         showModal = true;
@@ -547,16 +645,19 @@ else
         isSaving = true;
         try
         {
+            var breakdown = effortEntries.Select(e => new EffortBreakdownInput(e.Role, e.EstimationDays, e.OverlapPct)).ToList();
             var command = new UpsertTaskCommand(
                 Id: taskForm.Id,
                 TaskId: taskForm.TaskId,
                 ServiceName: taskForm.ServiceName,
-                DevEstimation: taskForm.DevEstimation,
                 MaxResource: taskForm.MaxResource,
                 Priority: taskForm.Priority,
+                EffortBreakdown: breakdown,
                 StrictDate: strictDateValue,
                 DependsOnTaskIds: selectedDependencies.Any() ? string.Join(",", selectedDependencies) : null,
-                IsNew: editingTask == null);
+                IsNew: editingTask == null,
+                Phase: string.IsNullOrWhiteSpace(editPhase) ? null : editPhase,
+                PreferredResourceIds: string.IsNullOrWhiteSpace(editPreferredResourceIds) ? null : editPreferredResourceIds);
 
             var result = await Mediator.Send(command);
             await LoadTasks();
@@ -678,14 +779,21 @@ else
             {
                 var parts = line.Split(',');
                 if (parts.Length < 3) continue;
+                var devEst = double.TryParse(parts[2].Trim(), out var estDev) ? estDev : 1;
+                var qaEst = parts.Length > 3 && double.TryParse(parts[3].Trim(), out var estQa) ? estQa : 1;
+                var bulkEffort = new List<EffortBreakdownInput>
+                {
+                    new("DEV", devEst, 0),
+                    new("QA", qaEst, 0)
+                };
                 parsedRows.Add(new BulkTaskRowDto(
                     TaskId: parts[0].Trim(),
                     ServiceName: parts[1].Trim(),
-                    DevEstimation: double.TryParse(parts[2].Trim(), out var est) ? est : 0,
-                    MaxResource: parts.Length > 3 && double.TryParse(parts[3].Trim(), out var maxResource) ? maxResource : 1,
-                    Priority: parts.Length > 4 && int.TryParse(parts[4].Trim(), out var pri) ? pri : 5,
-                    StrictDate: parts.Length > 5 && DateTime.TryParse(parts[5].Trim(), out var sd) ? sd : null,
-                    DependsOnTaskIds: parts.Length > 6 ? parts[6].Trim() : null
+                    MaxResource: parts.Length > 4 && double.TryParse(parts[4].Trim(), out var maxResource) ? maxResource : 1,
+                    Priority: parts.Length > 5 && int.TryParse(parts[5].Trim(), out var pri) ? pri : 5,
+                    EffortBreakdown: bulkEffort,
+                    StrictDate: parts.Length > 6 && DateTime.TryParse(parts[6].Trim(), out var sd) ? sd : null,
+                    DependsOnTaskIds: parts.Length > 7 ? parts[7].Trim() : null
                 ));
             }
         }
@@ -755,17 +863,21 @@ else
 
         try
         {
+            var dragBreakdown = draggedTask.EffortBreakdown.Select(e => new EffortBreakdownInput(e.Role, e.EstimationDays, e.OverlapPct)).ToList();
             await Mediator.Send(new UpsertTaskCommand(
                 Id: draggedTask.Id, TaskId: draggedTask.TaskId, ServiceName: draggedTask.ServiceName,
-                DevEstimation: draggedTask.DevEstimation, MaxResource: draggedTask.MaxResource,
-                Priority: targetPriority, StrictDate: draggedTask.StrictDate,
-                DependsOnTaskIds: draggedTask.DependsOnTaskIds, IsNew: false));
+                MaxResource: draggedTask.MaxResource,
+                Priority: targetPriority, EffortBreakdown: dragBreakdown, StrictDate: draggedTask.StrictDate,
+                DependsOnTaskIds: draggedTask.DependsOnTaskIds, IsNew: false,
+                Phase: draggedTask.Phase, PreferredResourceIds: draggedTask.PreferredResourceIds));
 
+            var targetBreakdown = targetTask.EffortBreakdown.Select(e => new EffortBreakdownInput(e.Role, e.EstimationDays, e.OverlapPct)).ToList();
             await Mediator.Send(new UpsertTaskCommand(
                 Id: targetTask.Id, TaskId: targetTask.TaskId, ServiceName: targetTask.ServiceName,
-                DevEstimation: targetTask.DevEstimation, MaxResource: targetTask.MaxResource,
-                Priority: dragPriority, StrictDate: targetTask.StrictDate,
-                DependsOnTaskIds: targetTask.DependsOnTaskIds, IsNew: false));
+                MaxResource: targetTask.MaxResource,
+                Priority: dragPriority, EffortBreakdown: targetBreakdown, StrictDate: targetTask.StrictDate,
+                DependsOnTaskIds: targetTask.DependsOnTaskIds, IsNew: false,
+                Phase: targetTask.Phase, PreferredResourceIds: targetTask.PreferredResourceIds));
 
             await LoadTasks();
             toast.Show($"Priority swapped: {draggedTask.TaskId} ↔ {targetTask.TaskId}");

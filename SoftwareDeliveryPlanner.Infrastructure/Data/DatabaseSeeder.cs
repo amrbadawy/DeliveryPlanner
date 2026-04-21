@@ -52,7 +52,10 @@ internal sealed class DatabaseSeeder : IDatabaseSeeder
             TeamMember.Create("DEV-002", "Developer 2", DomainConstants.ResourceRole.Developer, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 4, 12), notes: "Initial team"),
             TeamMember.Create("DEV-003", "Developer 3", DomainConstants.ResourceRole.Developer, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 4, 12), notes: "Initial team"),
             TeamMember.Create("DEV-004", "Developer 4", DomainConstants.ResourceRole.Developer, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 6, 1), notes: "Phase 2"),
-            TeamMember.Create("DEV-005", "Developer 5", DomainConstants.ResourceRole.Developer, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 6, 1), notes: "Phase 2")
+            TeamMember.Create("DEV-005", "Developer 5", DomainConstants.ResourceRole.Developer, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 6, 1), notes: "Phase 2"),
+            TeamMember.Create("QA-001", "QA Engineer 1", DomainConstants.ResourceRole.QA, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 4, 12), notes: "Initial team"),
+            TeamMember.Create("QA-002", "QA Engineer 2", DomainConstants.ResourceRole.QA, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 4, 12), notes: "Initial team"),
+            TeamMember.Create("QA-003", "QA Engineer 3", DomainConstants.ResourceRole.QA, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 6, 1), notes: "Phase 2")
         );
     }
 
@@ -69,19 +72,32 @@ internal sealed class DatabaseSeeder : IDatabaseSeeder
     private static void SeedTasks(PlannerDbContext db)
     {
         db.Tasks.AddRange(
-            TaskItem.Create("SVC-001", "ادارة المحتوى اخبار والحملات التوعوية", 53, 3.5, 5),
-            TaskItem.Create("SVC-002", "التكامل مع منصة تحميل المرحلة الثانية", 18, 2.0, 5, strictDate: new DateTime(2026, 7, 23)),
-            TaskItem.Create("SVC-003", "اضافه / حذف موظف على جهة بعد اصدار الترخيص", 40, 3.5, 5),
-            TaskItem.Create("SVC-004", "التكامل مع نظام الموارد البشرية للملف الشخصي", 27, 2.5, 5),
-            TaskItem.Create("SVC-005", "طلب تغيير تعديل حقول تقرير الكشف والتسرب", 5, 2.0, 5),
-            TaskItem.Create("SVC-006", "تعديل التراخيص الاضافية", 10, 2.0, 5),
-            TaskItem.Create("SVC-007", "لوحات التحكم والرقابة", 20, 2.5, 5),
-            TaskItem.Create("SVC-008", "خدمة تنفيذ الاصلاحات", 92, 4.5, 5),
-            TaskItem.Create("SVC-009", "تجديد الترخيص منصة نما", 12, 2.0, 5),
-            TaskItem.Create("SVC-010", "ادارة المستخدمين", 22, 2.5, 5),
-            TaskItem.Create("SVC-011", "الغاء الترخيص", 37, 3.0, 5),
-            TaskItem.Create("SVC-012", "اتمتة الانذارات على الجهات المعتمدة", 15, 2.0, 5),
-            TaskItem.Create("SVC-013", "التكامل مع المؤسسة العامة للري", 29, 3.0, 5)
+            TaskItem.Create("SVC-001", "ادارة المحتوى اخبار والحملات التوعوية", 3.5, 5,
+                [("DEV", 40, 0), ("QA", 10, 20)], phase: "Phase 1"),
+            TaskItem.Create("SVC-002", "التكامل مع منصة تحميل المرحلة الثانية", 2.0, 5,
+                [("DEV", 14, 0), ("QA", 4, 25)], strictDate: new DateTime(2026, 7, 23), phase: "Phase 1"),
+            TaskItem.Create("SVC-003", "اضافه / حذف موظف على جهة بعد اصدار الترخيص", 3.5, 5,
+                [("BA", 2, 0), ("DEV", 30, 0), ("QA", 8, 20)], phase: "Phase 1"),
+            TaskItem.Create("SVC-004", "التكامل مع نظام الموارد البشرية للملف الشخصي", 2.5, 5,
+                [("SA", 2, 0), ("DEV", 20, 0), ("QA", 5, 20)], phase: "Phase 1"),
+            TaskItem.Create("SVC-005", "طلب تغيير تعديل حقول تقرير الكشف والتسرب", 2.0, 5,
+                [("DEV", 3, 0), ("QA", 2, 0)], phase: "Phase 1"),
+            TaskItem.Create("SVC-006", "تعديل التراخيص الاضافية", 2.0, 5,
+                [("DEV", 7, 0), ("QA", 3, 0)], phase: "Phase 1"),
+            TaskItem.Create("SVC-007", "لوحات التحكم والرقابة", 2.5, 5,
+                [("DEV", 15, 0), ("QA", 5, 20)], phase: "Phase 2"),
+            TaskItem.Create("SVC-008", "خدمة تنفيذ الاصلاحات", 4.5, 5,
+                [("BA", 5, 0), ("UX", 7, 0), ("DEV", 60, 0), ("QA", 20, 15)], phase: "Phase 2"),
+            TaskItem.Create("SVC-009", "تجديد الترخيص منصة نما", 2.0, 5,
+                [("DEV", 9, 0), ("QA", 3, 0)], phase: "Phase 2"),
+            TaskItem.Create("SVC-010", "ادارة المستخدمين", 2.5, 5,
+                [("DEV", 16, 0), ("QA", 6, 20)], phase: "Phase 2"),
+            TaskItem.Create("SVC-011", "الغاء الترخيص", 3.0, 5,
+                [("DEV", 28, 0), ("QA", 9, 20)], phase: "Phase 2"),
+            TaskItem.Create("SVC-012", "اتمتة الانذارات على الجهات المعتمدة", 2.0, 5,
+                [("DEV", 11, 0), ("QA", 4, 0)], phase: "Phase 2"),
+            TaskItem.Create("SVC-013", "التكامل مع المؤسسة العامة للري", 3.0, 5,
+                [("DEV", 22, 0), ("QA", 7, 20)], phase: "Phase 2")
         );
     }
 }

@@ -1,9 +1,12 @@
 using SoftwareDeliveryPlanner.Domain.Models;
+using SoftwareDeliveryPlanner.Tests.Infrastructure;
 
 namespace SoftwareDeliveryPlanner.Tests;
 
 public class ModelsTests
 {
+    private static List<(string, double, double)> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
+
     #region TaskItem Tests
 
     [Fact]
@@ -13,7 +16,7 @@ public class ModelsTests
         
         Assert.Equal(string.Empty, task.TaskId);
         Assert.Equal(string.Empty, task.ServiceName);
-        Assert.Equal(0, task.DevEstimation);
+        Assert.Equal(0, task.TotalEstimationDays);
         Assert.Equal(1.0, task.MaxResource);
         Assert.Equal(5, task.Priority);
         Assert.Equal("Not Started", task.Status);
@@ -26,11 +29,11 @@ public class ModelsTests
     [Fact]
     public void TaskItem_CanSetProperties()
     {
-        var task = TaskItem.Create("TST-01", "API Development", 10, 2, 1, strictDate: new DateTime(2026, 6, 1));
+        var task = TaskItem.Create("TST-01", "API Development", 2, 1, B(10), strictDate: new DateTime(2026, 6, 1));
 
         Assert.Equal("TST-01", task.TaskId);
         Assert.Equal("API Development", task.ServiceName);
-        Assert.Equal(10, task.DevEstimation);
+        Assert.True(task.TotalEstimationDays >= 10);
         Assert.Equal(2, task.MaxResource);
         Assert.Equal(1, task.Priority);
         Assert.Equal(new DateTime(2026, 6, 1), task.StrictDate);
@@ -42,7 +45,7 @@ public class ModelsTests
     public void TaskItem_Timestamps_AreSetOnCreation()
     {
         var before = DateTime.Now.AddSeconds(-1);
-        var task = TaskItem.Create("TST-02", "Timestamp Test", 1, 1, 5);
+        var task = TaskItem.Create("TST-02", "Timestamp Test", 1, 5, B(1));
         var after = DateTime.Now.AddSeconds(1);
 
         Assert.True(task.CreatedAt >= before && task.CreatedAt <= after);
@@ -201,13 +204,13 @@ public class ModelsTests
         
         Assert.Equal(string.Empty, alloc.AllocationId);
         Assert.Equal(string.Empty, alloc.TaskId);
-        Assert.Equal(0, alloc.AssignedResource);
+        Assert.Equal(string.Empty, alloc.ResourceId);
+        Assert.Equal(string.Empty, alloc.Role);
+        Assert.Equal(0, alloc.HoursAllocated);
         Assert.Equal(0, alloc.CumulativeEffort);
         Assert.False(alloc.IsComplete);
         Assert.Equal("Not Started", alloc.ServiceStatus);
         Assert.Null(alloc.SchedRank);
-        Assert.Null(alloc.MaxResource);
-        Assert.Null(alloc.AvailableCapacity);
         Assert.Null(alloc.Task);
     }
 
@@ -218,12 +221,12 @@ public class ModelsTests
         {
             AllocationId = "ALLOC-000001",
             TaskId = "T-001",
+            ResourceId = "DEV-001",
+            Role = "DEV",
             DateKey = 1,
             CalendarDate = new DateTime(2026, 5, 4),
             SchedRank = 1000000,
-            MaxResource = 2.0,
-            AvailableCapacity = 4.0,
-            AssignedResource = 1.0,
+            HoursAllocated = 1.0,
             CumulativeEffort = 1.0,
             IsComplete = false,
             ServiceStatus = "In Progress"
@@ -231,12 +234,12 @@ public class ModelsTests
 
         Assert.Equal("ALLOC-000001", alloc.AllocationId);
         Assert.Equal("T-001", alloc.TaskId);
+        Assert.Equal("DEV-001", alloc.ResourceId);
+        Assert.Equal("DEV", alloc.Role);
         Assert.Equal(1, alloc.DateKey);
         Assert.Equal(new DateTime(2026, 5, 4), alloc.CalendarDate);
         Assert.Equal(1000000, alloc.SchedRank);
-        Assert.Equal(2.0, alloc.MaxResource);
-        Assert.Equal(4.0, alloc.AvailableCapacity);
-        Assert.Equal(1.0, alloc.AssignedResource);
+        Assert.Equal(1.0, alloc.HoursAllocated);
         Assert.Equal(1.0, alloc.CumulativeEffort);
         Assert.False(alloc.IsComplete);
         Assert.Equal("In Progress", alloc.ServiceStatus);

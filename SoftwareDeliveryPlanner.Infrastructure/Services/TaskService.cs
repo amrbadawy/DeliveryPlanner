@@ -18,13 +18,18 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
     public async Task<List<TaskItem>> GetTasksAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await ReadOnlyDbFactory.CreateDbContextAsync(cancellationToken);
-        return await db.Tasks.OrderBy(t => t.SchedulingRank ?? 999).ToListAsync(cancellationToken);
+        return await db.Tasks
+            .Include(t => t.EffortBreakdown)
+            .OrderBy(t => t.SchedulingRank ?? 999)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<TaskItem?> GetTaskByTaskIdAsync(string taskId, CancellationToken cancellationToken = default)
     {
         await using var db = await ReadOnlyDbFactory.CreateDbContextAsync(cancellationToken);
-        return await db.Tasks.FirstOrDefaultAsync(t => t.TaskId == taskId, cancellationToken);
+        return await db.Tasks
+            .Include(t => t.EffortBreakdown)
+            .FirstOrDefaultAsync(t => t.TaskId == taskId, cancellationToken);
     }
 
     public async Task<int> GetTaskCountAsync(CancellationToken cancellationToken = default)
@@ -34,22 +39,27 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
     }
 
     public async Task UpsertTaskAsync(
-        int id, string taskId, string serviceName, double devEstimation,
-        double maxResource, int priority, DateTime? strictDate,
-        string? dependsOnTaskIds, bool isNew,
+        int id, string taskId, string serviceName, double maxResource, int priority,
+        List<(string Role, double EstimationDays, double OverlapPct)> effortBreakdown,
+        DateTime? strictDate, string? dependsOnTaskIds, bool isNew,
+        DateTime? overrideStart = null, string? phase = null, string? preferredResourceIds = null,
         CancellationToken cancellationToken = default)
     {
         await using var db = await DbFactory.CreateDbContextAsync(cancellationToken);
 
         if (isNew)
         {
-            var task = TaskItem.Create(taskId, serviceName, devEstimation, maxResource, priority, strictDate, dependsOnTaskIds);
+            var task = TaskItem.Create(taskId, serviceName, maxResource, priority, effortBreakdown,
+                strictDate, dependsOnTaskIds, overrideStart, phase, preferredResourceIds);
             db.Tasks.Add(task);
         }
         else
         {
-            var existing = await db.Tasks.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
-            existing?.Update(serviceName, devEstimation, maxResource, priority, strictDate, dependsOnTaskIds);
+            var existing = await db.Tasks
+                .Include(t => t.EffortBreakdown)
+                .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+            existing?.Update(serviceName, maxResource, priority, effortBreakdown,
+                strictDate, dependsOnTaskIds, phase, preferredResourceIds);
         }
 
         await SaveDispatchAndRescheduleAsync(db, cancellationToken);

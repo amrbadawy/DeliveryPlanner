@@ -21,11 +21,16 @@ internal sealed class BulkImportTasksCommandHandler : IRequestHandler<BulkImport
             var isNew = existing is null;
             var id = existing?.Id ?? 0;
 
+            var breakdown = row.EffortBreakdown
+                .Select(e => (e.Role, e.EstimationDays, e.OverlapPct))
+                .ToList();
+
             await _orchestrator.UpsertTaskAsync(
                 id, row.TaskId, row.ServiceName,
-                row.DevEstimation, row.MaxResource, row.Priority,
+                row.MaxResource, row.Priority, breakdown,
                 row.StrictDate, row.DependsOnTaskIds, isNew,
-                cancellationToken);
+                phase: row.Phase, preferredResourceIds: row.PreferredResourceIds,
+                cancellationToken: cancellationToken);
 
             count++;
         }

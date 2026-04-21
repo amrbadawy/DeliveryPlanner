@@ -57,6 +57,13 @@ public abstract class OrchestratorFixture : IAsyncDisposable
     private protected readonly IScenarioOrchestrator ScenarioOrchestrator;
     private protected readonly TimeProvider TestTimeProvider;
 
+    private protected static List<(string, double, double)> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
+    private protected static List<EffortBreakdownInput> EB(double dev) => new()
+    {
+        new EffortBreakdownInput("DEV", dev, 0),
+        new EffortBreakdownInput("QA", Math.Max(1, dev * 0.2), 0)
+    };
+
     protected OrchestratorFixture(SqlServerFixture fixture)
     {
         var (options, connectionString) = TestDatabaseHelper.CreateOptions(fixture);
@@ -126,7 +133,7 @@ public class GetTaskCountQueryHandlerTests : OrchestratorFixture
     public async Task Handle_AfterAddingTask_CountIncreases()
     {
         await using var db = await Factory.CreateDbContextAsync();
-        db.Tasks.Add(TaskItem.Create("TST-99", "Extra", 1, 1, 5));
+        db.Tasks.Add(TaskItem.Create("TST-99", "Extra", 1, 5, B(1)));
         await db.SaveChangesAsync();
 
         var handler = new GetTaskCountQueryHandler(TaskOrchestrator);
@@ -152,9 +159,9 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             Id: 0,
             TaskId: "NEW-01",
             ServiceName: "New Service",
-            DevEstimation: 10,
             MaxResource: 2,
             Priority: 3,
+            EffortBreakdown: EB(10),
             StrictDate: null,
             DependsOnTaskIds: null,
             IsNew: true);
@@ -169,7 +176,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
     public async Task Handle_UpdateTask_ModifiesExistingTask()
     {
         await using var db = await Factory.CreateDbContextAsync();
-        var existing = await db.Tasks.FirstAsync();
+        var existing = await db.Tasks.Include(t => t.EffortBreakdown).FirstAsync();
         var originalName = existing.ServiceName;
 
         var handler = new UpsertTaskCommandHandler(TaskOrchestrator);
@@ -177,9 +184,9 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             Id: existing.Id,
             TaskId: existing.TaskId,
             ServiceName: "Updated Service Name",
-            DevEstimation: existing.DevEstimation,
             MaxResource: existing.MaxResource,
             Priority: existing.Priority,
+            EffortBreakdown: EB(existing.TotalEstimationDays),
             StrictDate: null,
             DependsOnTaskIds: null,
             IsNew: false);
@@ -200,9 +207,9 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             Id: 0,
             TaskId: "STR-01",
             ServiceName: "Strict Task",
-            DevEstimation: 5,
             MaxResource: 1,
             Priority: 1,
+            EffortBreakdown: EB(5),
             StrictDate: strictDate,
             DependsOnTaskIds: null,
             IsNew: true), CancellationToken.None);
@@ -220,9 +227,9 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             Id: 0,
             TaskId: "DEP-01",
             ServiceName: "Dependent Task",
-            DevEstimation: 5,
             MaxResource: 1,
             Priority: 1,
+            EffortBreakdown: EB(5),
             StrictDate: null,
             DependsOnTaskIds: "SVC-001,SVC-002",
             IsNew: true), CancellationToken.None);
@@ -240,9 +247,9 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             Id: 0,
             TaskId: "NDP-01",
             ServiceName: "No Deps Task",
-            DevEstimation: 3,
             MaxResource: 1,
             Priority: 1,
+            EffortBreakdown: EB(3),
             StrictDate: null,
             DependsOnTaskIds: null,
             IsNew: true), CancellationToken.None);
@@ -289,9 +296,15 @@ public class UpsertTaskCommandValidatorTests
 {
     private readonly UpsertTaskCommandValidator _validator = new();
 
+    private static List<EffortBreakdownInput> ValidEB() => new()
+    {
+        new EffortBreakdownInput("DEV", 5, 0),
+        new EffortBreakdownInput("QA", 1, 0)
+    };
+
     private static UpsertTaskCommand Valid() => new(
         Id: 0, TaskId: "SVC-001", ServiceName: "My Service",
-        DevEstimation: 5, MaxResource: 2, Priority: 5,
+        MaxResource: 2, Priority: 5, EffortBreakdown: ValidEB(),
         StrictDate: null, DependsOnTaskIds: null, IsNew: true);
 
     [Fact]
@@ -326,9 +339,13 @@ public class UpsertTaskCommandValidatorTests
     [InlineData(-1)]
     public void ZeroOrNegativeEstimation_FailsValidation(double est)
     {
-        var result = _validator.Validate(Valid() with { DevEstimation = est });
+        var badEB = new List<EffortBreakdownInput>
+        {
+            new("DEV", est, 0),
+            new("QA", est, 0)
+        };
+        var result = _validator.Validate(Valid() with { EffortBreakdown = badEB });
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.DevEstimation));
     }
 
     [Theory]
@@ -377,7 +394,7 @@ public class GetResourcesQueryHandlerTests : OrchestratorFixture
     {
         var handler = new GetResourcesQueryHandler(ResourceOrchestrator);
         var result = await handler.Handle(new GetResourcesQuery(), CancellationToken.None);
-        Assert.Equal(5, result.Value.Count); // 5 seeded
+        Assert.Equal(8, result.Value.Count); // 5 DEV + 3 QA seeded
     }
 }
 
@@ -391,7 +408,7 @@ public class GetResourceCountQueryHandlerTests : OrchestratorFixture
     {
         var handler = new GetResourceCountQueryHandler(ResourceOrchestrator);
         var count = await handler.Handle(new GetResourceCountQuery(), CancellationToken.None);
-        Assert.Equal(5, count.Value);
+        Assert.Equal(8, count.Value);
     }
 }
 
@@ -744,7 +761,7 @@ public class GetHolidaysQueryHandlerTests : OrchestratorFixture
     {
         var handler = new GetHolidaysQueryHandler(HolidayOrchestrator);
         var result = await handler.Handle(new GetHolidaysQuery(), CancellationToken.None);
-        Assert.Equal(7, result.Value.Count); // 7 seeded (consolidated)
+        Assert.Equal(4, result.Value.Count); // 4 seeded holidays
     }
 
     [Fact]
@@ -1505,9 +1522,15 @@ public class UpsertTaskCommandValidatorAdditionalTests
 {
     private readonly UpsertTaskCommandValidator _validator = new();
 
+    private static List<EffortBreakdownInput> ValidEB() => new()
+    {
+        new EffortBreakdownInput("DEV", 5, 0),
+        new EffortBreakdownInput("QA", 1, 0)
+    };
+
     private static UpsertTaskCommand Valid() => new(
         Id: 0, TaskId: "SVC-001", ServiceName: "My Service",
-        DevEstimation: 5, MaxResource: 2, Priority: 5,
+        MaxResource: 2, Priority: 5, EffortBreakdown: ValidEB(),
         StrictDate: null, DependsOnTaskIds: null, IsNew: true);
 
     [Fact]
@@ -1529,7 +1552,12 @@ public class UpsertTaskCommandValidatorAdditionalTests
     [Fact]
     public void BoundaryEstimation_SmallPositive_PassesValidation()
     {
-        var result = _validator.Validate(Valid() with { DevEstimation = 0.001 });
+        var smallEB = new List<EffortBreakdownInput>
+        {
+            new("DEV", 0.001, 0),
+            new("QA", 0.001, 0)
+        };
+        var result = _validator.Validate(Valid() with { EffortBreakdown = smallEB });
         Assert.True(result.IsValid);
     }
 
@@ -1543,19 +1571,23 @@ public class UpsertTaskCommandValidatorAdditionalTests
     [Fact]
     public void MultipleFailures_AllErrorsReturned()
     {
+        var badEB = new List<EffortBreakdownInput>
+        {
+            new("DEV", 0, 0),
+            new("QA", 0, 0)
+        };
         var result = _validator.Validate(Valid() with
         {
             TaskId = "",
             ServiceName = "",
-            DevEstimation = 0,
+            EffortBreakdown = badEB,
             MaxResource = -1,
             Priority = 0
         });
         Assert.False(result.IsValid);
-        Assert.True(result.Errors.Count >= 5);
+        Assert.True(result.Errors.Count >= 4);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.TaskId));
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.ServiceName));
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.DevEstimation));
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.MaxResource));
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.Priority));
     }
@@ -1570,7 +1602,12 @@ public class UpsertTaskCommandValidatorAdditionalTests
     [Fact]
     public void ErrorMessage_Estimation_ContainsExpectedText()
     {
-        var result = _validator.Validate(Valid() with { DevEstimation = 0 });
+        var badEB = new List<EffortBreakdownInput>
+        {
+            new("DEV", 0, 0),
+            new("QA", 0, 0)
+        };
+        var result = _validator.Validate(Valid() with { EffortBreakdown = badEB });
         Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("greater than zero"));
     }
 

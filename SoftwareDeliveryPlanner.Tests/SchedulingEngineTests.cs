@@ -12,6 +12,8 @@ public class SchedulingEngineTests : IDisposable
     private readonly PlannerDbContext _db;
     private readonly SchedulingEngine _engine;
 
+    private static List<(string, double, double)> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
+
     public SchedulingEngineTests(SqlServerFixture fixture)
     {
         var (options, _) = TestDatabaseHelper.CreateOptions(fixture);
@@ -302,8 +304,8 @@ public class SchedulingEngineTests : IDisposable
     [Fact]
     public void CalculateSchedulingRank_StrictDateTask_HigherPriority()
     {
-        var task1 = TaskItem.Create("TST-01", "Test", 1, 1, 5, strictDate: new DateTime(2026, 6, 1));
-        var task2 = TaskItem.Create("TST-02", "Test", 1, 1, 3, strictDate: new DateTime(2026, 6, 1));
+        var task1 = TaskItem.Create("TST-01", "Test", 1, 5, B(1), strictDate: new DateTime(2026, 6, 1));
+        var task2 = TaskItem.Create("TST-02", "Test", 1, 3, B(1), strictDate: new DateTime(2026, 6, 1));
 
         var rank1 = GetPrivateRank(task1);
         var rank2 = GetPrivateRank(task2);
@@ -314,8 +316,8 @@ public class SchedulingEngineTests : IDisposable
     [Fact]
     public void CalculateSchedulingRank_StrictDate_EarlierDateHigherPriority()
     {
-        var task1 = TaskItem.Create("TST-01", "Test", 1, 1, 5, strictDate: new DateTime(2026, 5, 1));
-        var task2 = TaskItem.Create("TST-02", "Test", 1, 1, 5, strictDate: new DateTime(2026, 6, 1));
+        var task1 = TaskItem.Create("TST-01", "Test", 1, 5, B(1), strictDate: new DateTime(2026, 5, 1));
+        var task2 = TaskItem.Create("TST-02", "Test", 1, 5, B(1), strictDate: new DateTime(2026, 6, 1));
 
         var rank1 = GetPrivateRank(task1);
         var rank2 = GetPrivateRank(task2);
@@ -326,8 +328,8 @@ public class SchedulingEngineTests : IDisposable
     [Fact]
     public void CalculateSchedulingRank_NoStrictDate_LowerPriorityThanStrict()
     {
-        var taskWithStrict = TaskItem.Create("TST-01", "Test", 1, 1, 5, strictDate: new DateTime(2026, 6, 1));
-        var taskWithoutStrict = TaskItem.Create("TST-02", "Test", 1, 1, 5);
+        var taskWithStrict = TaskItem.Create("TST-01", "Test", 1, 5, B(1), strictDate: new DateTime(2026, 6, 1));
+        var taskWithoutStrict = TaskItem.Create("TST-02", "Test", 1, 5, B(1));
 
         var rankWithStrict = GetPrivateRank(taskWithStrict);
         var rankWithoutStrict = GetPrivateRank(taskWithoutStrict);
@@ -365,7 +367,7 @@ public class SchedulingEngineTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("TST-001", "Test Service", 5, 1, 5));
+        _db.Tasks.Add(TaskItem.Create("TST-001", "Test Service", 1, 5, B(5)));
         _db.SaveChanges();
 
         var result = _engine.RunScheduler();
@@ -382,8 +384,8 @@ public class SchedulingEngineTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("TL-001", "Low Priority", 3, 1, 10));
-        _db.Tasks.Add(TaskItem.Create("TH-001", "High Priority", 3, 1, 1));
+        _db.Tasks.Add(TaskItem.Create("TL-001", "Low Priority", 1, 10, B(3)));
+        _db.Tasks.Add(TaskItem.Create("TH-001", "High Priority", 1, 1, B(3)));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -403,7 +405,7 @@ public class SchedulingEngineTests : IDisposable
 
         var futureDate = DateTime.Today.AddDays(60);
 
-        _db.Tasks.Add(TaskItem.Create("TS-001", "Strict Deadline", 10, 1, 5, strictDate: futureDate));
+        _db.Tasks.Add(TaskItem.Create("TS-001", "Strict Deadline", 1, 5, B(10), strictDate: futureDate));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -419,7 +421,7 @@ public class SchedulingEngineTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("TD-001", "Date Test", 5, 1, 5));
+        _db.Tasks.Add(TaskItem.Create("TD-001", "Date Test", 1, 5, B(5)));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -448,7 +450,7 @@ public class SchedulingEngineTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("SM-001", "Small Task", 1, 1, 5));
+        _db.Tasks.Add(TaskItem.Create("SM-001", "Small Task", 1, 5, B(1)));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -569,6 +571,8 @@ public class SchedulingEngineMonFriTests : IDisposable
     private readonly PlannerDbContext _db;
     private readonly SchedulingEngine _engine;
 
+    private static List<(string, double, double)> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
+
     public SchedulingEngineMonFriTests(SqlServerFixture fixture)
     {
         var (options, _) = TestDatabaseHelper.CreateOptions(fixture);
@@ -631,7 +635,7 @@ public class SchedulingEngineMonFriTests : IDisposable
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("MF-001", "Mon-Fri Test", 3, 1, 5));
+        _db.Tasks.Add(TaskItem.Create("MF-001", "Mon-Fri Test", 1, 5, B(3)));
         _db.SaveChanges();
 
         _engine.RunScheduler();

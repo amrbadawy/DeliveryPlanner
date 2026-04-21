@@ -219,7 +219,7 @@ else
                     {
                         <tr data-testid="resources-row-@r.ResourceId">
                             <td>@r.ResourceId</td>
-                            <td>@r.ResourceName</td>
+                            <td><a href="/resources/@r.ResourceId" data-testid="resources-link-@r.ResourceId">@r.ResourceName</a></td>
                             <td>@r.Role</td>
                             <td>@r.Team</td>
                             <td>@r.AvailabilityPct%</td>

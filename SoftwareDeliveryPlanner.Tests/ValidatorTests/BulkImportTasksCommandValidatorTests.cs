@@ -7,9 +7,15 @@ public class BulkImportTasksCommandValidatorTests
 {
     private readonly BulkImportTasksCommandValidator _validator = new();
 
+    private static List<EffortBreakdownInput> ValidEB() => new()
+    {
+        new EffortBreakdownInput("DEV", 5, 0),
+        new EffortBreakdownInput("QA", 1, 0)
+    };
+
     private static BulkImportTasksCommand Valid() => new(new List<BulkTaskRowDto>
     {
-        new("SVC-001", "Test Service", 5.0, 1.0, 1, null, null)
+        new("SVC-001", "Test Service", 1.0, 1, ValidEB(), null, null)
     });
 
     [Fact]
@@ -29,7 +35,7 @@ public class BulkImportTasksCommandValidatorTests
     [Fact]
     public void EmptyTaskId_FailsValidation()
     {
-        var command = Valid() with { Tasks = new List<BulkTaskRowDto> { new("", "Test Service", 5.0, 1.0, 1, null, null) } };
+        var command = Valid() with { Tasks = new List<BulkTaskRowDto> { new("", "Test Service", 1.0, 1, ValidEB(), null, null) } };
         var result = _validator.TestValidate(command);
         Assert.False(result.IsValid);
     }
@@ -37,23 +43,28 @@ public class BulkImportTasksCommandValidatorTests
     [Fact]
     public void EmptyServiceName_FailsValidation()
     {
-        var command = Valid() with { Tasks = new List<BulkTaskRowDto> { new("SVC-001", "", 5.0, 1.0, 1, null, null) } };
+        var command = Valid() with { Tasks = new List<BulkTaskRowDto> { new("SVC-001", "", 1.0, 1, ValidEB(), null, null) } };
         var result = _validator.TestValidate(command);
         Assert.False(result.IsValid);
     }
 
     [Fact]
-    public void DevEstimationZero_FailsValidation()
+    public void EffortBreakdownEmpty_FailsValidation()
     {
-        var command = Valid() with { Tasks = new List<BulkTaskRowDto> { new("SVC-001", "Test Service", 0, 1.0, 1, null, null) } };
+        var command = Valid() with { Tasks = new List<BulkTaskRowDto> { new("SVC-001", "Test Service", 1.0, 1, new List<EffortBreakdownInput>(), null, null) } };
         var result = _validator.TestValidate(command);
         Assert.False(result.IsValid);
     }
 
     [Fact]
-    public void DevEstimationNegative_FailsValidation()
+    public void EffortBreakdownZeroEstimation_FailsValidation()
     {
-        var command = Valid() with { Tasks = new List<BulkTaskRowDto> { new("SVC-001", "Test Service", -1, 1.0, 1, null, null) } };
+        var badEB = new List<EffortBreakdownInput>
+        {
+            new("DEV", 0, 0),
+            new("QA", 0, 0)
+        };
+        var command = Valid() with { Tasks = new List<BulkTaskRowDto> { new("SVC-001", "Test Service", 1.0, 1, badEB, null, null) } };
         var result = _validator.TestValidate(command);
         Assert.False(result.IsValid);
     }

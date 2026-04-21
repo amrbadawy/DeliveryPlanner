@@ -28,6 +28,7 @@ internal sealed class ScenarioOrchestrator : ServiceBase, IScenarioOrchestrator
         await using var db = await ReadOnlyDbFactory.CreateDbContextAsync();
         return await db.PlanScenarios
             .Include(s => s.TaskSnapshots)
+                .ThenInclude(ts => ts.EffortSnapshots)
             .FirstOrDefaultAsync(s => s.Id == id);
     }
 
@@ -48,6 +49,10 @@ internal sealed class ScenarioOrchestrator : ServiceBase, IScenarioOrchestrator
 
         foreach (var task in tasks)
         {
+            var effortData = task.EffortBreakdown
+                .Select(e => (e.Role, e.EstimationDays, e.OverlapPct, e.SortOrder))
+                .ToList();
+
             var snapshot = ScenarioTaskSnapshot.Create(
                 scenario.Id,
                 task.TaskId,
@@ -60,11 +65,12 @@ internal sealed class ScenarioOrchestrator : ServiceBase, IScenarioOrchestrator
                 task.StrictDate,
                 task.AssignedResourceId,
                 task.AssignedResource,
-                task.DevEstimation,
                 task.MaxResource,
                 task.Status,
                 task.DeliveryRisk,
-                task.DependsOnTaskIds);
+                task.DependsOnTaskIds,
+                task.Phase,
+                effortData);
 
             db.ScenarioTaskSnapshots.Add(snapshot);
         }

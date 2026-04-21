@@ -3,15 +3,20 @@ using SoftwareDeliveryPlanner.SharedKernel;
 
 namespace SoftwareDeliveryPlanner.Application.Tasks.Commands;
 
+public sealed record EffortBreakdownInput(string Role, double EstimationDays, double OverlapPct);
+
 public sealed record UpsertTaskCommand(
     int Id,
     string TaskId,
     string ServiceName,
-    double DevEstimation,
     double MaxResource,
     int Priority,
+    List<EffortBreakdownInput> EffortBreakdown,
     DateTime? StrictDate,
     string? DependsOnTaskIds,
-    bool IsNew) : IRequest<Result>;
+    bool IsNew,
+    DateTime? OverrideStart = null,
+    string? Phase = null,
+    string? PreferredResourceIds = null) : IRequest<Result>;
 
 public sealed record DeleteTaskCommand(int Id) : IRequest<Result>;

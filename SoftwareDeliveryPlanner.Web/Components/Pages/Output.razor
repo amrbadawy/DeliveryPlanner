@@ -123,11 +123,11 @@ else
                             <td>@item.Num</td>
                             <td>@item.TaskId</td>
                             <td>@item.ServiceName</td>
-                            <td>@item.AssignedResource</td>
+                            <td>@item.AssignedResourceIds</td>
                             <td>@item.PlannedStart</td>
                             <td>@item.PlannedFinish</td>
                             <td>@item.Duration</td>
-                            <td>@item.DevEstimation</td>
+                            <td>@item.TotalEstimationDays</td>
                             <td>@item.StrictDate</td>
                             <td>
                                 <span class="badge bg-@GetStatusColor(item.Status)">
@@ -294,12 +294,12 @@ else
             }
 
             var csv = new System.Text.StringBuilder();
-            csv.AppendLine("Num,Task ID,Service,Resource,Start,Finish,Days,Est,Strict,Status,Risk");
+            csv.AppendLine("Num,Task ID,Service,Resources,Start,Finish,Days,Est,Strict,Status,Risk,Phase");
 
             foreach (var item in output)
             {
                 var service = item.ServiceName.Replace(",", ";").Replace("\r", " ").Replace("\n", " ");
-                csv.AppendLine($"{item.Num},{item.TaskId},{service},{item.AssignedResource?.ToString() ?? ""},{item.PlannedStart ?? ""},{item.PlannedFinish ?? ""},{item.Duration?.ToString() ?? ""},{item.DevEstimation},{item.StrictDate ?? ""},{item.Status},{item.DeliveryRisk}");
+                csv.AppendLine($"{item.Num},{item.TaskId},{service},{item.AssignedResourceIds ?? ""},{item.PlannedStart ?? ""},{item.PlannedFinish ?? ""},{item.Duration?.ToString() ?? ""},{item.TotalEstimationDays},{item.StrictDate ?? ""},{item.Status},{item.DeliveryRisk},{item.Phase ?? ""}");
             }
 
             var fileName = $"delivery_plan_{DateTime.Now:yyyyMMdd_HHmmss}.csv";

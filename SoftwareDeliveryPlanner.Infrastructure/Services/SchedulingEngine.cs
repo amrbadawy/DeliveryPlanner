@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.EntityFrameworkCore;
 using SoftwareDeliveryPlanner.Application.Abstractions;
 using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Domain;
@@ -89,6 +90,43 @@ internal class SchedulingEngine : ISchedulingEngine
         return daysSinceRef * 100 + priorityComponent;
     }
 
+    /// <summary>
+    /// Computes per-resource effective hours for a given date, accounting for availability and adjustments.
+    /// Returns a dictionary of ResourceId → available hours for that day.
+    /// </summary>
+    private Dictionary<string, double> CalculatePerResourceHours(DateTime date, List<TeamMember> resources, List<Adjustment> adjustments)
+    {
+        var result = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var resource in resources)
+        {
+            if (resource.Active != DomainConstants.ActiveStatus.Yes) continue;
+            if (date < resource.StartDate) continue;
+            if (resource.EndDate.HasValue && date > resource.EndDate.Value) continue;
+
+            double capacity = resource.DailyCapacity * (resource.AvailabilityPct / 100.0);
+
+            // Apply adjustments
+            var resourceAdjs = adjustments.Where(a => a.ResourceId == resource.ResourceId).ToList();
+            foreach (var adj in resourceAdjs)
+            {
+                if (adj.AdjStart <= date && adj.AdjEnd >= date)
+                {
+                    capacity *= adj.AvailabilityPct / 100.0;
+                }
+            }
+
+            var hours = capacity * DomainConstants.HoursPerDay;
+            if (hours > 0)
+                result[resource.ResourceId] = hours;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Computes the total effective capacity in resource-units for a given date (for CalendarDay).
+    /// </summary>
     private double CalculateEffectiveCapacity(DateTime date, List<TeamMember> resources, List<Adjustment> adjustments)
     {
         double totalCapacity = 0;
@@ -96,13 +134,11 @@ internal class SchedulingEngine : ISchedulingEngine
         foreach (var resource in resources)
         {
             if (resource.Active != DomainConstants.ActiveStatus.Yes) continue;
-
             if (date < resource.StartDate) continue;
             if (resource.EndDate.HasValue && date > resource.EndDate.Value) continue;
 
             double capacity = resource.DailyCapacity * (resource.AvailabilityPct / 100.0);
 
-            // Apply adjustments
             var resourceAdjs = adjustments.Where(a => a.ResourceId == resource.ResourceId).ToList();
             foreach (var adj in resourceAdjs)
             {
@@ -143,7 +179,7 @@ internal class SchedulingEngine : ISchedulingEngine
         var planStart = DateTime.TryParse(planStartSetting?.Value, out var ps) ? ps : new DateTime(2026, 5, 1);
         var endDate = planStart.AddDays(730);
 
-        var tasks = _db.Tasks.ToList();
+        var tasks = _db.Tasks.Include(t => t.EffortBreakdown).ToList();
         var resources = _db.Resources.ToList();
         var adjustments = _db.Adjustments.ToList();
 
@@ -181,7 +217,7 @@ internal class SchedulingEngine : ISchedulingEngine
         while (current <= endDate)
         {
             var isWorking = IsWorkingDay(current);
-            var holiday = GetHolidayForDate(current);  // Uses cache, no DB query
+            var holiday = GetHolidayForDate(current);
 
             var baseCap = isWorking ? CalculateEffectiveCapacity(current, resources, adjustments) : 0;
 
@@ -206,113 +242,245 @@ internal class SchedulingEngine : ISchedulingEngine
         _db.Calendar.AddRange(calendar);
         _db.SaveChanges();
 
-        // Run allocation
+        // Run per-resource allocation
         _db.Allocations.RemoveRange(_db.Allocations);
 
         var allocations = new List<Allocation>();
-        var taskEffort = tasks.ToDictionary(t => t.TaskId, t => 0.0);
-        var taskStartDate = tasks.ToDictionary(t => t.TaskId, t => (DateTime?)null);
-        var taskPeakDevs = tasks.ToDictionary(t => t.TaskId, t => 0.0);
-        var taskAllocations = tasks.ToDictionary(t => t.TaskId, t => new List<Allocation>());
         var allocCounter = 1;
+
+        // State tracking
+        // usedHours[resourceId][date] = hours already consumed
+        var usedHours = new Dictionary<string, Dictionary<DateTime, double>>(StringComparer.OrdinalIgnoreCase);
+        // phaseCompletedHours[taskId][role] = hours completed
+        var phaseCompletedHours = new Dictionary<string, Dictionary<string, double>>(StringComparer.OrdinalIgnoreCase);
+        // phaseStartDate[taskId][role] = first allocation date
+        var phaseStartDate = new Dictionary<string, Dictionary<string, DateTime?>>(StringComparer.OrdinalIgnoreCase);
+        // phaseFinishDate[taskId][role] = last allocation date when phase completes
+        var phaseFinishDate = new Dictionary<string, Dictionary<string, DateTime?>>(StringComparer.OrdinalIgnoreCase);
+        // taskResourceIds[taskId] = set of assigned resource IDs
+        var taskResourceIds = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+        // Build resource lookup by role
+        var resourcesByRole = resources
+            .Where(r => r.Active == DomainConstants.ActiveStatus.Yes)
+            .GroupBy(r => r.Role, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        // Initialize state for all tasks
+        foreach (var task in tasks)
+        {
+            phaseCompletedHours[task.TaskId] = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            phaseStartDate[task.TaskId] = new Dictionary<string, DateTime?>(StringComparer.OrdinalIgnoreCase);
+            phaseFinishDate[task.TaskId] = new Dictionary<string, DateTime?>(StringComparer.OrdinalIgnoreCase);
+            taskResourceIds[task.TaskId] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var phase in task.EffortBreakdown)
+            {
+                phaseCompletedHours[task.TaskId][phase.Role] = 0;
+                phaseStartDate[task.TaskId][phase.Role] = null;
+                phaseFinishDate[task.TaskId][phase.Role] = null;
+            }
+        }
+
+        // Build task lookup for dependency checking
+        var taskLookup = tasks.ToDictionary(t => t.TaskId, StringComparer.OrdinalIgnoreCase);
 
         foreach (var calRow in calendar.Where(c => c.IsWorkingDay))
         {
             var calDate = calRow.CalendarDate;
             var calDateKey = calRow.DateKey;
-            var remainingCap = calRow.EffectiveCapacity;
+
+            // Compute per-resource available hours for this day
+            var perResourceHours = CalculatePerResourceHours(calDate, resources, adjustments);
 
             foreach (var task in tasks)
             {
                 var taskId = task.TaskId;
-                var maxResource = task.MaxResource;
-                var estimation = task.DevEstimation;
-                var overrideStart = task.OverrideStart;
-                var overrideResource = task.OverrideResource;
+                var breakdown = task.EffortBreakdown.OrderBy(e => e.SortOrder).ToList();
 
-                // Check override constraints
-                if (overrideStart.HasValue && calDate < overrideStart.Value.Date)
+                if (breakdown.Count == 0) continue;
+
+                // Skip if all phases complete
+                var allPhasesComplete = breakdown.All(p =>
+                    phaseCompletedHours[taskId].GetValueOrDefault(p.Role) >= p.EstimationDays * DomainConstants.HoursPerDay);
+                if (allPhasesComplete) continue;
+
+                // Skip if before OverrideStart
+                if (task.OverrideStart.HasValue && calDate < task.OverrideStart.Value.Date)
                     continue;
 
                 // Check dependency constraints: all prerequisites must be fully completed
                 if (dependencyMap.TryGetValue(taskId, out var deps) && deps.Count > 0)
                 {
                     var allDepsCompleted = deps.All(depId =>
-                        taskEffort.ContainsKey(depId) &&
-                        tasks.Any(t => t.TaskId.Equals(depId, StringComparison.OrdinalIgnoreCase) &&
-                                       taskEffort[depId] >= t.DevEstimation));
+                    {
+                        if (!taskLookup.TryGetValue(depId, out var depTask)) return false;
+                        var depBreakdown = depTask.EffortBreakdown.OrderBy(e => e.SortOrder).ToList();
+                        return depBreakdown.All(p =>
+                            phaseCompletedHours.GetValueOrDefault(depId)?.GetValueOrDefault(p.Role) >= p.EstimationDays * DomainConstants.HoursPerDay);
+                    });
                     if (!allDepsCompleted)
                         continue;
                 }
 
-                var remainingEffort = estimation - taskEffort[taskId];
-                if (remainingEffort <= 0) continue;
-
-                double alloc;
-                if (overrideResource.HasValue)
-                    alloc = Math.Min(overrideResource.Value, Math.Min(maxResource, remainingCap));
-                else
-                    alloc = Math.Min(maxResource, Math.Min(remainingCap, remainingEffort));
-
-                // Apply minimum increment (0.5)
-                if (alloc >= 0.5)
-                    alloc = 0.5 * Math.Floor(alloc / 0.5);
-
-                if (alloc < 0.5) continue;
-
-                // Allocate
-                var allocId = $"ALLOC-{allocCounter++:D6}";
-                var newAlloc = new Allocation
+                // Parse preferred resources once per task
+                var preferredSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (!string.IsNullOrWhiteSpace(task.PreferredResourceIds))
                 {
-                    AllocationId = allocId,
-                    TaskId = taskId,
-                    DateKey = calDateKey,
-                    CalendarDate = calDate,
-                    SchedRank = task.SchedulingRank,
-                    MaxResource = maxResource,
-                    AvailableCapacity = remainingCap,
-                    AssignedResource = alloc,
-                    CumulativeEffort = taskEffort[taskId] + alloc,
-                    IsComplete = (taskEffort[taskId] + alloc) >= estimation,
-                    ServiceStatus = (taskEffort[taskId] + alloc) >= estimation ? DomainConstants.TaskStatus.Completed : DomainConstants.TaskStatus.InProgress
-                };
+                    foreach (var pref in task.PreferredResourceIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        preferredSet.Add(pref);
+                    }
+                }
 
-                if (!taskStartDate[taskId].HasValue)
-                    taskStartDate[taskId] = calDate;
+                // Find the first incomplete phase to work on
+                foreach (var phase in breakdown)
+                {
+                    var phaseIndex = breakdown.IndexOf(phase);
+                    var totalPhaseHours = phase.EstimationDays * DomainConstants.HoursPerDay;
+                    var completedHours = phaseCompletedHours[taskId].GetValueOrDefault(phase.Role);
 
-                taskEffort[taskId] += alloc;
-                taskPeakDevs[taskId] = Math.Max(taskPeakDevs[taskId], alloc);
-                taskAllocations[taskId].Add(newAlloc);
-                allocations.Add(newAlloc);
+                    if (completedHours >= totalPhaseHours)
+                        continue; // phase already complete
 
-                remainingCap -= alloc;
-                if (remainingCap < 0.5) break;
+                    // Check overlap constraint with previous phase
+                    if (phaseIndex > 0)
+                    {
+                        var prevPhase = breakdown[phaseIndex - 1];
+                        var prevCompleted = phaseCompletedHours[taskId].GetValueOrDefault(prevPhase.Role);
+                        var prevTotal = prevPhase.EstimationDays * DomainConstants.HoursPerDay;
+                        var requiredPct = (100.0 - phase.OverlapPct) / 100.0;
+                        if (prevCompleted < prevTotal * requiredPct)
+                            continue; // can't start this phase yet
+                    }
+
+                    // This is the active phase — allocate resources
+                    var remainingHours = totalPhaseHours - phaseCompletedHours[taskId].GetValueOrDefault(phase.Role);
+
+                    // Find eligible resources matching phase.Role
+                    List<TeamMember> eligible;
+                    if (resourcesByRole.TryGetValue(phase.Role, out var roleResources))
+                    {
+                        eligible = roleResources.Where(r =>
+                        {
+                            if (!perResourceHours.ContainsKey(r.ResourceId)) return false;
+                            var used = usedHours.GetValueOrDefault(r.ResourceId)?.GetValueOrDefault(calDate) ?? 0;
+                            var available = perResourceHours[r.ResourceId] - used;
+                            return available >= DomainConstants.MinAllocationHours;
+                        }).ToList();
+                    }
+                    else
+                    {
+                        eligible = new List<TeamMember>();
+                    }
+
+                    // Sort: preferred first, then most available (least loaded)
+                    eligible = eligible
+                        .OrderByDescending(r => preferredSet.Contains(r.ResourceId) ? 1 : 0)
+                        .ThenByDescending(r => perResourceHours[r.ResourceId] - (usedHours.GetValueOrDefault(r.ResourceId)?.GetValueOrDefault(calDate) ?? 0))
+                        .ToList();
+
+                    int resourcesAssigned = 0;
+                    var maxResources = (int)Math.Ceiling(task.MaxResource);
+
+                    foreach (var resource in eligible)
+                    {
+                        if (resourcesAssigned >= maxResources) break;
+                        if (remainingHours <= 0) break;
+
+                        var used = usedHours.GetValueOrDefault(resource.ResourceId)?.GetValueOrDefault(calDate) ?? 0;
+                        var available = perResourceHours[resource.ResourceId] - used;
+                        var give = Math.Min(available, remainingHours);
+                        give = DomainConstants.MinAllocationHours * Math.Floor(give / DomainConstants.MinAllocationHours);
+                        if (give < DomainConstants.MinAllocationHours) continue;
+
+                        var newCumulative = phaseCompletedHours[taskId].GetValueOrDefault(phase.Role) + give;
+                        var isPhaseComplete = newCumulative >= totalPhaseHours;
+
+                        var newAlloc = new Allocation
+                        {
+                            AllocationId = $"ALLOC-{allocCounter++:D6}",
+                            TaskId = taskId,
+                            ResourceId = resource.ResourceId,
+                            Role = phase.Role,
+                            DateKey = calDateKey,
+                            CalendarDate = calDate,
+                            SchedRank = task.SchedulingRank,
+                            HoursAllocated = give,
+                            CumulativeEffort = newCumulative,
+                            IsComplete = isPhaseComplete,
+                            ServiceStatus = isPhaseComplete ? DomainConstants.TaskStatus.Completed : DomainConstants.TaskStatus.InProgress
+                        };
+
+                        allocations.Add(newAlloc);
+
+                        // Update used hours
+                        if (!usedHours.ContainsKey(resource.ResourceId))
+                            usedHours[resource.ResourceId] = new Dictionary<DateTime, double>();
+                        if (!usedHours[resource.ResourceId].ContainsKey(calDate))
+                            usedHours[resource.ResourceId][calDate] = 0;
+                        usedHours[resource.ResourceId][calDate] += give;
+
+                        phaseCompletedHours[taskId][phase.Role] += give;
+                        taskResourceIds[taskId].Add(resource.ResourceId);
+                        remainingHours -= give;
+                        resourcesAssigned++;
+
+                        if (!phaseStartDate[taskId][phase.Role].HasValue)
+                            phaseStartDate[taskId][phase.Role] = calDate;
+
+                        if (remainingHours <= 0)
+                        {
+                            phaseFinishDate[taskId][phase.Role] = calDate;
+                            break;
+                        }
+                    }
+
+                    break; // Only work on first incomplete phase per task per day
+                }
             }
         }
 
         _db.Allocations.AddRange(allocations);
 
-        // Update tasks
+        // Update tasks with scheduling results
         foreach (var task in tasks)
         {
             var taskId = task.TaskId;
-            var taskAllocs = taskAllocations[taskId];
+            var breakdown = task.EffortBreakdown.OrderBy(e => e.SortOrder).ToList();
 
-            DateTime? plannedStart = taskAllocs.FirstOrDefault()?.CalendarDate;
-            DateTime? plannedFinish = taskAllocs.LastOrDefault(a => a.AssignedResource > 0)?.CalendarDate;
-            double peakResource = taskPeakDevs[taskId];
+            var starts = phaseStartDate.GetValueOrDefault(taskId)?.Values.Where(d => d.HasValue).Select(d => d!.Value).ToList()
+                ?? new List<DateTime>();
+            var finishes = phaseFinishDate.GetValueOrDefault(taskId)?.Values.Where(d => d.HasValue).Select(d => d!.Value).ToList()
+                ?? new List<DateTime>();
 
-            int duration = 0;
-            if (plannedStart.HasValue && plannedFinish.HasValue)
-                duration = GetWorkingDaysBetween(plannedStart.Value, plannedFinish.Value);
+            DateTime? plannedStart = starts.Any() ? starts.Min() : null;
+            DateTime? plannedFinish = finishes.Any() ? finishes.Max() : null;
+
+            // Check if all phases are complete
+            var allComplete = breakdown.Count > 0 && breakdown.All(p =>
+                phaseCompletedHours.GetValueOrDefault(taskId)?.GetValueOrDefault(p.Role) >= p.EstimationDays * DomainConstants.HoursPerDay);
 
             string status;
             if (!plannedStart.HasValue)
                 status = DomainConstants.TaskStatus.NotStarted;
-            else if (taskEffort[taskId] >= task.DevEstimation)
+            else if (allComplete)
                 status = DomainConstants.TaskStatus.Completed;
             else
                 status = DomainConstants.TaskStatus.InProgress;
+
+            var resIds = taskResourceIds.GetValueOrDefault(taskId) ?? new HashSet<string>();
+            var assignedResourceId = resIds.Count > 0 ? string.Join(",", resIds.OrderBy(r => r)) : null;
+
+            // Peak resource count: max resources allocated on any single day
+            var taskAllocs = allocations.Where(a => a.TaskId.Equals(taskId, StringComparison.OrdinalIgnoreCase)).ToList();
+            var peakResource = taskAllocs.Count > 0
+                ? taskAllocs.GroupBy(a => a.CalendarDate).Max(g => g.Count())
+                : 0;
+
+            int duration = 0;
+            if (plannedStart.HasValue && plannedFinish.HasValue)
+                duration = GetWorkingDaysBetween(plannedStart.Value, plannedFinish.Value);
 
             string risk = CalculateRisk(plannedFinish, task.StrictDate);
 
@@ -322,19 +490,20 @@ internal class SchedulingEngine : ISchedulingEngine
                 plannedFinish: plannedFinish,
                 duration: duration,
                 status: status,
-                deliveryRisk: risk);
+                deliveryRisk: risk,
+                assignedResourceId: assignedResourceId);
         }
 
         // Update calendar reserved/remaining capacity
         foreach (var calRow in calendar)
         {
             var dayAllocs = allocations.Where(a => a.CalendarDate.Date == calRow.CalendarDate.Date).ToList();
-            var reserved = dayAllocs.Sum(a => a.AssignedResource);
-            calRow.ReservedCapacity = reserved;
-            calRow.RemainingCapacity = calRow.EffectiveCapacity - reserved;
+            var reservedHours = dayAllocs.Sum(a => a.HoursAllocated);
+            calRow.ReservedCapacity = reservedHours / DomainConstants.HoursPerDay;
+            calRow.RemainingCapacity = calRow.EffectiveCapacity - calRow.ReservedCapacity;
 
             var existing = _db.Calendar.First(c => c.DateKey == calRow.DateKey);
-            existing.ReservedCapacity = reserved;
+            existing.ReservedCapacity = calRow.ReservedCapacity;
             existing.RemainingCapacity = calRow.RemainingCapacity;
         }
 
@@ -352,11 +521,11 @@ internal class SchedulingEngine : ISchedulingEngine
 
     public Dictionary<string, object> GetDashboardKPIs()
     {
-        var tasks = _db.Tasks.ToList();
+        var tasks = _db.Tasks.Include(t => t.EffortBreakdown).ToList();
         var resources = _db.Resources.Where(r => r.Active == DomainConstants.ActiveStatus.Yes).ToList();
 
         var totalServices = tasks.Count;
-        var totalEstimation = tasks.Sum(t => t.DevEstimation);
+        var totalEstimation = tasks.Sum(t => t.TotalEstimationDays);
         var totalCapacity = resources.Sum(r => r.DailyCapacity * r.AvailabilityPct / 100.0);
         var activeResources = resources.Count;
 
@@ -395,7 +564,7 @@ internal class SchedulingEngine : ISchedulingEngine
 
     public List<OutputPlanRowDto> GetOutputPlan()
     {
-        var tasks = _db.Tasks.OrderBy(t => t.SchedulingRank).ToList();
+        var tasks = _db.Tasks.Include(t => t.EffortBreakdown).OrderBy(t => t.SchedulingRank).ToList();
         var output = new List<OutputPlanRowDto>();
 
         for (int i = 0; i < tasks.Count; i++)
@@ -405,14 +574,15 @@ internal class SchedulingEngine : ISchedulingEngine
                 Num: i + 1,
                 TaskId: task.TaskId,
                 ServiceName: task.ServiceName,
-                AssignedResource: task.AssignedResource,
+                AssignedResourceIds: task.AssignedResourceId,
                 PlannedStart: task.PlannedStart?.ToString("yyyy-MM-dd"),
                 PlannedFinish: task.PlannedFinish?.ToString("yyyy-MM-dd"),
                 Duration: task.Duration,
-                DevEstimation: task.DevEstimation,
+                TotalEstimationDays: task.TotalEstimationDays,
                 StrictDate: task.StrictDate?.ToString("yyyy-MM-dd"),
                 Status: task.Status,
-                DeliveryRisk: task.DeliveryRisk));
+                DeliveryRisk: task.DeliveryRisk,
+                Phase: task.Phase));
         }
 
         return output;

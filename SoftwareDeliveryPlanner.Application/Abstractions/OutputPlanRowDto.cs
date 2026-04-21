@@ -9,11 +9,12 @@ public sealed record OutputPlanRowDto(
     int Num,
     string TaskId,
     string ServiceName,
-    double? AssignedResource,
+    string? AssignedResourceIds,
     string? PlannedStart,
     string? PlannedFinish,
     int? Duration,
-    double DevEstimation,
+    double TotalEstimationDays,
     string? StrictDate,
     string Status,
-    string DeliveryRisk);
+    string DeliveryRisk,
+    string? Phase);

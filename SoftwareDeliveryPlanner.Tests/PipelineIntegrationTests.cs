@@ -33,6 +33,14 @@ public abstract class PipelineFixture : IAsyncDisposable
 {
     protected readonly IServiceProvider Services;
 
+    private static List<EffortBreakdownInput> EB(double dev) => new()
+    {
+        new EffortBreakdownInput("DEV", dev, 0),
+        new EffortBreakdownInput("QA", Math.Max(1, dev * 0.2), 0)
+    };
+
+    protected static List<EffortBreakdownInput> MakeEffortBreakdown(double dev) => EB(dev);
+
     protected PipelineFixture(SqlServerFixture fixture)
     {
         var connectionString = fixture.CreateDatabaseConnectionString();
@@ -96,9 +104,9 @@ public class Pipeline_UpsertTaskTests : PipelineFixture
             Id: 0,
             TaskId: "SVC-100",
             ServiceName: "Pipeline Test Service",
-            DevEstimation: 10,
             MaxResource: 2,
             Priority: 5,
+            EffortBreakdown: MakeEffortBreakdown(10),
             StrictDate: null,
             DependsOnTaskIds: null,
             IsNew: true);
@@ -119,9 +127,9 @@ public class Pipeline_UpsertTaskTests : PipelineFixture
             Id: 0,
             TaskId: "SVC-101",
             ServiceName: "",
-            DevEstimation: 10,
             MaxResource: 2,
             Priority: 5,
+            EffortBreakdown: MakeEffortBreakdown(10),
             StrictDate: null,
             DependsOnTaskIds: null,
             IsNew: true);
@@ -140,9 +148,13 @@ public class Pipeline_UpsertTaskTests : PipelineFixture
             Id: 0,
             TaskId: "SVC-102",
             ServiceName: "Valid Name",
-            DevEstimation: 0,
             MaxResource: 2,
             Priority: 5,
+            EffortBreakdown: new List<EffortBreakdownInput>
+            {
+                new("DEV", 0, 0),
+                new("QA", 0, 0)
+            },
             StrictDate: null,
             DependsOnTaskIds: null,
             IsNew: true);
@@ -431,9 +443,9 @@ public class Pipeline_CrossEntityTests : PipelineFixture
             Id: existing.Id,
             TaskId: existing.TaskId,
             ServiceName: "Updated Service Name",
-            DevEstimation: existing.DevEstimation + 5,
             MaxResource: existing.MaxResource,
             Priority: existing.Priority,
+            EffortBreakdown: MakeEffortBreakdown(existing.TotalEstimationDays + 5),
             StrictDate: existing.StrictDate,
             DependsOnTaskIds: null,
             IsNew: false);
@@ -442,7 +454,11 @@ public class Pipeline_CrossEntityTests : PipelineFixture
 
         var updated = (await mediator.Send(new GetTasksQuery())).Value.First(t => t.TaskId == existing.TaskId);
         Assert.Equal("Updated Service Name", updated.ServiceName);
-        Assert.Equal(existing.DevEstimation + 5, updated.DevEstimation);
+        // MakeEffortBreakdown(dev) produces DEV=dev + QA=Max(1, dev*0.2),
+        // so TotalEstimationDays = dev + QA, not just dev.
+        var newDev = existing.TotalEstimationDays + 5;
+        var expectedTotal = newDev + Math.Max(1, newDev * 0.2);
+        Assert.Equal(expectedTotal, updated.TotalEstimationDays, 1);
     }
 }
 
@@ -501,9 +517,9 @@ public class Pipeline_TaskDependencyTests : PipelineFixture
             Id: 0,
             TaskId: "PRE-001",
             ServiceName: "Prerequisite",
-            DevEstimation: 5,
             MaxResource: 1,
             Priority: 1,
+            EffortBreakdown: MakeEffortBreakdown(5),
             StrictDate: null,
             DependsOnTaskIds: null,
             IsNew: true));
@@ -513,9 +529,9 @@ public class Pipeline_TaskDependencyTests : PipelineFixture
             Id: 0,
             TaskId: "DEP-001",
             ServiceName: "Dependent",
-            DevEstimation: 3,
             MaxResource: 1,
             Priority: 1,
+            EffortBreakdown: MakeEffortBreakdown(3),
             StrictDate: null,
             DependsOnTaskIds: "PRE-001",
             IsNew: true));
@@ -739,9 +755,9 @@ public class Pipeline_RoundTripTests : PipelineFixture
             Id: 0,
             TaskId: "RT-001",
             ServiceName: "Round Trip Service",
-            DevEstimation: 5,
             MaxResource: 1,
             Priority: 3,
+            EffortBreakdown: MakeEffortBreakdown(5),
             StrictDate: null,
             DependsOnTaskIds: null,
             IsNew: true));
@@ -774,9 +790,9 @@ public class Pipeline_RoundTripTests : PipelineFixture
             Id: existing.Id,
             TaskId: existing.TaskId,
             ServiceName: existing.ServiceName,
-            DevEstimation: existing.DevEstimation + 100,
             MaxResource: existing.MaxResource,
             Priority: existing.Priority,
+            EffortBreakdown: MakeEffortBreakdown(existing.TotalEstimationDays + 100),
             StrictDate: existing.StrictDate,
             DependsOnTaskIds: existing.DependsOnTaskIds,
             IsNew: false));
@@ -786,6 +802,8 @@ public class Pipeline_RoundTripTests : PipelineFixture
 
         // Verify updated estimation persisted
         var updated = (await mediator.Send(new GetTasksQuery())).Value.First(t => t.Id == existing.Id);
-        Assert.Equal(existing.DevEstimation + 100, updated.DevEstimation);
+        var devDays = existing.TotalEstimationDays + 100;
+        var expectedTotal = devDays + Math.Max(1, devDays * 0.2);
+        Assert.Equal(expectedTotal, updated.TotalEstimationDays, 1);
     }
 }

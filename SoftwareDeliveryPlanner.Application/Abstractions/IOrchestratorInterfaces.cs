@@ -8,9 +8,12 @@ public interface ITaskOrchestrator
     Task<TaskItem?> GetTaskByTaskIdAsync(string taskId, CancellationToken cancellationToken = default);
     Task<int> GetTaskCountAsync(CancellationToken cancellationToken = default);
     Task UpsertTaskAsync(
-        int id, string taskId, string serviceName, double devEstimation,
-        double maxResource, int priority, DateTime? strictDate,
-        string? dependsOnTaskIds, bool isNew,
+        int id, string taskId, string serviceName,
+        double maxResource, int priority,
+        List<(string Role, double EstimationDays, double OverlapPct)> effortBreakdown,
+        DateTime? strictDate, string? dependsOnTaskIds, bool isNew,
+        DateTime? overrideStart = null, string? phase = null,
+        string? preferredResourceIds = null,
         CancellationToken cancellationToken = default);
     Task DeleteTaskAsync(int id, CancellationToken cancellationToken = default);
 }
@@ -111,4 +114,5 @@ public interface IPlanningQueryService
     Task<List<Planning.Queries.RiskTrendPointDto>> GetRiskTrendAsync(int maxPoints);
     Task<List<Tasks.Queries.TaskAllocationDto>> GetTaskAllocationsAsync(string taskId, CancellationToken cancellationToken = default);
     Task<DateTime?> GetLastSchedulerRunAsync(CancellationToken cancellationToken = default);
+    Task<List<Planning.Queries.ResourceUtilizationDto>> GetResourceUtilizationAsync(CancellationToken cancellationToken = default);
 }

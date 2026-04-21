@@ -79,7 +79,50 @@ public static class DomainConstants
         public const string BA = "BA";
         public const string UX = "UX";
         public const string UI = "UI";
+
+        /// <summary>
+        /// Fixed pipeline execution order: BA → SA → UX → UI → DEV → QA.
+        /// The scheduler processes effort phases in this order.
+        /// Only roles present in a task's breakdown are executed; absent roles are skipped.
+        /// </summary>
+        public static readonly IReadOnlyList<string> PipelineOrder = new[]
+        {
+            BA,        // 1 – Business Analysis
+            SA,        // 2 – Solution Architecture
+            UX,        // 3 – User Experience Design
+            UI,        // 4 – UI Design
+            Developer, // 5 – Development
+            QA         // 6 – Quality Assurance
+        };
+
+        /// <summary>Required roles that every task must include in its effort breakdown.</summary>
+        public static readonly IReadOnlySet<string> RequiredRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { Developer, QA };
+
+        /// <summary>All valid role codes.</summary>
+        public static readonly IReadOnlySet<string> AllRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { BA, SA, UX, UI, Developer, QA };
+
+        /// <summary>Returns the pipeline sort order for a role (lower = earlier).</summary>
+        public static int GetPipelineSortOrder(string role) =>
+            PipelineOrder is List<string> list ? (list.IndexOf(role) is int idx and >= 0 ? idx + 1 : int.MaxValue) : int.MaxValue;
+
+        /// <summary>Human-readable display name for a role code.</summary>
+        public static string GetDisplayName(string role) => role switch
+        {
+            BA => "Business Analyst",
+            SA => "Solution Architect",
+            UX => "UX Designer",
+            UI => "UI Designer",
+            Developer => "Developer",
+            QA => "QA Engineer",
+            _ => role
+        };
     }
+
+    /// <summary>Hours per working day for scheduling calculations.</summary>
+    public const double HoursPerDay = 8.0;
+
+    /// <summary>Minimum allocation block in hours (half-day).</summary>
+    public const double MinAllocationHours = 4.0;
 
     /// <summary>Audit action types.</summary>
     public static class AuditAction
