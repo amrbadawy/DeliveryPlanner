@@ -39,9 +39,29 @@ test.describe('Navigation and dashboard', () => {
     await expect(page).toHaveURL(/\/output$/);
     await expect(page.getByRole('heading', { name: /Delivery Plan/ })).toBeVisible();
 
-    await page.getByTestId('nav-gantt').click();
+    // Items below may be outside the viewport in the nav sidebar — use dispatchEvent
+    // to bypass viewport restrictions (the sidebar has overflow:hidden on some viewports)
+    await page.getByTestId('nav-gantt').dispatchEvent('click');
     await expect(page).toHaveURL(/\/gantt$/);
     await expect(page.getByRole('heading', { name: /Gantt Chart/ })).toBeVisible();
+
+    // New analysis pages
+    await page.getByTestId('nav-overallocation').dispatchEvent('click');
+    await expect(page).toHaveURL(/\/overallocation$/);
+    await expect(page.getByRole('heading', { name: /Overallocation Alerts/ })).toBeVisible();
+
+    await page.getByTestId('nav-feasibility').dispatchEvent('click');
+    await expect(page).toHaveURL(/\/feasibility$/);
+    await expect(page.getByRole('heading', { name: /Capacity Feasibility/ })).toBeVisible();
+
+    await page.getByTestId('nav-forecast').dispatchEvent('click');
+    await expect(page).toHaveURL(/\/forecast$/);
+    await expect(page.getByRole('heading', { name: /Utilization Forecast/ })).toBeVisible();
+
+    // Configuration
+    await page.getByTestId('nav-settings').dispatchEvent('click');
+    await expect(page).toHaveURL(/\/settings$/);
+    await expect(page.getByRole('heading', { name: /Settings/ })).toBeVisible();
   });
 
   test('runs scheduler from dashboard and shows message', async ({ page }) => {

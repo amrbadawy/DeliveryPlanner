@@ -6,6 +6,8 @@ test.describe('Smoke suite', () => {
     await gotoPage(page, '/');
     await expect(page.getByRole('heading', { name: /Dashboard/ })).toBeVisible();
     await expect(page.getByTestId('btn-run-scheduler')).toBeVisible();
+    await expect(page.getByTestId('btn-preview-changes')).toBeVisible();
+    await expect(page.getByTestId('kpi-overallocation')).toBeVisible();
   });
 
   test('critical navigation works', async ({ page }) => {
@@ -25,6 +27,12 @@ test.describe('Smoke suite', () => {
     await page.waitForURL('**/output');
     await expect(page).toHaveURL(/\/output$/);
     await expect(page.getByTestId('output-table')).toBeVisible();
+
+    // New pages: settings and analysis
+    await page.getByTestId('nav-settings').click();
+    await page.waitForURL('**/settings');
+    await expect(page).toHaveURL(/\/settings$/);
+    await expect(page.getByRole('heading', { name: /Settings/ })).toBeVisible();
   });
 
   test('core CRUD entry points open modals', async ({ page }) => {
