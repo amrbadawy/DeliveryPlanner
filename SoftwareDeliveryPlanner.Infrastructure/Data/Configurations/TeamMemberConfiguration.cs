@@ -36,6 +36,14 @@ public sealed class TeamMemberConfiguration : IEntityTypeConfiguration<TeamMembe
         builder.Property(r => r.Notes)
             .HasMaxLength(500);
 
+        builder.Property(r => r.SeniorityLevel)
+            .IsRequired()
+            .HasMaxLength(20)
+            .HasDefaultValue("Mid");
+
+        builder.Property(r => r.WorkingWeek)
+            .HasMaxLength(20);
+
         builder.HasIndex(r => r.ResourceId)
             .IsUnique();
 

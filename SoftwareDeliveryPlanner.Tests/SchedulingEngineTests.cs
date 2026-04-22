@@ -12,7 +12,7 @@ public class SchedulingEngineTests : IDisposable
     private readonly PlannerDbContext _db;
     private readonly SchedulingEngine _engine;
 
-    private static List<(string, double, double)> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
+    private static List<EffortBreakdownSpec> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
 
     public SchedulingEngineTests(SqlServerFixture fixture)
     {
@@ -571,7 +571,7 @@ public class SchedulingEngineMonFriTests : IDisposable
     private readonly PlannerDbContext _db;
     private readonly SchedulingEngine _engine;
 
-    private static List<(string, double, double)> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
+    private static List<EffortBreakdownSpec> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
 
     public SchedulingEngineMonFriTests(SqlServerFixture fixture)
     {

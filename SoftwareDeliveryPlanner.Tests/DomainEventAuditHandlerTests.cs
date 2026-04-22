@@ -8,15 +8,20 @@ using SoftwareDeliveryPlanner.Infrastructure.Services;
 namespace SoftwareDeliveryPlanner.Tests;
 
 /// <summary>
+/// Captured audit log entry for test verification.
+/// </summary>
+internal sealed record AuditRecord(string Action, string EntityType, string EntityId, string Description);
+
+/// <summary>
 /// Records audit log calls for verification in tests.
 /// </summary>
 internal sealed class RecordingAuditService : IAuditService
 {
-    public List<(string Action, string EntityType, string EntityId, string Description)> Entries { get; } = new();
+    public List<AuditRecord> Entries { get; } = new();
 
     public Task LogAsync(string action, string entityType, string entityId, string description, string? oldValue = null, string? newValue = null)
     {
-        Entries.Add((action, entityType, entityId, description));
+        Entries.Add(new AuditRecord(action, entityType, entityId, description));
         return Task.CompletedTask;
     }
 

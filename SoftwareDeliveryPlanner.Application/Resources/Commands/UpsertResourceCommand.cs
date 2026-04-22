@@ -14,6 +14,8 @@ public sealed record UpsertResourceCommand(
     DateTime StartDate,
     string Active,
     string? Notes,
-    bool IsNew) : IRequest<Result>;
+    bool IsNew,
+    string? SeniorityLevel = null,
+    string? WorkingWeek = null) : IRequest<Result>;
 
 public sealed record DeleteResourceCommand(int Id) : IRequest<Result>;

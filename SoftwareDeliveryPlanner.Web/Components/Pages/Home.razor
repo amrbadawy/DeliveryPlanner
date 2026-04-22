@@ -17,7 +17,7 @@
         <h3 class="mb-1"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h3>
         <p class="page-subtitle">Overview of your delivery schedule and key metrics</p>
     </div>
-    <div>
+    <div class="d-flex gap-2">
         <button class="btn btn-primary" @onclick="RunScheduler" disabled="@isRunning" data-testid="btn-run-scheduler">
             @if (isRunning)
             {
@@ -28,6 +28,17 @@
                 <i class="bi bi-arrow-clockwise me-1"></i>
             }
             Run Scheduler
+        </button>
+        <button class="btn btn-outline-info" @onclick="PreviewChanges" disabled="@isPreviewing" data-testid="btn-preview-changes">
+            @if (isPreviewing)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+            }
+            else
+            {
+                <i class="bi bi-eye me-1"></i>
+            }
+            Preview Changes
         </button>
     </div>
 </div>
@@ -78,29 +89,35 @@ else
 
     <!-- KPI Row -->
     <div class="row g-3 mb-4">
-        <div class="col-md-3">
+        <div class="col">
             <div class="kpi-card p-3 kpi-clickable" @onclick='() => NavigateToTasks("", "")' @onkeydown="(e) => OnKpiKeyDown(e, string.Empty, string.Empty)" role="button" tabindex="0" title="View all tasks">
                 <div class="kpi-label">Total Services</div>
                 <div class="kpi-value kpi-text-primary">@totalServices</div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col">
             <div class="kpi-card kpi-success p-3">
                 <div class="kpi-label">Total Estimation</div>
                 <div class="kpi-value kpi-text-success">@totalEstimation <small class="text-muted kpi-sub">days</small></div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col">
             <div class="kpi-card kpi-info p-3">
                 <div class="kpi-label">Active Resources</div>
                 <div class="kpi-value kpi-text-info">@activeResources</div>
                 <div class="text-muted kpi-sub-detail">Capacity: @totalCapacity.ToString("F1")</div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col">
             <div class="kpi-card kpi-warning p-3">
                 <div class="kpi-label">Projected Finish</div>
                 <div class="kpi-value kpi-value-sm kpi-text-warning">@overallFinish</div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="kpi-card p-3 kpi-clickable @(overallocationCount > 0 ? "kpi-danger" : "")" @onclick='() => NavigationManager.NavigateTo("/overallocation")' role="button" tabindex="0" title="View overallocation alerts" data-testid="kpi-overallocation">
+                <div class="kpi-label">Overallocations</div>
+                <div class="kpi-value @(overallocationCount > 0 ? "kpi-text-danger" : "kpi-text-success")">@overallocationCount</div>
             </div>
         </div>
     </div>
@@ -141,6 +158,70 @@ else
             </div>
         </div>
     </div>
+
+    <!-- Preview Diff Card (collapsible) -->
+    @if (previewDiff is not null)
+    {
+        <div class="card border-0 shadow-sm mb-4 border-start border-info border-3" data-testid="preview-diff-card">
+            <div class="card-header border-bottom d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-eye me-2"></i>Schedule Preview Diff</span>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => previewDiff = null" data-testid="preview-diff-close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="d-flex gap-4 mb-3">
+                    <div><span class="text-muted">Tasks Affected:</span> <strong class="text-primary">@previewDiff.TasksAffected</strong></div>
+                    <div><span class="text-muted">Unchanged:</span> <strong>@previewDiff.TasksUnchanged</strong></div>
+                    <div><span class="text-muted">New Allocations:</span> <strong>@previewDiff.NewAllocations</strong></div>
+                </div>
+                @if (previewDiff.TaskChanges.Any())
+                {
+                    <div class="table-responsive" style="max-height:300px;overflow-y:auto">
+                        <table class="table table-sm table-bordered mb-0" data-testid="preview-diff-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Task</th>
+                                    <th>Change</th>
+                                    <th>Start</th>
+                                    <th>Finish</th>
+                                    <th>Risk</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var change in previewDiff.TaskChanges)
+                                {
+                                    <tr>
+                                        <td><strong>@change.TaskId</strong> <small class="text-muted">@change.TaskName</small></td>
+                                        <td><span class="badge bg-@ChangeTypeBadge(change.ChangeType)">@change.ChangeType</span></td>
+                                        <td>
+                                            @(change.OldStart?.ToString("MMM dd") ?? "—")
+                                            @if (change.OldStart != change.NewStart)
+                                            { <span class="text-primary"> &rarr; @(change.NewStart?.ToString("MMM dd") ?? "—")</span> }
+                                        </td>
+                                        <td>
+                                            @(change.OldFinish?.ToString("MMM dd") ?? "—")
+                                            @if (change.OldFinish != change.NewFinish)
+                                            { <span class="text-primary"> &rarr; @(change.NewFinish?.ToString("MMM dd") ?? "—")</span> }
+                                        </td>
+                                        <td>
+                                            @(change.OldRisk ?? "—")
+                                            @if (change.OldRisk != change.NewRisk)
+                                            { <span class="text-primary"> &rarr; @(change.NewRisk ?? "—")</span> }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted mb-0">No task changes detected. The schedule is up to date.</p>
+                }
+            </div>
+        </div>
+    }
 
     <!-- Statistics Card -->
     <div class="card border-0 shadow-sm">
@@ -214,12 +295,15 @@ else
     private int atRisk = 0;
     private int late = 0;
     private double avgAssigned = 0;
+    private int overallocationCount = 0;
     private string schedulerResult = "";
     private bool isLoaded = false;
     private bool isRunning = false;
+    private bool isPreviewing = false;
     private bool isPlanStale = false;
     private List<RiskTrendPointDto> riskTrend = new();
     private List<RiskNotification> notifications = new();
+    private ScheduleDiffDto? previewDiff;
 
     protected override async Task OnInitializedAsync()
     {
@@ -250,6 +334,7 @@ else
         atRisk = kpis.AtRisk;
         late = kpis.Late;
         avgAssigned = kpis.AvgAssigned;
+        overallocationCount = kpis.OverallocationCount;
     }
 
     private async Task RunScheduler()
@@ -281,6 +366,29 @@ else
         if (e.Key is "Enter" or " ")
             NavigateToTasks(filterType, filterValue);
     }
+
+    private async Task PreviewChanges()
+    {
+        isPreviewing = true;
+        try
+        {
+            var result = await Mediator.Send(new PreviewScheduleCommand());
+            previewDiff = result.Value;
+        }
+        finally
+        {
+            isPreviewing = false;
+        }
+    }
+
+    private static string ChangeTypeBadge(string changeType) => changeType switch
+    {
+        "Added" => "success",
+        "NowLate" => "danger",
+        "NoLongerLate" => "info",
+        "Modified" => "warning",
+        _ => "secondary"
+    };
 
     private async Task DismissNotifications()
     {

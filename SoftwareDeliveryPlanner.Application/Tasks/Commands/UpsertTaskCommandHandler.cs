@@ -1,5 +1,6 @@
 using MediatR;
 using SoftwareDeliveryPlanner.Application.Abstractions;
+using SoftwareDeliveryPlanner.Domain.Models;
 using SoftwareDeliveryPlanner.SharedKernel;
 
 namespace SoftwareDeliveryPlanner.Application.Tasks.Commands;
@@ -14,13 +15,17 @@ internal sealed class UpsertTaskCommandHandler : IRequestHandler<UpsertTaskComma
     public async Task<Result> Handle(UpsertTaskCommand request, CancellationToken cancellationToken)
     {
         var breakdown = request.EffortBreakdown
-            .Select(e => (e.Role, e.EstimationDays, e.OverlapPct))
+            .Select(e => new EffortBreakdownSpec(e.Role, e.EstimationDays, e.OverlapPct, e.MinSeniority))
+            .ToList();
+
+        var dependencies = request.Dependencies?
+            .Select(d => new DependencySpec(d.PredecessorTaskId, d.Type, d.LagDays, d.OverlapPct))
             .ToList();
 
         await _orchestrator.UpsertTaskAsync(
             request.Id, request.TaskId, request.ServiceName,
             request.MaxResource, request.Priority, breakdown,
-            request.StrictDate, request.DependsOnTaskIds, request.IsNew,
+            request.StrictDate, dependencies, request.IsNew,
             request.OverrideStart, request.Phase, request.PreferredResourceIds,
             cancellationToken);
 

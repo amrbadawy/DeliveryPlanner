@@ -57,7 +57,7 @@ public abstract class OrchestratorFixture : IAsyncDisposable
     private protected readonly IScenarioOrchestrator ScenarioOrchestrator;
     private protected readonly TimeProvider TestTimeProvider;
 
-    private protected static List<(string, double, double)> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
+    private protected static List<EffortBreakdownSpec> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
     private protected static List<EffortBreakdownInput> EB(double dev) => new()
     {
         new EffortBreakdownInput("DEV", dev, 0),
@@ -163,7 +163,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             Priority: 3,
             EffortBreakdown: EB(10),
             StrictDate: null,
-            DependsOnTaskIds: null,
+            Dependencies: null,
             IsNew: true);
 
         await handler.Handle(command, CancellationToken.None);
@@ -188,7 +188,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             Priority: existing.Priority,
             EffortBreakdown: EB(existing.TotalEstimationDays),
             StrictDate: null,
-            DependsOnTaskIds: null,
+            Dependencies: null,
             IsNew: false);
 
         await handler.Handle(command, CancellationToken.None);
@@ -211,7 +211,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             Priority: 1,
             EffortBreakdown: EB(5),
             StrictDate: strictDate,
-            DependsOnTaskIds: null,
+            Dependencies: null,
             IsNew: true), CancellationToken.None);
 
         await using var db = await Factory.CreateDbContextAsync();
@@ -220,7 +220,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
     }
 
     [Fact]
-    public async Task Handle_NewTask_WithDependsOnTaskIds_PersistsDependencies()
+    public async Task Handle_NewTask_WithDependencies_PersistsDependencies()
     {
         var handler = new UpsertTaskCommandHandler(TaskOrchestrator);
         await handler.Handle(new UpsertTaskCommand(
@@ -231,16 +231,16 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             Priority: 1,
             EffortBreakdown: EB(5),
             StrictDate: null,
-            DependsOnTaskIds: "SVC-001,SVC-002",
+            Dependencies: new List<DependencyInput> { new("SVC-001", "FS", 0, 0), new("SVC-002", "FS", 0, 0) },
             IsNew: true), CancellationToken.None);
 
         await using var db = await Factory.CreateDbContextAsync();
-        var task = await db.Tasks.FirstAsync(t => t.TaskId == "DEP-01");
+        var task = await db.Tasks.Include(t => t.Dependencies).FirstAsync(t => t.TaskId == "DEP-01");
         Assert.Equal("SVC-001,SVC-002", task.DependsOnTaskIds);
     }
 
     [Fact]
-    public async Task Handle_NewTask_WithNullDependsOnTaskIds_PersistsNull()
+    public async Task Handle_NewTask_WithNullDependencies_PersistsNull()
     {
         var handler = new UpsertTaskCommandHandler(TaskOrchestrator);
         await handler.Handle(new UpsertTaskCommand(
@@ -251,11 +251,11 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             Priority: 1,
             EffortBreakdown: EB(3),
             StrictDate: null,
-            DependsOnTaskIds: null,
+            Dependencies: null,
             IsNew: true), CancellationToken.None);
 
         await using var db = await Factory.CreateDbContextAsync();
-        var task = await db.Tasks.FirstAsync(t => t.TaskId == "NDP-01");
+        var task = await db.Tasks.Include(t => t.Dependencies).FirstAsync(t => t.TaskId == "NDP-01");
         Assert.Null(task.DependsOnTaskIds);
     }
 }
@@ -305,7 +305,7 @@ public class UpsertTaskCommandValidatorTests
     private static UpsertTaskCommand Valid() => new(
         Id: 0, TaskId: "SVC-001", ServiceName: "My Service",
         MaxResource: 2, Priority: 5, EffortBreakdown: ValidEB(),
-        StrictDate: null, DependsOnTaskIds: null, IsNew: true);
+        StrictDate: null, Dependencies: null, IsNew: true);
 
     [Fact]
     public void Valid_Command_PassesValidation()
@@ -1531,7 +1531,7 @@ public class UpsertTaskCommandValidatorAdditionalTests
     private static UpsertTaskCommand Valid() => new(
         Id: 0, TaskId: "SVC-001", ServiceName: "My Service",
         MaxResource: 2, Priority: 5, EffortBreakdown: ValidEB(),
-        StrictDate: null, DependsOnTaskIds: null, IsNew: true);
+        StrictDate: null, Dependencies: null, IsNew: true);
 
     [Fact]
     public void NullTaskId_FailsValidation()
@@ -1626,9 +1626,9 @@ public class UpsertTaskCommandValidatorAdditionalTests
     }
 
     [Fact]
-    public void DependsOnTaskIds_AcceptsAnyValue()
+    public void Dependencies_AcceptsAnyValue()
     {
-        var result = _validator.Validate(Valid() with { DependsOnTaskIds = "GARBAGE,INVALID" });
+        var result = _validator.Validate(Valid() with { Dependencies = new List<DependencyInput> { new("GARBAGE", "FS", 0, 0) } });
         Assert.True(result.IsValid);
     }
 }

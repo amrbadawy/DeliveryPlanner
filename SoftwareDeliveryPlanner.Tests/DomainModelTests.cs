@@ -11,7 +11,7 @@ namespace SoftwareDeliveryPlanner.Tests;
 
 public class TaskItemDomainTests
 {
-    private static List<(string, double, double)> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
+    private static List<EffortBreakdownSpec> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
 
     [Fact]
     public void Create_ValidInputs_ReturnsPopulatedTaskItem()
@@ -44,29 +44,33 @@ public class TaskItemDomainTests
     [Fact]
     public void Create_WithDependsOnTaskIds_SetsDependencies()
     {
-        var task = TaskItem.Create("SVC-003", "Service", 1, 5, B(5), dependsOnTaskIds: "SVC-001,SVC-002");
+        var task = TaskItem.Create("SVC-003", "Service", 1, 5, B(5));
+        task.AddDependency("SVC-001");
+        task.AddDependency("SVC-002");
         Assert.Equal("SVC-001,SVC-002", task.DependsOnTaskIds);
     }
 
     [Fact]
     public void Create_WithNullDependsOnTaskIds_SetsNull()
     {
-        var task = TaskItem.Create("SVC-003", "Service", 1, 5, B(5), dependsOnTaskIds: null);
+        var task = TaskItem.Create("SVC-003", "Service", 1, 5, B(5));
         Assert.Null(task.DependsOnTaskIds);
     }
 
     [Fact]
-    public void Create_WithWhitespaceDependsOnTaskIds_SetsNull()
+    public void Create_WithNoDependencies_ReturnsNullDependsOnTaskIds()
     {
-        var task = TaskItem.Create("SVC-003", "Service", 1, 5, B(5), dependsOnTaskIds: "   ");
+        var task = TaskItem.Create("SVC-003", "Service", 1, 5, B(5));
         Assert.Null(task.DependsOnTaskIds);
     }
 
     [Fact]
-    public void Create_WithDependsOnTaskIds_TrimsDependencies()
+    public void AddDependency_NormalizesAndStoresPredecessorId()
     {
-        var task = TaskItem.Create("SVC-003", "Service", 1, 5, B(5), dependsOnTaskIds: "  SVC-001 , SVC-002  ");
-        Assert.Equal("SVC-001 , SVC-002", task.DependsOnTaskIds);
+        var task = TaskItem.Create("SVC-003", "Service", 1, 5, B(5));
+        task.AddDependency("  SVC-001 ");
+        task.AddDependency("  SVC-002  ");
+        Assert.Equal("SVC-001,SVC-002", task.DependsOnTaskIds);
     }
 
     [Theory]
@@ -475,7 +479,7 @@ public class HolidayDomainTests
 
 public class DomainExceptionTests
 {
-    private static List<(string, double, double)> B(double dev) => TestDatabaseHelper.MakeBreakdown(dev);
+    private static List<EffortBreakdownSpec> B(double dev) => TestDatabaseHelper.MakeBreakdown(dev);
 
     [Fact]
     public void DomainException_HasCorrectMessage()
@@ -608,7 +612,7 @@ public class DomainConstantsTests
 
 public class TaskItemDomainAdditionalTests
 {
-    private static List<(string, double, double)> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
+    private static List<EffortBreakdownSpec> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
 
     [Fact]
     public void Create_NullTaskId_ThrowsDomainException()
@@ -650,10 +654,10 @@ public class TaskItemDomainAdditionalTests
     }
 
     [Fact]
-    public void Create_Factory_AssignedResource_DefaultsToNull()
+    public void Create_Factory_PeakConcurrency_DefaultsToNull()
     {
         var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
-        Assert.Null(task.AssignedResource);
+        Assert.Null(task.PeakConcurrency);
     }
 
     [Fact]
@@ -669,7 +673,9 @@ public class TaskItemDomainAdditionalTests
     public void Create_CombinedBoundaries_Priority1_StrictDate_Dependencies()
     {
         var strict = new DateTime(2026, 12, 31);
-        var task = TaskItem.Create("SVC-001", "Service", 0.5, 1, B(0.001), strict, "SVC-002,SVC-003");
+        var task = TaskItem.Create("SVC-001", "Service", 0.5, 1, B(0.001), strict);
+        task.AddDependency("SVC-002");
+        task.AddDependency("SVC-003");
 
         Assert.Equal(1, task.Priority);
         Assert.Equal(strict, task.StrictDate);
@@ -700,10 +706,10 @@ public class TaskItemDomainAdditionalTests
     }
 
     [Fact]
-    public void Create_DependsOnTaskIds_InvalidFormat_AcceptedWithoutValidation()
+    public void AddDependency_AcceptsArbitraryPredecessorIds()
     {
-        // Factory does not validate dependency format, only trims
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5), dependsOnTaskIds: "GARBAGE");
+        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        task.AddDependency("GARBAGE");
         Assert.Equal("GARBAGE", task.DependsOnTaskIds);
     }
 

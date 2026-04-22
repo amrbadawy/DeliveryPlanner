@@ -89,12 +89,14 @@ internal static class TestDatabaseHelper
         db.SaveChanges();
     }
 
-    /// <summary>Helper to create effort breakdown tuples for test tasks.</summary>
-    internal static List<(string Role, double EstimationDays, double OverlapPct)> MakeBreakdown(
+    /// <summary>Helper to create effort breakdown specs for test tasks.</summary>
+    internal static List<EffortBreakdownSpec> MakeBreakdown(
         double devDays, double qaDays = 1, double overlapPct = 0)
     {
-        var result = new List<(string, double, double)> { ("DEV", devDays, 0) };
-        result.Add(("QA", qaDays > 0 ? qaDays : 1, overlapPct));
-        return result;
+        return
+        [
+            new EffortBreakdownSpec("DEV", devDays, 0),
+            new EffortBreakdownSpec("QA", qaDays > 0 ? qaDays : 1, overlapPct)
+        ];
     }
 }

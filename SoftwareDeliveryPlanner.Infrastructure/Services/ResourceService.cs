@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using SoftwareDeliveryPlanner.Application.Abstractions;
+using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.Domain.Models;
 using SoftwareDeliveryPlanner.Infrastructure.Data;
 
@@ -39,19 +40,20 @@ internal sealed class ResourceService : ServiceBase, IResourceOrchestrator
         int id, string resourceId, string resourceName, string role,
         string team, double availabilityPct, double dailyCapacity,
         DateTime startDate, string active, string? notes, bool isNew,
+        string? seniorityLevel = null, string? workingWeek = null,
         CancellationToken cancellationToken = default)
     {
         await using var db = await DbFactory.CreateDbContextAsync(cancellationToken);
 
         if (isNew)
         {
-            var resource = TeamMember.Create(resourceId, resourceName, role, team, availabilityPct, dailyCapacity, startDate, active: active, notes: notes);
+            var resource = TeamMember.Create(resourceId, resourceName, role, team, availabilityPct, dailyCapacity, startDate, active: active, notes: notes, seniorityLevel: seniorityLevel ?? DomainConstants.Seniority.Mid, workingWeek: workingWeek);
             db.Resources.Add(resource);
         }
         else
         {
             var existing = await db.Resources.FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
-            existing?.Update(resourceName, role, team, availabilityPct, dailyCapacity, startDate, active, notes);
+            existing?.Update(resourceName, role, team, availabilityPct, dailyCapacity, startDate, active, notes, seniorityLevel ?? existing.SeniorityLevel, workingWeek);
         }
 
         await SaveDispatchAndRescheduleAsync(db, cancellationToken);

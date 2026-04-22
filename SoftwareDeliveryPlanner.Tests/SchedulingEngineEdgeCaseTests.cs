@@ -16,7 +16,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     private readonly PlannerDbContext _db;
     private readonly SchedulingEngine _engine;
 
-    private static List<(string, double, double)> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
+    private static List<EffortBreakdownSpec> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
 
     public SchedulingEngineEdgeCaseTests(SqlServerFixture fixture)
     {
@@ -420,7 +420,9 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("DEP-001", "Prerequisite Task", 1, 1, B(5)));
 
         // Task B: depends on DEP-001, estimated 3 days
-        _db.Tasks.Add(TaskItem.Create("DEP-002", "Dependent Task", 1, 1, B(3), dependsOnTaskIds: "DEP-001"));
+        var dep002 = TaskItem.Create("DEP-002", "Dependent Task", 1, 1, B(3));
+        dep002.AddDependency("DEP-001");
+        _db.Tasks.Add(dep002);
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -451,7 +453,10 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("DEP-011", "Prereq B", 1, 1, B(5)));
 
         // Task C: depends on both A and B
-        _db.Tasks.Add(TaskItem.Create("DEP-012", "Final Task", 1, 1, B(2), dependsOnTaskIds: "DEP-010,DEP-011"));
+        var dep012 = TaskItem.Create("DEP-012", "Final Task", 1, 1, B(2));
+        dep012.AddDependency("DEP-010");
+        dep012.AddDependency("DEP-011");
+        _db.Tasks.Add(dep012);
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -499,8 +504,12 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
 
         // Chain: A -> B -> C
         _db.Tasks.Add(TaskItem.Create("CHN-001", "Chain First", 1, 1, B(2)));
-        _db.Tasks.Add(TaskItem.Create("CHN-002", "Chain Second", 1, 1, B(2), dependsOnTaskIds: "CHN-001"));
-        _db.Tasks.Add(TaskItem.Create("CHN-003", "Chain Third", 1, 1, B(2), dependsOnTaskIds: "CHN-002"));
+        var chn002 = TaskItem.Create("CHN-002", "Chain Second", 1, 1, B(2));
+        chn002.AddDependency("CHN-001");
+        _db.Tasks.Add(chn002);
+        var chn003 = TaskItem.Create("CHN-003", "Chain Third", 1, 1, B(2));
+        chn003.AddDependency("CHN-002");
+        _db.Tasks.Add(chn003);
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -526,7 +535,9 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         // Depends on a task that doesn't exist — can never be satisfied
-        _db.Tasks.Add(TaskItem.Create("DEP-030", "Orphan Dependency", 1, 1, B(3), dependsOnTaskIds: "MISSING-999"));
+        var dep030 = TaskItem.Create("DEP-030", "Orphan Dependency", 1, 1, B(3));
+        dep030.AddDependency("MISSING-999");
+        _db.Tasks.Add(dep030);
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -548,8 +559,12 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("CIR-001", "Circular A", 1, 1, B(3), dependsOnTaskIds: "CIR-002"));
-        _db.Tasks.Add(TaskItem.Create("CIR-002", "Circular B", 1, 1, B(3), dependsOnTaskIds: "CIR-001"));
+        var cir001 = TaskItem.Create("CIR-001", "Circular A", 1, 1, B(3));
+        cir001.AddDependency("CIR-002");
+        _db.Tasks.Add(cir001);
+        var cir002 = TaskItem.Create("CIR-002", "Circular B", 1, 1, B(3));
+        cir002.AddDependency("CIR-001");
+        _db.Tasks.Add(cir002);
         _db.SaveChanges();
 
         // Should not throw — circular deps just mean tasks never get scheduled
@@ -575,8 +590,15 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("SELF-001", "Self Referencing", 1, 1, B(3), dependsOnTaskIds: "SELF-001"));
+        // Domain correctly forbids self-referencing deps, so bypass it and insert directly
+        // to test that the engine handles corrupt/injected data gracefully.
+        var self001 = TaskItem.Create("SELF-001", "Self Referencing", 1, 1, B(3));
+        _db.Tasks.Add(self001);
         _db.SaveChanges();
+
+        // Insert self-referencing dep directly via raw SQL (domain blocks it)
+        _db.Database.ExecuteSqlRaw(
+            "INSERT INTO [task].[TaskDependencies] (TaskId, PredecessorTaskId, Type, LagDays, OverlapPct) VALUES ('SELF-001', 'SELF-001', 'FS', 0, 0)");
 
         var exception = Record.Exception(() => _engine.RunScheduler());
         Assert.Null(exception);

@@ -34,6 +34,9 @@ public sealed class AllocationConfiguration : IEntityTypeConfiguration<Allocatio
             .IsRequired()
             .HasMaxLength(30);
 
+        builder.Property(a => a.IsLocked)
+            .HasDefaultValue(false);
+
         builder.HasOne(a => a.Task)
             .WithMany()
             .HasForeignKey(a => a.TaskId)

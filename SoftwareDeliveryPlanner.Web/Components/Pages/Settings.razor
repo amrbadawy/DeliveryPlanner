@@ -1,0 +1,202 @@
+@page "/settings"
+@using MediatR
+@using SoftwareDeliveryPlanner.Application.Settings.Queries
+@using SoftwareDeliveryPlanner.Application.Settings.Commands
+@using SoftwareDeliveryPlanner.Application.Abstractions
+@using SoftwareDeliveryPlanner.Domain
+@inject IMediator Mediator
+
+<PageTitle>Settings</PageTitle>
+
+<div class="d-flex justify-content-between align-items-start mb-4 page-header">
+    <div>
+        <h3 class="mb-1"><i class="bi bi-gear me-2"></i>Settings</h3>
+        <p class="page-subtitle">Configure scheduling behaviour and baseline management</p>
+    </div>
+</div>
+
+@if (!isLoaded)
+{
+    <SkeletonLoader Variant="block" TestId="settings-skeleton" />
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="alert @(statusIsError ? "alert-danger" : "alert-success") alert-dismissible" role="alert" data-testid="settings-status">
+            @statusMessage
+            <button type="button" class="btn-close" @onclick="() => statusMessage = string.Empty" aria-label="Close"></button>
+        </div>
+    }
+
+    <!-- Scheduling Strategy -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header border-bottom">
+            <i class="bi bi-diagram-3 me-2"></i>Scheduling Strategy
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-3">Controls the order in which tasks are ranked and scheduled.</p>
+            <div class="d-flex gap-3 align-items-end">
+                <div>
+                    <label class="form-label">Strategy</label>
+                    <select class="form-select" style="width:220px" @bind="selectedStrategy" data-testid="settings-strategy-select">
+                        <option value="@DomainConstants.SchedulingStrategy.PriorityFirst">Priority First</option>
+                        <option value="@DomainConstants.SchedulingStrategy.DeadlineFirst">Deadline First</option>
+                        <option value="@DomainConstants.SchedulingStrategy.BalancedWorkload">Balanced Workload</option>
+                        <option value="@DomainConstants.SchedulingStrategy.CriticalPath">Critical Path</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" @onclick="SaveStrategy" disabled="@isSavingStrategy" data-testid="settings-strategy-save">
+                    @if (isSavingStrategy)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                    }
+                    Save Strategy
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Baseline Management -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header border-bottom">
+            <i class="bi bi-pin-angle me-2"></i>Baseline Management
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-3">
+                Freezing the baseline locks all current allocations so they are preserved across future scheduler runs.
+                The baseline date marks the cut-off point before which no re-scheduling occurs.
+            </p>
+            <div class="mb-3">
+                <span class="text-muted">Current Baseline Date:&nbsp;</span>
+                @if (!string.IsNullOrWhiteSpace(currentBaselineDate))
+                {
+                    <strong class="text-primary" data-testid="settings-baseline-date">@currentBaselineDate</strong>
+                }
+                else
+                {
+                    <span class="text-muted fst-italic" data-testid="settings-baseline-date">Not set</span>
+                }
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-warning" @onclick="FreezeBaseline" disabled="@isFreezing" data-testid="settings-freeze-baseline">
+                    @if (isFreezing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-lock me-1"></i>
+                    }
+                    Freeze Baseline
+                </button>
+                @if (!string.IsNullOrWhiteSpace(currentBaselineDate))
+                {
+                    <button class="btn btn-outline-danger" @onclick="ClearBaseline" disabled="@isClearing" data-testid="settings-clear-baseline">
+                        @if (isClearing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-unlock me-1"></i>
+                        }
+                        Clear Baseline
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private SettingsDto? settings;
+    private string selectedStrategy = DomainConstants.SchedulingStrategy.PriorityFirst;
+    private string currentBaselineDate = string.Empty;
+    private bool isLoaded = false;
+    private bool isSavingStrategy = false;
+    private bool isFreezing = false;
+    private bool isClearing = false;
+    private string statusMessage = string.Empty;
+    private bool statusIsError = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSettings();
+        isLoaded = true;
+    }
+
+    private async Task LoadSettings()
+    {
+        var result = await Mediator.Send(new GetSettingsQuery());
+        settings = result.Value;
+        selectedStrategy = settings.SchedulingStrategy ?? DomainConstants.SchedulingStrategy.PriorityFirst;
+        currentBaselineDate = settings.BaselineDate ?? string.Empty;
+    }
+
+    private async Task SaveStrategy()
+    {
+        isSavingStrategy = true;
+        statusMessage = string.Empty;
+        try
+        {
+            await Mediator.Send(new UpsertSettingCommand(DomainConstants.SettingKeys.SchedulingStrategy, selectedStrategy));
+            ShowStatus("Scheduling strategy saved.", false);
+            await LoadSettings();
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Error: {ex.Message}", true);
+        }
+        finally
+        {
+            isSavingStrategy = false;
+        }
+    }
+
+    private async Task FreezeBaseline()
+    {
+        isFreezing = true;
+        statusMessage = string.Empty;
+        try
+        {
+            await Mediator.Send(new FreezeBaselineCommand());
+            ShowStatus("Baseline frozen. All current allocations are now locked.", false);
+            await LoadSettings();
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Error: {ex.Message}", true);
+        }
+        finally
+        {
+            isFreezing = false;
+        }
+    }
+
+    private async Task ClearBaseline()
+    {
+        isClearing = true;
+        statusMessage = string.Empty;
+        try
+        {
+            await Mediator.Send(new UpsertSettingCommand(DomainConstants.SettingKeys.BaselineDate, null));
+            ShowStatus("Baseline date cleared. Future scheduler runs will regenerate all allocations.", false);
+            await LoadSettings();
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Error: {ex.Message}", true);
+        }
+        finally
+        {
+            isClearing = false;
+        }
+    }
+
+    private void ShowStatus(string message, bool isError)
+    {
+        statusMessage = message;
+        statusIsError = isError;
+    }
+}

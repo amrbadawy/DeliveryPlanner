@@ -1,5 +1,6 @@
 using MediatR;
 using SoftwareDeliveryPlanner.Application.Abstractions;
+using SoftwareDeliveryPlanner.Domain.Models;
 using SoftwareDeliveryPlanner.SharedKernel;
 
 namespace SoftwareDeliveryPlanner.Application.Tasks.Commands;
@@ -22,13 +23,17 @@ internal sealed class BulkImportTasksCommandHandler : IRequestHandler<BulkImport
             var id = existing?.Id ?? 0;
 
             var breakdown = row.EffortBreakdown
-                .Select(e => (e.Role, e.EstimationDays, e.OverlapPct))
+                .Select(e => new EffortBreakdownSpec(e.Role, e.EstimationDays, e.OverlapPct, e.MinSeniority))
+                .ToList();
+
+            var dependencies = row.Dependencies?
+                .Select(d => new DependencySpec(d.PredecessorTaskId, d.Type, d.LagDays, d.OverlapPct))
                 .ToList();
 
             await _orchestrator.UpsertTaskAsync(
                 id, row.TaskId, row.ServiceName,
                 row.MaxResource, row.Priority, breakdown,
-                row.StrictDate, row.DependsOnTaskIds, isNew,
+                row.StrictDate, dependencies, isNew,
                 phase: row.Phase, preferredResourceIds: row.PreferredResourceIds,
                 cancellationToken: cancellationToken);
 

@@ -151,6 +151,26 @@
                         <label class="form-label">Notes:</label>
                         <textarea class="form-control" @bind="resourceForm.Notes" data-testid="resources-notes"></textarea>
                     </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">Seniority Level:</label>
+                            <select class="form-select" @bind="resourceForm.SeniorityLevel" data-testid="resources-seniority">
+                                <option value="">Any</option>
+                                <option value="@DomainConstants.Seniority.Junior">Junior</option>
+                                <option value="@DomainConstants.Seniority.Mid">Mid</option>
+                                <option value="@DomainConstants.Seniority.Senior">Senior</option>
+                                <option value="@DomainConstants.Seniority.Principal">Principal</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">Working Week:</label>
+                            <select class="form-select" @bind="resourceForm.WorkingWeek" data-testid="resources-working-week">
+                                <option value="">Global Default</option>
+                                <option value="@DomainConstants.WorkingWeek.MonFri">Mon–Fri</option>
+                                <option value="@DomainConstants.WorkingWeek.SunThu">Sun–Thu</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-primary" @onclick="SaveResource" disabled="@isSaving" data-testid="resources-save">
@@ -285,6 +305,8 @@ else
         public DateTime StartDate { get; set; }
         public string Active { get; set; } = "Yes";
         public string? Notes { get; set; }
+        public string? SeniorityLevel { get; set; }
+        public string? WorkingWeek { get; set; }
     }
 
     private IReadOnlyList<TeamMember> FilteredResources
@@ -439,7 +461,9 @@ else
             DailyCapacity = r.DailyCapacity,
             StartDate = r.StartDate,
             Active = r.Active,
-            Notes = r.Notes
+            Notes = r.Notes,
+            SeniorityLevel = r.SeniorityLevel,
+            WorkingWeek = r.WorkingWeek
         };
         startDateValue = r.StartDate;
         modalError = string.Empty;
@@ -471,7 +495,9 @@ else
                 StartDate: startDateValue,
                 Active: resourceForm.Active,
                 Notes: resourceForm.Notes,
-                IsNew: editingResource == null);
+                IsNew: editingResource == null,
+                SeniorityLevel: string.IsNullOrEmpty(resourceForm.SeniorityLevel) ? null : resourceForm.SeniorityLevel,
+                WorkingWeek: string.IsNullOrEmpty(resourceForm.WorkingWeek) ? null : resourceForm.WorkingWeek);
 
             var result = await Mediator.Send(command);
             await LoadResources();

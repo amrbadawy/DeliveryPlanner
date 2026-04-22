@@ -17,7 +17,8 @@ internal sealed class UpsertResourceCommandHandler : IRequestHandler<UpsertResou
             request.Id, request.ResourceId, request.ResourceName,
             request.Role, request.Team, request.AvailabilityPct,
             request.DailyCapacity, request.StartDate, request.Active,
-            request.Notes, request.IsNew, cancellationToken);
+            request.Notes, request.IsNew, request.SeniorityLevel,
+            request.WorkingWeek, cancellationToken);
 
         return Result.Success();
     }

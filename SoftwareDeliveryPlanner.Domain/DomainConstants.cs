@@ -44,6 +44,8 @@ public static class DomainConstants
         public const string AtRiskThreshold = "at_risk_threshold";
         public const string WorkingWeek = "working_week";
         public const string LastSchedulerRun = "last_scheduler_run";
+        public const string BaselineDate = "baseline_date";
+        public const string SchedulingStrategy = "scheduling_strategy";
     }
 
     /// <summary>Holiday classification types.</summary>
@@ -163,5 +165,48 @@ public static class DomainConstants
                 MonFri => new HashSet<DayOfWeek> { DayOfWeek.Saturday, DayOfWeek.Sunday },
                 _ => new HashSet<DayOfWeek> { DayOfWeek.Friday, DayOfWeek.Saturday }   // SunThu default
             };
+    }
+
+    /// <summary>Seniority levels for team members.</summary>
+    public static class Seniority
+    {
+        public const string Junior = "Junior";
+        public const string Mid = "Mid";
+        public const string Senior = "Senior";
+        public const string Principal = "Principal";
+
+        public static readonly IReadOnlyList<string> Levels = [Junior, Mid, Senior, Principal];
+
+        public static readonly IReadOnlyDictionary<string, int> Rank = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            [Junior] = 1, [Mid] = 2, [Senior] = 3, [Principal] = 4
+        };
+
+        public static bool IsValid(string level) => Rank.ContainsKey(level);
+    }
+
+    /// <summary>Task dependency relationship types.</summary>
+    public static class DependencyType
+    {
+        public const string FinishToStart = "FS";
+        public const string StartToStart = "SS";
+        public const string FinishToFinish = "FF";
+
+        public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { FinishToStart, StartToStart, FinishToFinish };
+        public static bool IsValid(string type) => All.Contains(type);
+    }
+
+    /// <summary>Scheduling strategy identifiers.</summary>
+    public static class SchedulingStrategy
+    {
+        public const string PriorityFirst = "priority_first";
+        public const string DeadlineFirst = "deadline_first";
+        public const string BalancedWorkload = "balanced_workload";
+        public const string CriticalPath = "critical_path";
+
+        public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            PriorityFirst, DeadlineFirst, BalancedWorkload, CriticalPath
+        };
     }
 }

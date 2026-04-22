@@ -26,7 +26,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     private readonly ISchedulerService _schedulerService;
     private readonly IPlanningQueryService _planningQueryService;
 
-    private static List<(string, double, double)> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
+    private static List<EffortBreakdownSpec> B(double dev, double qa = 1) => TestDatabaseHelper.MakeBreakdown(dev, qa);
 
     public SchedulingOrchestratorTests(SqlServerFixture fixture)
     {

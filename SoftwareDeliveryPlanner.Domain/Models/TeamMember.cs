@@ -22,6 +22,13 @@ public class TeamMember : AggregateRoot
     public DateTime? EndDate { get; private set; }
     public string Active { get; private set; } = DomainConstants.ActiveStatus.Yes;
     public string? Notes { get; private set; }
+
+    /// <summary>Seniority level of the team member (Junior, Mid, Senior, Principal).</summary>
+    public string SeniorityLevel { get; private set; } = DomainConstants.Seniority.Mid;
+
+    /// <summary>Working week override for this team member. Null means use the global default.</summary>
+    public string? WorkingWeek { get; private set; }
+
     public DateTime CreatedAt { get; private set; } = TimeProvider.System.GetLocalNow().DateTime;
 
     /// <summary>Adjustments owned by this aggregate. Managed via <see cref="AddAdjustment"/> / <see cref="RemoveAdjustment"/>.</summary>
@@ -42,7 +49,9 @@ public class TeamMember : AggregateRoot
         DateTime startDate,
         DateTime? endDate = null,
         string active = DomainConstants.ActiveStatus.Yes,
-        string? notes = null)
+        string? notes = null,
+        string seniorityLevel = DomainConstants.Seniority.Mid,
+        string? workingWeek = null)
     {
         if (!ResourceIdVO.TryCreate(resourceId, out _))
             throw new DomainException($"Invalid Resource ID '{resourceId}'. Expected format: AAA-000.");
@@ -56,6 +65,14 @@ public class TeamMember : AggregateRoot
         if (dailyCapacity <= 0)
             throw new DomainException("Daily capacity must be greater than zero.");
 
+        if (!DomainConstants.Seniority.IsValid(seniorityLevel))
+            throw new DomainException($"Invalid seniority level '{seniorityLevel}'. Valid levels: {string.Join(", ", DomainConstants.Seniority.Levels)}.");
+
+        if (workingWeek is not null &&
+            workingWeek != DomainConstants.WorkingWeek.SunThu &&
+            workingWeek != DomainConstants.WorkingWeek.MonFri)
+            throw new DomainException($"Invalid working week '{workingWeek}'. Valid values: {DomainConstants.WorkingWeek.SunThu}, {DomainConstants.WorkingWeek.MonFri}.");
+
         var member = new TeamMember
         {
             ResourceId = resourceId.Trim().ToUpperInvariant(),
@@ -67,7 +84,9 @@ public class TeamMember : AggregateRoot
             StartDate = startDate,
             EndDate = endDate,
             Active = active,
-            Notes = notes
+            Notes = notes,
+            SeniorityLevel = seniorityLevel,
+            WorkingWeek = workingWeek
         };
 
         member.RaiseDomainEvent(new ResourceCreatedEvent(member.ResourceId, member.ResourceName));
@@ -86,7 +105,9 @@ public class TeamMember : AggregateRoot
         double dailyCapacity,
         DateTime startDate,
         string active,
-        string? notes = null)
+        string? notes = null,
+        string seniorityLevel = DomainConstants.Seniority.Mid,
+        string? workingWeek = null)
     {
         if (string.IsNullOrWhiteSpace(resourceName))
             throw new DomainException("Resource name must not be empty.");
@@ -97,6 +118,14 @@ public class TeamMember : AggregateRoot
         if (dailyCapacity <= 0)
             throw new DomainException("Daily capacity must be greater than zero.");
 
+        if (!DomainConstants.Seniority.IsValid(seniorityLevel))
+            throw new DomainException($"Invalid seniority level '{seniorityLevel}'. Valid levels: {string.Join(", ", DomainConstants.Seniority.Levels)}.");
+
+        if (workingWeek is not null &&
+            workingWeek != DomainConstants.WorkingWeek.SunThu &&
+            workingWeek != DomainConstants.WorkingWeek.MonFri)
+            throw new DomainException($"Invalid working week '{workingWeek}'. Valid values: {DomainConstants.WorkingWeek.SunThu}, {DomainConstants.WorkingWeek.MonFri}.");
+
         ResourceName = resourceName.Trim();
         Role = role;
         Team = team;
@@ -105,6 +134,8 @@ public class TeamMember : AggregateRoot
         StartDate = startDate;
         Active = active;
         Notes = notes;
+        SeniorityLevel = seniorityLevel;
+        WorkingWeek = workingWeek;
 
         RaiseDomainEvent(new ResourceUpdatedEvent(ResourceId));
     }

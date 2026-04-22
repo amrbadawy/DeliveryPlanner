@@ -66,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<IHolidayOrchestrator, HolidayService>();
         services.AddScoped<ISchedulerService, SchedulerService>();
         services.AddScoped<IPlanningQueryService, PlanningQueryService>();
+        services.AddScoped<ISettingsService, SettingsService>();
         services.AddScoped<ITaskNoteOrchestrator, TaskNoteOrchestrator>();
         services.AddScoped<INotificationOrchestrator, NotificationOrchestrator>();
         services.AddScoped<IScenarioOrchestrator, ScenarioOrchestrator>();

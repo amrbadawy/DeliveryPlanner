@@ -27,4 +27,13 @@ public interface ISchedulingEngine : IDisposable
 
     /// <summary>Finds the first holiday covering the given date, or null.</summary>
     Holiday? GetHolidayForDate(DateTime date);
+
+    /// <summary>Runs the scheduler in dry-run mode and returns a diff of what would change.</summary>
+    ScheduleDiffDto PreviewSchedule();
+
+    /// <summary>
+    /// Locks all current unlocked allocations as the frozen baseline
+    /// and records today as the baseline_date setting.
+    /// </summary>
+    void FreezeBaseline();
 }

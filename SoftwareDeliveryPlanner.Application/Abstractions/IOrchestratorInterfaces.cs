@@ -10,8 +10,10 @@ public interface ITaskOrchestrator
     Task UpsertTaskAsync(
         int id, string taskId, string serviceName,
         double maxResource, int priority,
-        List<(string Role, double EstimationDays, double OverlapPct)> effortBreakdown,
-        DateTime? strictDate, string? dependsOnTaskIds, bool isNew,
+        List<EffortBreakdownSpec> effortBreakdown,
+        DateTime? strictDate,
+        List<DependencySpec>? dependencies,
+        bool isNew,
         DateTime? overrideStart = null, string? phase = null,
         string? preferredResourceIds = null,
         CancellationToken cancellationToken = default);
@@ -27,6 +29,7 @@ public interface IResourceOrchestrator
         int id, string resourceId, string resourceName, string role,
         string team, double availabilityPct, double dailyCapacity,
         DateTime startDate, string active, string? notes, bool isNew,
+        string? seniorityLevel = null, string? workingWeek = null,
         CancellationToken cancellationToken = default);
     Task DeleteResourceAsync(int id, CancellationToken cancellationToken = default);
 }
@@ -81,6 +84,8 @@ public interface ISchedulerService
 {
     Task<string> RunSchedulerAsync(CancellationToken cancellationToken = default);
     Task<DashboardKpisDto> GetDashboardKpisAsync(CancellationToken cancellationToken = default);
+    Task<ScheduleDiffDto> PreviewScheduleAsync(CancellationToken cancellationToken = default);
+    Task FreezeBaselineAsync(CancellationToken cancellationToken = default);
 }
 
 public interface INotificationOrchestrator
@@ -104,6 +109,12 @@ public interface IScenarioOrchestrator
     Task DeleteScenarioAsync(int id);
 }
 
+public interface ISettingsService
+{
+    Task<SettingsDto> GetSettingsAsync(CancellationToken cancellationToken = default);
+    Task UpsertSettingAsync(string key, string? value, CancellationToken cancellationToken = default);
+}
+
 public interface IPlanningQueryService
 {
     Task<List<CalendarDay>> GetCalendarAsync(CancellationToken cancellationToken = default);
@@ -115,4 +126,7 @@ public interface IPlanningQueryService
     Task<List<Tasks.Queries.TaskAllocationDto>> GetTaskAllocationsAsync(string taskId, CancellationToken cancellationToken = default);
     Task<DateTime?> GetLastSchedulerRunAsync(CancellationToken cancellationToken = default);
     Task<List<Planning.Queries.ResourceUtilizationDto>> GetResourceUtilizationAsync(CancellationToken cancellationToken = default);
+    Task<List<OverallocationAlertDto>> GetOverallocationAlertsAsync(CancellationToken cancellationToken = default);
+    Task<UtilizationForecastDto> GetUtilizationForecastAsync(int weeksAhead = 26, CancellationToken cancellationToken = default);
+    Task<List<FeasibilityResultDto>> GetFeasibilityAsync(string? taskId = null, CancellationToken cancellationToken = default);
 }

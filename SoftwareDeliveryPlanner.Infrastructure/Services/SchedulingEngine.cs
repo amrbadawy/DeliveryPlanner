@@ -53,6 +53,27 @@ internal class SchedulingEngine : ISchedulingEngine
         return !isHoliday;
     }
 
+    /// <summary>
+    /// Checks if a date is a working day for a specific resource, considering their per-resource WorkingWeek override.
+    /// Falls back to global IsWorkingDay if the resource has no override.
+    /// </summary>
+    private bool IsWorkingDayForResource(DateTime date, TeamMember resource)
+    {
+        // If resource has a working week override, use it instead of global weekend days
+        if (!string.IsNullOrEmpty(resource.WorkingWeek))
+        {
+            var resourceWeekendDays = DomainConstants.WorkingWeek.GetWeekendDays(resource.WorkingWeek);
+            if (resourceWeekendDays.Contains(date.DayOfWeek))
+                return false;
+
+            // Still check holidays
+            var holidays = GetHolidayCache();
+            return !holidays.Any(h => h.StartDate.Date <= date.Date && h.EndDate.Date >= date.Date);
+        }
+
+        return IsWorkingDay(date);
+    }
+
     /// <summary>Finds the first holiday whose range covers the given date, or null.</summary>
     public Holiday? GetHolidayForDate(DateTime date)
     {
@@ -90,6 +111,120 @@ internal class SchedulingEngine : ISchedulingEngine
         return daysSinceRef * 100 + priorityComponent;
     }
 
+    /// <summary>Ranks tasks using the deadline_first strategy: nearest strict date first, then least slack.</summary>
+    private int CalculateDeadlineFirstRank(TaskItem task)
+    {
+        int priorityComponent = (11 - task.Priority) * 10;
+
+        if (!task.StrictDate.HasValue)
+            return int.MaxValue / 2 + priorityComponent;
+
+        var today = _timeProvider.GetLocalNow().LocalDateTime.Date;
+        int slackDays = GetWorkingDaysBetween(today, task.StrictDate.Value);
+        // Lower slack = higher priority
+        return slackDays * 100 + priorityComponent;
+    }
+
+    /// <summary>
+    /// Computes the critical path depth for a task (longest chain of dependencies).
+    /// </summary>
+    private int ComputeCriticalPathDepth(
+        TaskItem task,
+        Dictionary<string, TaskItem> taskLookup,
+        Dictionary<string, int> depthCache)
+    {
+        if (depthCache.TryGetValue(task.TaskId, out var cached))
+            return cached;
+
+        int maxDepth = 0;
+        foreach (var dep in task.Dependencies)
+        {
+            if (taskLookup.TryGetValue(dep.PredecessorTaskId, out var predTask))
+            {
+                int predDepth = ComputeCriticalPathDepth(predTask, taskLookup, depthCache);
+                maxDepth = Math.Max(maxDepth, predDepth + 1);
+            }
+        }
+
+        depthCache[task.TaskId] = maxDepth;
+        return maxDepth;
+    }
+
+    /// <summary>
+    /// Ranks tasks for scheduling based on the chosen strategy.
+    /// </summary>
+    private IReadOnlyList<TaskItem> RankTasks(List<TaskItem> tasks, string strategy, Dictionary<string, TaskItem> taskLookup)
+    {
+        switch (strategy)
+        {
+            case DomainConstants.SchedulingStrategy.DeadlineFirst:
+                foreach (var task in tasks)
+                    task.ApplySchedulingRank(CalculateDeadlineFirstRank(task));
+                return tasks.OrderBy(t => t.SchedulingRank).ToList();
+
+            case DomainConstants.SchedulingStrategy.CriticalPath:
+            {
+                var depthCache = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                foreach (var task in tasks)
+                {
+                    ComputeCriticalPathDepth(task, taskLookup, depthCache);
+                    task.ApplySchedulingRank(CalculateSchedulingRank(task));
+                }
+                // Deepest dependency chain first, then by standard rank
+                return tasks
+                    .OrderByDescending(t => depthCache.GetValueOrDefault(t.TaskId))
+                    .ThenBy(t => t.SchedulingRank)
+                    .ToList();
+            }
+
+            case DomainConstants.SchedulingStrategy.BalancedWorkload:
+            case DomainConstants.SchedulingStrategy.PriorityFirst:
+            default:
+                // priority_first and balanced_workload use same task ranking
+                // balanced_workload differs only in resource selection
+                foreach (var task in tasks)
+                    task.ApplySchedulingRank(CalculateSchedulingRank(task));
+                return tasks.OrderBy(t => t.SchedulingRank).ToList();
+        }
+    }
+
+    /// <summary>
+    /// Selects the best resource from eligible list based on strategy.
+    /// </summary>
+    private TeamMember? SelectResource(
+        List<TeamMember> eligible,
+        TaskItem task,
+        string strategy,
+        Dictionary<string, double> utilization,
+        HashSet<string> preferredSet,
+        Dictionary<string, Dictionary<DateTime, double>> usedHours,
+        Dictionary<string, double> perResourceHours,
+        DateTime calDate)
+    {
+        if (eligible.Count == 0) return null;
+
+        IOrderedEnumerable<TeamMember> sorted;
+
+        if (string.Equals(strategy, DomainConstants.SchedulingStrategy.BalancedWorkload, StringComparison.OrdinalIgnoreCase))
+        {
+            // Balanced workload: prefer resource with lowest overall utilization
+            sorted = eligible
+                .OrderByDescending(r => preferredSet.Contains(r.ResourceId) ? 1 : 0)
+                .ThenBy(r => utilization.GetValueOrDefault(r.ResourceId))
+                .ThenByDescending(r => DomainConstants.Seniority.Rank.GetValueOrDefault(r.SeniorityLevel));
+        }
+        else
+        {
+            // Default: preferred first, then most available today, then seniority tiebreaker
+            sorted = eligible
+                .OrderByDescending(r => preferredSet.Contains(r.ResourceId) ? 1 : 0)
+                .ThenByDescending(r => perResourceHours[r.ResourceId] - (usedHours.GetValueOrDefault(r.ResourceId)?.GetValueOrDefault(calDate) ?? 0))
+                .ThenByDescending(r => DomainConstants.Seniority.Rank.GetValueOrDefault(r.SeniorityLevel));
+        }
+
+        return sorted.FirstOrDefault();
+    }
+
     /// <summary>
     /// Computes per-resource effective hours for a given date, accounting for availability and adjustments.
     /// Returns a dictionary of ResourceId → available hours for that day.
@@ -103,6 +238,9 @@ internal class SchedulingEngine : ISchedulingEngine
             if (resource.Active != DomainConstants.ActiveStatus.Yes) continue;
             if (date < resource.StartDate) continue;
             if (resource.EndDate.HasValue && date > resource.EndDate.Value) continue;
+
+            // Per-resource working day check
+            if (!IsWorkingDayForResource(date, resource)) continue;
 
             double capacity = resource.DailyCapacity * (resource.AvailabilityPct / 100.0);
 
@@ -168,6 +306,114 @@ internal class SchedulingEngine : ISchedulingEngine
         return DomainConstants.DeliveryRisk.OnTrack;
     }
 
+    /// <summary>
+    /// Adds N working days to a date (for computing lag).
+    /// </summary>
+    private DateTime AddWorkingDays(DateTime from, int days)
+    {
+        var current = from;
+        int added = 0;
+        while (added < days)
+        {
+            current = current.AddDays(1);
+            if (IsWorkingDay(current)) added++;
+        }
+        return current;
+    }
+
+    /// <summary>
+    /// Checks if all dependency constraints for a task are met on the given calendar date.
+    /// Uses the TaskDependency collection with FS/SS/FF types, lag days, and overlap.
+    /// </summary>
+    private bool AreDependenciesMet(
+        TaskItem task,
+        DateTime calDate,
+        Dictionary<string, TaskItem> taskLookup,
+        Dictionary<string, Dictionary<string, double>> phaseCompletedHours,
+        Dictionary<string, Dictionary<string, DateTime?>> phaseStartDate)
+    {
+        if (task.Dependencies.Count == 0)
+            return true;
+
+        foreach (var dep in task.Dependencies)
+        {
+            if (!taskLookup.TryGetValue(dep.PredecessorTaskId, out var predTask))
+                return false; // unknown predecessor = not met
+
+            var predBreakdown = predTask.EffortBreakdown.OrderBy(e => e.SortOrder).ToList();
+            if (predBreakdown.Count == 0)
+                return false;
+
+            var predTotalHours = predBreakdown.Sum(p => p.EstimationDays * DomainConstants.HoursPerDay);
+            var predCompletedHours = predBreakdown.Sum(p =>
+                phaseCompletedHours.GetValueOrDefault(dep.PredecessorTaskId)?.GetValueOrDefault(p.Role) ?? 0);
+
+            switch (dep.Type.ToUpperInvariant())
+            {
+                case DomainConstants.DependencyType.FinishToStart:
+                {
+                    // Predecessor must be (100 - overlapPct)% complete
+                    var requiredPct = (100.0 - dep.OverlapPct) / 100.0;
+                    if (predTotalHours > 0 && predCompletedHours < predTotalHours * requiredPct)
+                        return false;
+
+                    // If there's lag, find when the required completion was reached and add lag working days
+                    if (dep.LagDays > 0)
+                    {
+                        // Find the latest phase finish date as proxy for when completion was reached
+                        var predFinishes = phaseStartDate.GetValueOrDefault(dep.PredecessorTaskId)?
+                            .Values.Where(d => d.HasValue).Select(d => d!.Value).ToList();
+                        if (predFinishes == null || predFinishes.Count == 0)
+                            return false;
+
+                        var completionDate = predFinishes.Max();
+                        var earliestStart = AddWorkingDays(completionDate, dep.LagDays);
+                        if (calDate < earliestStart)
+                            return false;
+                    }
+                    break;
+                }
+
+                case DomainConstants.DependencyType.StartToStart:
+                {
+                    // Predecessor must have started
+                    var predStarts = phaseStartDate.GetValueOrDefault(dep.PredecessorTaskId)?
+                        .Values.Where(d => d.HasValue).Select(d => d!.Value).ToList();
+                    if (predStarts == null || predStarts.Count == 0)
+                        return false;
+
+                    var predStartDate = predStarts.Min();
+
+                    // Current date must be >= predecessor start + lag working days
+                    if (dep.LagDays > 0)
+                    {
+                        var earliestStart = AddWorkingDays(predStartDate, dep.LagDays);
+                        if (calDate < earliestStart)
+                            return false;
+                    }
+                    break;
+                }
+
+                case DomainConstants.DependencyType.FinishToFinish:
+                {
+                    // FF: task can start anytime, finish constraint checked post-allocation
+                    // Just allow start
+                    break;
+                }
+
+                default:
+                {
+                    // Unknown type — treat as FS with full completion required
+                    if (predTotalHours > 0 && predCompletedHours < predTotalHours)
+                        return false;
+                    break;
+                }
+            }
+        }
+
+        return true;
+    }
+
     public string RunScheduler()
     {
         using var activity = ActivitySource.StartActivity("RunScheduler", ActivityKind.Internal);
@@ -179,33 +425,31 @@ internal class SchedulingEngine : ISchedulingEngine
         var planStart = DateTime.TryParse(planStartSetting?.Value, out var ps) ? ps : new DateTime(2026, 5, 1);
         var endDate = planStart.AddDays(730);
 
-        var tasks = _db.Tasks.Include(t => t.EffortBreakdown).ToList();
+        // Read scheduling strategy
+        var strategySetting = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.SchedulingStrategy);
+        var strategy = strategySetting?.Value ?? DomainConstants.SchedulingStrategy.PriorityFirst;
+        if (!DomainConstants.SchedulingStrategy.All.Contains(strategy))
+            strategy = DomainConstants.SchedulingStrategy.PriorityFirst;
+
+        // Read baseline date
+        var baselineSetting = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.BaselineDate);
+        DateTime? baselineDate = DateTime.TryParse(baselineSetting?.Value, out var bd) ? bd : null;
+
+        var tasks = _db.Tasks
+            .Include(t => t.EffortBreakdown)
+            .Include(t => t.Dependencies)
+            .ToList();
         var resources = _db.Resources.ToList();
         var adjustments = _db.Adjustments.ToList();
 
         if (!tasks.Any()) return "No tasks to schedule";
 
-        // Build dependency lookup: TaskId -> list of prerequisite TaskIds
-        var dependencyMap = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var task in tasks)
-        {
-            var deps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (!string.IsNullOrWhiteSpace(task.DependsOnTaskIds))
-            {
-                foreach (var dep in task.DependsOnTaskIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                {
-                    deps.Add(dep);
-                }
-            }
-            dependencyMap[task.TaskId] = deps;
-        }
+        // Build task lookup for dependency checking
+        var taskLookup = tasks.ToDictionary(t => t.TaskId, StringComparer.OrdinalIgnoreCase);
 
-        // Calculate scheduling ranks
-        foreach (var task in tasks)
-        {
-            task.ApplySchedulingRank(CalculateSchedulingRank(task));
-        }
-        tasks = tasks.OrderBy(t => t.SchedulingRank).ToList();
+        // Rank tasks using strategy
+        var rankedTasks = RankTasks(tasks, strategy, taskLookup);
+        tasks = rankedTasks.ToList();
 
         // Clear and generate calendar
         _db.Calendar.RemoveRange(_db.Calendar);
@@ -242,8 +486,11 @@ internal class SchedulingEngine : ISchedulingEngine
         _db.Calendar.AddRange(calendar);
         _db.SaveChanges();
 
-        // Run per-resource allocation
-        _db.Allocations.RemoveRange(_db.Allocations);
+        // Baseline freeze: only remove unlocked allocations
+        _db.Allocations.RemoveRange(_db.Allocations.Where(a => !a.IsLocked));
+
+        // Load locked allocations to pre-compute cumulative state
+        var lockedAllocations = _db.Allocations.Where(a => a.IsLocked).ToList();
 
         var allocations = new List<Allocation>();
         var allocCounter = 1;
@@ -282,13 +529,71 @@ internal class SchedulingEngine : ISchedulingEngine
             }
         }
 
-        // Build task lookup for dependency checking
-        var taskLookup = tasks.ToDictionary(t => t.TaskId, StringComparer.OrdinalIgnoreCase);
+        // Pre-compute cumulative hours from locked allocations
+        foreach (var locked in lockedAllocations)
+        {
+            // Update used hours
+            if (!usedHours.ContainsKey(locked.ResourceId))
+                usedHours[locked.ResourceId] = new Dictionary<DateTime, double>();
+            if (!usedHours[locked.ResourceId].ContainsKey(locked.CalendarDate))
+                usedHours[locked.ResourceId][locked.CalendarDate] = 0;
+            usedHours[locked.ResourceId][locked.CalendarDate] += locked.HoursAllocated;
+
+            // Update phase state
+            if (phaseCompletedHours.ContainsKey(locked.TaskId) &&
+                phaseCompletedHours[locked.TaskId].ContainsKey(locked.Role))
+            {
+                phaseCompletedHours[locked.TaskId][locked.Role] += locked.HoursAllocated;
+
+                if (!phaseStartDate[locked.TaskId][locked.Role].HasValue ||
+                    locked.CalendarDate < phaseStartDate[locked.TaskId][locked.Role])
+                    phaseStartDate[locked.TaskId][locked.Role] = locked.CalendarDate;
+
+                if (locked.IsComplete)
+                    phaseFinishDate[locked.TaskId][locked.Role] = locked.CalendarDate;
+            }
+
+            if (taskResourceIds.ContainsKey(locked.TaskId))
+                taskResourceIds[locked.TaskId].Add(locked.ResourceId);
+        }
+
+        // Overall utilization tracking for balanced_workload strategy
+        var overallUtilization = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        foreach (var resource in resources.Where(r => r.Active == DomainConstants.ActiveStatus.Yes))
+        {
+            overallUtilization[resource.ResourceId] = 0;
+        }
+        // Seed utilization from locked allocations
+        foreach (var locked in lockedAllocations)
+        {
+            if (overallUtilization.ContainsKey(locked.ResourceId))
+                overallUtilization[locked.ResourceId] += locked.HoursAllocated;
+        }
+
+        // Track which resources are allocated to which task on which day (for parallel phase guard)
+        // taskDayResources[taskId][date] = set of resourceIds already allocated on that day
+        var taskDayResources = new Dictionary<string, Dictionary<DateTime, HashSet<string>>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var task in tasks)
+            taskDayResources[task.TaskId] = new Dictionary<DateTime, HashSet<string>>();
+
+        // Seed from locked allocations
+        foreach (var locked in lockedAllocations)
+        {
+            if (!taskDayResources.ContainsKey(locked.TaskId))
+                taskDayResources[locked.TaskId] = new Dictionary<DateTime, HashSet<string>>();
+            if (!taskDayResources[locked.TaskId].ContainsKey(locked.CalendarDate))
+                taskDayResources[locked.TaskId][locked.CalendarDate] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            taskDayResources[locked.TaskId][locked.CalendarDate].Add(locked.ResourceId);
+        }
 
         foreach (var calRow in calendar.Where(c => c.IsWorkingDay))
         {
             var calDate = calRow.CalendarDate;
             var calDateKey = calRow.DateKey;
+
+            // Baseline freeze: skip days before baseline_date
+            if (baselineDate.HasValue && calDate < baselineDate.Value.Date)
+                continue;
 
             // Compute per-resource available hours for this day
             var perResourceHours = CalculatePerResourceHours(calDate, resources, adjustments);
@@ -309,19 +614,9 @@ internal class SchedulingEngine : ISchedulingEngine
                 if (task.OverrideStart.HasValue && calDate < task.OverrideStart.Value.Date)
                     continue;
 
-                // Check dependency constraints: all prerequisites must be fully completed
-                if (dependencyMap.TryGetValue(taskId, out var deps) && deps.Count > 0)
-                {
-                    var allDepsCompleted = deps.All(depId =>
-                    {
-                        if (!taskLookup.TryGetValue(depId, out var depTask)) return false;
-                        var depBreakdown = depTask.EffortBreakdown.OrderBy(e => e.SortOrder).ToList();
-                        return depBreakdown.All(p =>
-                            phaseCompletedHours.GetValueOrDefault(depId)?.GetValueOrDefault(p.Role) >= p.EstimationDays * DomainConstants.HoursPerDay);
-                    });
-                    if (!allDepsCompleted)
-                        continue;
-                }
+                // Check dependency constraints using TaskDependency collection with FS/SS/FF support
+                if (!AreDependenciesMet(task, calDate, taskLookup, phaseCompletedHours, phaseStartDate))
+                    continue;
 
                 // Parse preferred resources once per task
                 var preferredSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -333,7 +628,7 @@ internal class SchedulingEngine : ISchedulingEngine
                     }
                 }
 
-                // Find the first incomplete phase to work on
+                // Parallel phase execution: iterate all incomplete phases instead of breaking on first
                 foreach (var phase in breakdown)
                 {
                     var phaseIndex = breakdown.IndexOf(phase);
@@ -354,7 +649,7 @@ internal class SchedulingEngine : ISchedulingEngine
                             continue; // can't start this phase yet
                     }
 
-                    // This is the active phase — allocate resources
+                    // This is an active phase — allocate resources
                     var remainingHours = totalPhaseHours - phaseCompletedHours[taskId].GetValueOrDefault(phase.Role);
 
                     // Find eligible resources matching phase.Role
@@ -366,7 +661,27 @@ internal class SchedulingEngine : ISchedulingEngine
                             if (!perResourceHours.ContainsKey(r.ResourceId)) return false;
                             var used = usedHours.GetValueOrDefault(r.ResourceId)?.GetValueOrDefault(calDate) ?? 0;
                             var available = perResourceHours[r.ResourceId] - used;
-                            return available >= DomainConstants.MinAllocationHours;
+                            if (available < DomainConstants.MinAllocationHours) return false;
+
+                            // Per-resource working day check
+                            if (!IsWorkingDayForResource(calDate, r)) return false;
+
+                            // Guard: don't allocate same resource to two phases of same task on same day
+                            if (taskDayResources.TryGetValue(taskId, out var dayMap) &&
+                                dayMap.TryGetValue(calDate, out var dayResources) &&
+                                dayResources.Contains(r.ResourceId))
+                                return false;
+
+                            // Seniority filter: if phase has MinSeniority, only include resources meeting the requirement
+                            if (!string.IsNullOrEmpty(phase.MinSeniority))
+                            {
+                                var requiredRank = DomainConstants.Seniority.Rank.GetValueOrDefault(phase.MinSeniority);
+                                var resourceRank = DomainConstants.Seniority.Rank.GetValueOrDefault(r.SeniorityLevel);
+                                if (resourceRank < requiredRank)
+                                    return false;
+                            }
+
+                            return true;
                         }).ToList();
                     }
                     else
@@ -374,19 +689,15 @@ internal class SchedulingEngine : ISchedulingEngine
                         eligible = new List<TeamMember>();
                     }
 
-                    // Sort: preferred first, then most available (least loaded)
-                    eligible = eligible
-                        .OrderByDescending(r => preferredSet.Contains(r.ResourceId) ? 1 : 0)
-                        .ThenByDescending(r => perResourceHours[r.ResourceId] - (usedHours.GetValueOrDefault(r.ResourceId)?.GetValueOrDefault(calDate) ?? 0))
-                        .ToList();
-
                     int resourcesAssigned = 0;
                     var maxResources = (int)Math.Ceiling(task.MaxResource);
 
-                    foreach (var resource in eligible)
+                    while (eligible.Count > 0 && resourcesAssigned < maxResources && remainingHours > 0)
                     {
-                        if (resourcesAssigned >= maxResources) break;
-                        if (remainingHours <= 0) break;
+                        var resource = SelectResource(eligible, task, strategy, overallUtilization, preferredSet, usedHours, perResourceHours, calDate);
+                        if (resource == null) break;
+
+                        eligible.Remove(resource);
 
                         var used = usedHours.GetValueOrDefault(resource.ResourceId)?.GetValueOrDefault(calDate) ?? 0;
                         var available = perResourceHours[resource.ResourceId] - used;
@@ -421,10 +732,19 @@ internal class SchedulingEngine : ISchedulingEngine
                             usedHours[resource.ResourceId][calDate] = 0;
                         usedHours[resource.ResourceId][calDate] += give;
 
+                        // Update overall utilization
+                        if (overallUtilization.ContainsKey(resource.ResourceId))
+                            overallUtilization[resource.ResourceId] += give;
+
                         phaseCompletedHours[taskId][phase.Role] += give;
                         taskResourceIds[taskId].Add(resource.ResourceId);
                         remainingHours -= give;
                         resourcesAssigned++;
+
+                        // Track task-day-resource for parallel phase guard
+                        if (!taskDayResources[taskId].ContainsKey(calDate))
+                            taskDayResources[taskId][calDate] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        taskDayResources[taskId][calDate].Add(resource.ResourceId);
 
                         if (!phaseStartDate[taskId][phase.Role].HasValue)
                             phaseStartDate[taskId][phase.Role] = calDate;
@@ -436,12 +756,15 @@ internal class SchedulingEngine : ISchedulingEngine
                         }
                     }
 
-                    break; // Only work on first incomplete phase per task per day
+                    // No break here — continue to check next phases (parallel phase execution)
                 }
             }
         }
 
         _db.Allocations.AddRange(allocations);
+
+        // Combine locked + new allocations for task result computation
+        var allAllocations = lockedAllocations.Concat(allocations).ToList();
 
         // Update tasks with scheduling results
         foreach (var task in tasks)
@@ -473,7 +796,7 @@ internal class SchedulingEngine : ISchedulingEngine
             var assignedResourceId = resIds.Count > 0 ? string.Join(",", resIds.OrderBy(r => r)) : null;
 
             // Peak resource count: max resources allocated on any single day
-            var taskAllocs = allocations.Where(a => a.TaskId.Equals(taskId, StringComparison.OrdinalIgnoreCase)).ToList();
+            var taskAllocs = allAllocations.Where(a => a.TaskId.Equals(taskId, StringComparison.OrdinalIgnoreCase)).ToList();
             var peakResource = taskAllocs.Count > 0
                 ? taskAllocs.GroupBy(a => a.CalendarDate).Max(g => g.Count())
                 : 0;
@@ -485,7 +808,7 @@ internal class SchedulingEngine : ISchedulingEngine
             string risk = CalculateRisk(plannedFinish, task.StrictDate);
 
             task.ApplySchedulingResult(
-                assignedResource: peakResource,
+                peakConcurrency: peakResource,
                 plannedStart: plannedStart,
                 plannedFinish: plannedFinish,
                 duration: duration,
@@ -497,7 +820,7 @@ internal class SchedulingEngine : ISchedulingEngine
         // Update calendar reserved/remaining capacity
         foreach (var calRow in calendar)
         {
-            var dayAllocs = allocations.Where(a => a.CalendarDate.Date == calRow.CalendarDate.Date).ToList();
+            var dayAllocs = allAllocations.Where(a => a.CalendarDate.Date == calRow.CalendarDate.Date).ToList();
             var reservedHours = dayAllocs.Sum(a => a.HoursAllocated);
             calRow.ReservedCapacity = reservedHours / DomainConstants.HoursPerDay;
             calRow.RemainingCapacity = calRow.EffectiveCapacity - calRow.ReservedCapacity;
@@ -515,8 +838,107 @@ internal class SchedulingEngine : ISchedulingEngine
         activity?.SetTag("scheduling.task_count", tasks.Count);
         activity?.SetTag("scheduling.allocation_count", allocations.Count);
         activity?.SetTag("scheduling.status", "success");
+        activity?.SetTag("scheduling.strategy", strategy);
 
         return resultMessage;
+    }
+
+    public ScheduleDiffDto PreviewSchedule()
+    {
+        using var activity = ActivitySource.StartActivity("PreviewSchedule", ActivityKind.Internal);
+
+        // 1. Snapshot current task state before any changes (AsNoTracking so EF stays clean)
+        var tasks = _db.Tasks.Include(t => t.EffortBreakdown).Include(t => t.Dependencies).AsNoTracking().ToList();
+        var snapshots = tasks.Select(t => new
+        {
+            t.TaskId,
+            t.ServiceName,
+            OldStart = t.PlannedStart,
+            OldFinish = t.PlannedFinish,
+            OldRisk = t.DeliveryRisk,
+            OldAssignedResourceId = t.AssignedResourceId
+        }).ToDictionary(s => s.TaskId, StringComparer.OrdinalIgnoreCase);
+
+        // 2. Run the full scheduler inside a transaction that we will roll back,
+        //    so the DB is left exactly as it was — true dry-run.
+        using var transaction = _db.Database.BeginTransaction();
+        try
+        {
+            RunScheduler();
+
+            // 3. Detach tracked entities so the next reads go to the DB (still in transaction)
+            foreach (var entry in _db.ChangeTracker.Entries().ToList())
+                entry.State = EntityState.Detached;
+
+            var updatedTasks = _db.Tasks.Include(t => t.EffortBreakdown).Include(t => t.Dependencies).AsNoTracking().ToList();
+            var newAllocCount = _db.Allocations.AsNoTracking().Count(a => !a.IsLocked);
+
+            // 4. Compute diffs
+            var changes = new List<TaskDiffEntry>();
+            int affected = 0;
+            int unchanged = 0;
+
+            foreach (var newTask in updatedTasks)
+            {
+                if (!snapshots.TryGetValue(newTask.TaskId, out var old))
+                {
+                    changes.Add(new TaskDiffEntry(
+                        newTask.TaskId, newTask.ServiceName,
+                        null, newTask.PlannedStart,
+                        null, newTask.PlannedFinish,
+                        null, newTask.DeliveryRisk,
+                        null, newTask.AssignedResourceId,
+                        "Added"));
+                    affected++;
+                    continue;
+                }
+
+                bool startChanged = old.OldStart != newTask.PlannedStart;
+                bool finishChanged = old.OldFinish != newTask.PlannedFinish;
+                bool riskChanged = !string.Equals(old.OldRisk, newTask.DeliveryRisk, StringComparison.OrdinalIgnoreCase);
+                bool resourceChanged = !string.Equals(old.OldAssignedResourceId, newTask.AssignedResourceId, StringComparison.OrdinalIgnoreCase);
+
+                if (startChanged || finishChanged || riskChanged || resourceChanged)
+                {
+                    string changeType = "Modified";
+                    if (riskChanged && string.Equals(newTask.DeliveryRisk, DomainConstants.DeliveryRisk.Late, StringComparison.OrdinalIgnoreCase))
+                        changeType = "NowLate";
+                    else if (riskChanged && string.Equals(old.OldRisk, DomainConstants.DeliveryRisk.Late, StringComparison.OrdinalIgnoreCase))
+                        changeType = "NoLongerLate";
+
+                    changes.Add(new TaskDiffEntry(
+                        newTask.TaskId, newTask.ServiceName,
+                        old.OldStart, newTask.PlannedStart,
+                        old.OldFinish, newTask.PlannedFinish,
+                        old.OldRisk, newTask.DeliveryRisk,
+                        old.OldAssignedResourceId, newTask.AssignedResourceId,
+                        changeType));
+                    affected++;
+                }
+                else
+                {
+                    unchanged++;
+                }
+            }
+
+            var result = new ScheduleDiffDto(changes, affected, unchanged, newAllocCount);
+
+            // 5. Roll back — undoes all RunScheduler() DB writes (true dry-run)
+            transaction.Rollback();
+
+            // 6. Detach all tracked entities so the DbContext is clean for future use
+            foreach (var entry in _db.ChangeTracker.Entries().ToList())
+                entry.State = EntityState.Detached;
+
+            return result;
+        }
+        catch
+        {
+            transaction.Rollback();
+            foreach (var entry in _db.ChangeTracker.Entries().ToList())
+                entry.State = EntityState.Detached;
+            throw;
+        }
     }
 
     public Dictionary<string, object> GetDashboardKPIs()
@@ -537,7 +959,7 @@ internal class SchedulingEngine : ISchedulingEngine
         var atRisk = tasks.Count(t => t.DeliveryRisk == DomainConstants.DeliveryRisk.AtRisk);
         var late = tasks.Count(t => t.DeliveryRisk == DomainConstants.DeliveryRisk.Late);
 
-        var assignedResources = tasks.Where(t => t.AssignedResource.HasValue && t.AssignedResource > 0).Select(t => t.AssignedResource!.Value).ToList();
+        var assignedResources = tasks.Where(t => t.PeakConcurrency.HasValue && t.PeakConcurrency > 0).Select(t => t.PeakConcurrency!.Value).ToList();
         var avgAssigned = assignedResources.Any() ? assignedResources.Average() : 0;
 
         var today = _timeProvider.GetLocalNow().LocalDateTime.Date;
@@ -545,6 +967,12 @@ internal class SchedulingEngine : ISchedulingEngine
             .OrderBy(t => t.StrictDate)
             .Take(5)
             .ToList();
+
+        // Count overallocations: days where a resource's total allocated hours exceed 8
+        var allocations = _db.Allocations.ToList();
+        var overallocationCount = allocations
+            .GroupBy(a => new { a.ResourceId, a.CalendarDate })
+            .Count(g => g.Sum(a => a.HoursAllocated) > 8);
 
         return new Dictionary<string, object>
         {
@@ -558,7 +986,8 @@ internal class SchedulingEngine : ISchedulingEngine
             ["at_risk"] = atRisk,
             ["late"] = late,
             ["avg_assigned"] = Math.Round(avgAssigned, 1),
-            ["upcoming_strict"] = upcomingStrict
+            ["upcoming_strict"] = upcomingStrict,
+            ["overallocation_count"] = overallocationCount
         };
     }
 
@@ -592,5 +1021,23 @@ internal class SchedulingEngine : ISchedulingEngine
     {
         if (_ownsContext)
             _db.Dispose();
+    }
+
+    public void FreezeBaseline()
+    {
+        // Lock all currently-unlocked allocations so they survive future scheduler runs
+        var unlocked = _db.Allocations.Where(a => !a.IsLocked).ToList();
+        foreach (var a in unlocked)
+            a.IsLocked = true;
+
+        // Upsert baseline_date = today
+        var today = _timeProvider.GetUtcNow().Date.ToString("yyyy-MM-dd");
+        var setting = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.BaselineDate);
+        if (setting is not null)
+            setting.Value = today;
+        else
+            _db.Settings.Add(new Setting { Key = DomainConstants.SettingKeys.BaselineDate, Value = today });
+
+        _db.SaveChanges();
     }
 }

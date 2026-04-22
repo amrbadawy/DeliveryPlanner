@@ -1,0 +1,121 @@
+@page "/overallocation"
+@using MediatR
+@using SoftwareDeliveryPlanner.Application.Planning.Queries
+@using SoftwareDeliveryPlanner.Application.Abstractions
+@inject IMediator Mediator
+
+<PageTitle>Overallocation Alerts</PageTitle>
+
+<div class="d-flex justify-content-between align-items-start mb-4 page-header">
+    <div>
+        <h3 class="mb-1"><i class="bi bi-exclamation-triangle me-2"></i>Overallocation Alerts</h3>
+        <p class="page-subtitle">Resources allocated beyond daily capacity</p>
+    </div>
+    <div>
+        <button class="btn btn-outline-secondary" @onclick="LoadData" disabled="@isLoading" data-testid="overallocation-refresh">
+            @if (isLoading)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+            }
+            else
+            {
+                <i class="bi bi-arrow-clockwise"></i>
+            }
+            Refresh
+        </button>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <SkeletonLoader Variant="table" Rows="5" Columns="6" TestId="overallocation-skeleton" />
+}
+else if (!alerts.Any())
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5" data-testid="overallocation-empty">
+            <i class="bi bi-check-circle text-success" style="font-size:3rem;"></i>
+            <h5 class="mt-3">No overallocation detected</h5>
+            <p class="text-muted">All resources are within their daily capacity limits.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card border-0 shadow-sm mb-2">
+        <div class="card-body py-2">
+            <small class="text-muted">@alerts.Count alert(s) found. Run the scheduler to recalculate.</small>
+        </div>
+    </div>
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover mb-0" data-testid="overallocation-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>Resource</th>
+                        <th>Date</th>
+                        <th>Allocated (h)</th>
+                        <th>Capacity (h)</th>
+                        <th>Overage (h)</th>
+                        <th>Severity</th>
+                        <th>Tasks</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var alert in alerts)
+                    {
+                        <tr data-testid="overallocation-row-@alert.ResourceId">
+                            <td><strong>@alert.ResourceId</strong><br /><small class="text-muted">@alert.ResourceName</small></td>
+                            <td>@alert.Date.ToString("yyyy-MM-dd")</td>
+                            <td>@alert.AllocatedHours.ToString("F1")</td>
+                            <td>@alert.CapacityHours.ToString("F1")</td>
+                            <td class="text-danger fw-semibold">+@alert.OverageHours.ToString("F1")</td>
+                            <td>
+                                <span class="badge bg-@SeverityColor(alert.Severity)">@alert.Severity</span>
+                            </td>
+                            <td>
+                                @foreach (var tid in alert.TaskIds.Take(3))
+                                {
+                                    <span class="badge bg-light text-dark me-1">@tid</span>
+                                }
+                                @if (alert.TaskIds.Count > 3)
+                                {
+                                    <small class="text-muted">+@(alert.TaskIds.Count - 3) more</small>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<OverallocationAlertDto> alerts = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            var result = await Mediator.Send(new GetOverallocationAlertsQuery());
+            alerts = result.IsSuccess ? result.Value : new();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string SeverityColor(string severity) => severity switch
+    {
+        "Critical" => "danger",
+        "High" => "warning",
+        "Medium" => "info",
+        _ => "secondary"
+    };
+}

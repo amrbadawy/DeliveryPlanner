@@ -12,42 +12,48 @@ internal sealed class DomainEventAuditHandler : INotificationHandler<DomainEvent
 
     public DomainEventAuditHandler(IAuditService audit) => _audit = audit;
 
+    private readonly record struct AuditContext(
+        string? Action,
+        string? EntityType,
+        string? EntityId,
+        string? Description);
+
     public async Task Handle(DomainEventNotification notification, CancellationToken ct)
     {
         var domainEvent = notification.DomainEvent;
 
-        var (action, entityType, entityId, description) = domainEvent switch
+        var ctx = domainEvent switch
         {
-            TaskCreatedEvent e => (DomainConstants.AuditAction.Created, DomainConstants.EntityType.Task,
+            TaskCreatedEvent e => new AuditContext(DomainConstants.AuditAction.Created, DomainConstants.EntityType.Task,
                 e.TaskId, $"Task '{e.ServiceName}' created"),
 
-            TaskUpdatedEvent e => (DomainConstants.AuditAction.Updated, DomainConstants.EntityType.Task,
+            TaskUpdatedEvent e => new AuditContext(DomainConstants.AuditAction.Updated, DomainConstants.EntityType.Task,
                 e.TaskId, $"Task '{e.TaskId}' updated"),
 
-            ResourceCreatedEvent e => (DomainConstants.AuditAction.Created, DomainConstants.EntityType.Resource,
+            ResourceCreatedEvent e => new AuditContext(DomainConstants.AuditAction.Created, DomainConstants.EntityType.Resource,
                 e.ResourceId, $"Resource '{e.ResourceName}' created"),
 
-            ResourceUpdatedEvent e => (DomainConstants.AuditAction.Updated, DomainConstants.EntityType.Resource,
+            ResourceUpdatedEvent e => new AuditContext(DomainConstants.AuditAction.Updated, DomainConstants.EntityType.Resource,
                 e.ResourceId, $"Resource '{e.ResourceId}' updated"),
 
-            HolidayCreatedEvent e => (DomainConstants.AuditAction.Created, DomainConstants.EntityType.Holiday,
+            HolidayCreatedEvent e => new AuditContext(DomainConstants.AuditAction.Created, DomainConstants.EntityType.Holiday,
                 string.Empty, $"Holiday '{e.HolidayName}' created starting {e.StartDate:yyyy-MM-dd}"),
 
-            HolidayUpdatedEvent e => (DomainConstants.AuditAction.Updated, DomainConstants.EntityType.Holiday,
+            HolidayUpdatedEvent e => new AuditContext(DomainConstants.AuditAction.Updated, DomainConstants.EntityType.Holiday,
                 e.HolidayId.ToString(), $"Holiday #{e.HolidayId} updated"),
 
-            AdjustmentAddedEvent e => (DomainConstants.AuditAction.Created, DomainConstants.EntityType.Adjustment,
+            AdjustmentAddedEvent e => new AuditContext(DomainConstants.AuditAction.Created, DomainConstants.EntityType.Adjustment,
                 e.ResourceId, $"Adjustment '{e.AdjType}' added for resource '{e.ResourceId}'"),
 
-            AdjustmentRemovedEvent e => (DomainConstants.AuditAction.Deleted, DomainConstants.EntityType.Adjustment,
+            AdjustmentRemovedEvent e => new AuditContext(DomainConstants.AuditAction.Deleted, DomainConstants.EntityType.Adjustment,
                 e.AdjustmentId.ToString(), $"Adjustment #{e.AdjustmentId} removed from resource '{e.ResourceId}'"),
 
             _ => default
         };
 
-        if (action is not null)
+        if (ctx.Action is not null)
         {
-            await _audit.LogAsync(action, entityType, entityId, description);
+            await _audit.LogAsync(ctx.Action, ctx.EntityType!, ctx.EntityId!, ctx.Description!);
         }
     }
 }

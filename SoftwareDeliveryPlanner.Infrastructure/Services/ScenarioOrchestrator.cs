@@ -50,7 +50,7 @@ internal sealed class ScenarioOrchestrator : ServiceBase, IScenarioOrchestrator
         foreach (var task in tasks)
         {
             var effortData = task.EffortBreakdown
-                .Select(e => (e.Role, e.EstimationDays, e.OverlapPct, e.SortOrder))
+                .Select(e => new EffortSnapshotSpec(e.Role, e.EstimationDays, e.OverlapPct, e.SortOrder))
                 .ToList();
 
             var snapshot = ScenarioTaskSnapshot.Create(
@@ -64,7 +64,7 @@ internal sealed class ScenarioOrchestrator : ServiceBase, IScenarioOrchestrator
                 task.Duration,
                 task.StrictDate,
                 task.AssignedResourceId,
-                task.AssignedResource,
+                task.PeakConcurrency,
                 task.MaxResource,
                 task.Status,
                 task.DeliveryRisk,

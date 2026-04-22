@@ -14,5 +14,8 @@ internal class TaskEffortBreakdownConfiguration : IEntityTypeConfiguration<TaskE
         builder.Property(e => e.EstimationDays);
         builder.Property(e => e.OverlapPct);
         builder.Property(e => e.SortOrder);
+
+        builder.Property(e => e.MinSeniority)
+            .HasMaxLength(20);
     }
 }

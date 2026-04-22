@@ -216,7 +216,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     StrictDate = table.Column<DateTime>(type: "datetime2", nullable: true),
                     Priority = table.Column<int>(type: "int", nullable: false),
                     SchedulingRank = table.Column<int>(type: "int", nullable: true),
-                    AssignedResource = table.Column<double>(type: "float", nullable: true),
+                    PeakConcurrency = table.Column<double>(type: "float", nullable: true),
                     AssignedResourceId = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     PlannedStart = table.Column<DateTime>(type: "datetime2", nullable: true),
                     PlannedFinish = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -224,7 +224,6 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     Status = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
                     DeliveryRisk = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
                     OverrideStart = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    DependsOnTaskIds = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     Comments = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
                     Phase = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
                     PreferredResourceIds = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
@@ -272,7 +271,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     Duration = table.Column<int>(type: "int", nullable: true),
                     StrictDate = table.Column<DateTime>(type: "datetime2", nullable: true),
                     AssignedResourceId = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
-                    AssignedResource = table.Column<double>(type: "float", nullable: true),
+                    PeakConcurrency = table.Column<double>(type: "float", nullable: true),
                     MaxResource = table.Column<double>(type: "float", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     DeliveryRisk = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
@@ -307,6 +306,8 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     EndDate = table.Column<DateTime>(type: "datetime2", nullable: true),
                     Active = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     Notes = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    SeniorityLevel = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false, defaultValue: "Mid"),
+                    WorkingWeek = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
@@ -339,13 +340,39 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     HoursAllocated = table.Column<double>(type: "float", nullable: false),
                     CumulativeEffort = table.Column<double>(type: "float", nullable: false),
                     IsComplete = table.Column<bool>(type: "bit", nullable: false),
-                    ServiceStatus = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false)
+                    ServiceStatus = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
+                    IsLocked = table.Column<bool>(type: "bit", nullable: false, defaultValue: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Allocations", x => x.Id);
                     table.ForeignKey(
                         name: "FK_Allocations_TaskItems_TaskId",
+                        column: x => x.TaskId,
+                        principalSchema: "task",
+                        principalTable: "TaskItems",
+                        principalColumn: "TaskId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "TaskDependencies",
+                schema: "task",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    TaskId = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    PredecessorTaskId = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    Type = table.Column<string>(type: "nvarchar(5)", maxLength: 5, nullable: false),
+                    LagDays = table.Column<int>(type: "int", nullable: false),
+                    OverlapPct = table.Column<double>(type: "float", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TaskDependencies", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_TaskDependencies_TaskItems_TaskId",
                         column: x => x.TaskId,
                         principalSchema: "task",
                         principalTable: "TaskItems",
@@ -363,7 +390,8 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     Role = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     EstimationDays = table.Column<double>(type: "float", nullable: false),
                     OverlapPct = table.Column<double>(type: "float", nullable: false),
-                    SortOrder = table.Column<int>(type: "int", nullable: false)
+                    SortOrder = table.Column<int>(type: "int", nullable: false),
+                    MinSeniority = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -559,6 +587,13 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_TaskDependencies_TaskId_PredecessorTaskId",
+                schema: "task",
+                table: "TaskDependencies",
+                columns: new[] { "TaskId", "PredecessorTaskId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_TaskEffortBreakdowns_TaskId",
                 table: "TaskEffortBreakdowns",
                 column: "TaskId");
@@ -631,6 +666,10 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
             migrationBuilder.DropTable(
                 name: "Settings",
                 schema: "scheduling");
+
+            migrationBuilder.DropTable(
+                name: "TaskDependencies",
+                schema: "task");
 
             migrationBuilder.DropTable(
                 name: "TaskEffortBreakdowns");

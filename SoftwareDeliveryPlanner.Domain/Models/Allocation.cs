@@ -21,6 +21,9 @@ public class Allocation
     public bool IsComplete { get; set; }
     public string ServiceStatus { get; set; } = DomainConstants.TaskStatus.NotStarted;
 
+    /// <summary>Whether this allocation is locked and should not be modified by the scheduler.</summary>
+    public bool IsLocked { get; set; }
+
     // Navigation property
     public TaskItem? Task { get; set; }
 }

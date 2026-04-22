@@ -135,7 +135,7 @@
                         <label class="form-label fw-semibold">Effort Breakdown <span class="text-danger">*</span></label>
                         <table class="table table-sm table-bordered mb-2">
                             <thead class="table-light">
-                                <tr><th>Role</th><th style="width:120px">Days</th><th style="width:120px">Overlap %</th><th style="width:50px"></th></tr>
+                                <tr><th>Role</th><th style="width:120px">Days</th><th style="width:120px">Overlap %</th><th style="width:130px">Min Seniority</th><th style="width:50px"></th></tr>
                             </thead>
                             <tbody>
                                 @foreach (var entry in effortEntries)
@@ -158,6 +158,15 @@
                                             else
                                             { <input type="number" class="form-control form-control-sm" min="0" max="100" step="5"
                                                      @bind="entry.OverlapPct" data-testid="effort-overlap-@entry.Role" /> }
+                                        </td>
+                                        <td>
+                                            <select class="form-select form-select-sm" @bind="entry.MinSeniority" data-testid="effort-seniority-@entry.Role">
+                                                <option value="">Any</option>
+                                                <option value="@DomainConstants.Seniority.Junior">Junior</option>
+                                                <option value="@DomainConstants.Seniority.Mid">Mid</option>
+                                                <option value="@DomainConstants.Seniority.Senior">Senior</option>
+                                                <option value="@DomainConstants.Seniority.Principal">Principal</option>
+                                            </select>
                                         </td>
                                         <td>
                                             @if (!isRequired)
@@ -194,17 +203,41 @@
                     </div>
                     <div class="mb-2">
                         <label class="form-label">Depends On:</label>
-                        <select class="form-select" multiple size="4" @onchange="OnDependencyChanged" aria-label="Select task dependencies" data-testid="tasks-depends-on">
+                        <div class="border rounded p-2" style="max-height:200px;overflow-y:auto" data-testid="tasks-depends-on">
                             @foreach (var t in tasks.Where(t => t.TaskId != taskForm.TaskId))
                             {
-                                <option value="@t.TaskId" selected="@(selectedDependencies.Contains(t.TaskId))">
-                                    @t.TaskId — @t.ServiceName
-                                </option>
+                                var detail = selectedDepDetails.FirstOrDefault(d => d.TaskId == t.TaskId);
+                                var isChecked = detail != null;
+                                <div class="mb-1">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="dep-@t.TaskId"
+                                               checked="@isChecked" @onchange="() => ToggleDependency(t.TaskId)"
+                                               data-testid="dep-check-@t.TaskId" />
+                                        <label class="form-check-label" for="dep-@t.TaskId">
+                                            @t.TaskId &mdash; @t.ServiceName
+                                        </label>
+                                    </div>
+                                    @if (isChecked && detail != null)
+                                    {
+                                        <div class="d-flex gap-2 ms-4 mt-1 align-items-center">
+                                            <select class="form-select form-select-sm" style="width:80px"
+                                                    @bind="detail.Type" data-testid="dep-type-@t.TaskId">
+                                                <option value="FS">FS</option>
+                                                <option value="SS">SS</option>
+                                                <option value="FF">FF</option>
+                                            </select>
+                                            <input type="number" class="form-control form-control-sm" style="width:90px"
+                                                   min="0" @bind="detail.LagDays" placeholder="Lag days"
+                                                   data-testid="dep-lag-@t.TaskId" />
+                                            <small class="text-muted">lag days</small>
+                                        </div>
+                                    }
+                                </div>
                             }
-                        </select>
-                        @if (selectedDependencies.Any())
+                        </div>
+                        @if (selectedDepDetails.Any())
                         {
-                            <small class="text-muted">Selected: @string.Join(", ", selectedDependencies)</small>
+                            <small class="text-muted mt-1 d-block">Selected: @string.Join(", ", selectedDepDetails.Select(d => $"{d.TaskId} ({d.Type})"))</small>
                         }
                     </div>
                 </div>
@@ -256,7 +289,7 @@
                                                 <td>@row.EffortBreakdown.FirstOrDefault(e => e.Role == "DEV")?.EstimationDays</td>
                                                 <td>@row.EffortBreakdown.FirstOrDefault(e => e.Role == "QA")?.EstimationDays</td>
                                                 <td>@row.MaxResource</td><td>@row.Priority</td>
-                                                <td>@(row.StrictDate?.ToString("yyyy-MM-dd") ?? "")</td><td>@(row.DependsOnTaskIds ?? "")</td>
+                                                <td>@(row.StrictDate?.ToString("yyyy-MM-dd") ?? "")</td><td>@(row.Dependencies != null ? string.Join(",", row.Dependencies.Select(d => d.PredecessorTaskId)) : "")</td>
                                             </tr>
                                         }
                                     </tbody>
@@ -404,7 +437,7 @@ else
     private DateTime? strictDateValue;
     private string modalError = string.Empty;
     private ToastNotification toast = default!;
-    private HashSet<string> selectedDependencies = new();
+    private List<SelectedDependencyDetail> selectedDepDetails = new();
     private bool isLoaded = false;
     private bool isSaving = false;
     private bool isDeleting = false;
@@ -441,6 +474,7 @@ else
         public string Role { get; set; } = "";
         public double EstimationDays { get; set; }
         public double OverlapPct { get; set; }
+        public string? MinSeniority { get; set; }
     }
 
     private class TaskFormModel
@@ -452,6 +486,13 @@ else
         public int Priority { get; set; } = 5;
         public DateTime? StrictDate { get; set; }
         public string? DependsOnTaskIds { get; set; }
+    }
+
+    private class SelectedDependencyDetail
+    {
+        public string TaskId { get; set; } = "";
+        public string Type { get; set; } = "FS";
+        public int LagDays { get; set; } = 0;
     }
 
     private void AddEffortEntry()
@@ -586,7 +627,7 @@ else
             MaxResource = 1
         };
         strictDateValue = null;
-        selectedDependencies = new();
+        selectedDepDetails = new();
         editingTask = null;
         modalError = string.Empty;
         fieldErrors.Clear();
@@ -615,14 +656,18 @@ else
             DependsOnTaskIds = task.DependsOnTaskIds
         };
         strictDateValue = task.StrictDate;
-        selectedDependencies = string.IsNullOrWhiteSpace(task.DependsOnTaskIds)
-            ? new HashSet<string>()
-            : new HashSet<string>(task.DependsOnTaskIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        selectedDepDetails = task.Dependencies.Select(d => new SelectedDependencyDetail
+        {
+            TaskId = d.PredecessorTaskId,
+            Type = d.Type,
+            LagDays = d.LagDays
+        }).ToList();
         effortEntries = task.EffortBreakdown.Select(e => new EffortEntryModel
         {
             Role = e.Role,
             EstimationDays = e.EstimationDays,
-            OverlapPct = e.OverlapPct
+            OverlapPct = e.OverlapPct,
+            MinSeniority = e.MinSeniority
         }).OrderBy(e => DomainConstants.ResourceRole.GetPipelineSortOrder(e.Role)).ToList();
         editPhase = task.Phase ?? "";
         editPreferredResourceIds = task.PreferredResourceIds ?? "";
@@ -645,7 +690,7 @@ else
         isSaving = true;
         try
         {
-            var breakdown = effortEntries.Select(e => new EffortBreakdownInput(e.Role, e.EstimationDays, e.OverlapPct)).ToList();
+            var breakdown = effortEntries.Select(e => new EffortBreakdownInput(e.Role, e.EstimationDays, e.OverlapPct, string.IsNullOrEmpty(e.MinSeniority) ? null : e.MinSeniority)).ToList();
             var command = new UpsertTaskCommand(
                 Id: taskForm.Id,
                 TaskId: taskForm.TaskId,
@@ -654,7 +699,7 @@ else
                 Priority: taskForm.Priority,
                 EffortBreakdown: breakdown,
                 StrictDate: strictDateValue,
-                DependsOnTaskIds: selectedDependencies.Any() ? string.Join(",", selectedDependencies) : null,
+                Dependencies: selectedDepDetails.Any() ? selectedDepDetails.Select(d => new DependencyInput(d.TaskId, d.Type, d.LagDays, 0)).ToList() : null,
                 IsNew: editingTask == null,
                 Phase: string.IsNullOrWhiteSpace(editPhase) ? null : editPhase,
                 PreferredResourceIds: string.IsNullOrWhiteSpace(editPreferredResourceIds) ? null : editPreferredResourceIds);
@@ -738,16 +783,13 @@ else
         NavigationManager.NavigateTo($"/tasks/{taskId}");
     }
 
-    private void OnDependencyChanged(ChangeEventArgs e)
+    private void ToggleDependency(string taskId)
     {
-        if (e.Value is string[] values)
-        {
-            selectedDependencies = new HashSet<string>(values);
-        }
-        else if (e.Value is string single)
-        {
-            selectedDependencies = string.IsNullOrWhiteSpace(single) ? new() : new HashSet<string> { single };
-        }
+        var existing = selectedDepDetails.FirstOrDefault(d => d.TaskId == taskId);
+        if (existing != null)
+            selectedDepDetails.Remove(existing);
+        else
+            selectedDepDetails.Add(new SelectedDependencyDetail { TaskId = taskId });
     }
 
     private void ShowBulkImportModal()
@@ -793,7 +835,9 @@ else
                     Priority: parts.Length > 5 && int.TryParse(parts[5].Trim(), out var pri) ? pri : 5,
                     EffortBreakdown: bulkEffort,
                     StrictDate: parts.Length > 6 && DateTime.TryParse(parts[6].Trim(), out var sd) ? sd : null,
-                    DependsOnTaskIds: parts.Length > 7 ? parts[7].Trim() : null
+                    Dependencies: parts.Length > 7 && !string.IsNullOrWhiteSpace(parts[7].Trim())
+                        ? parts[7].Trim().Split(',', StringSplitOptions.RemoveEmptyEntries).Select(id => new DependencyInput(id.Trim(), "FS", 0, 0)).ToList()
+                        : null
                 ));
             }
         }
@@ -868,7 +912,8 @@ else
                 Id: draggedTask.Id, TaskId: draggedTask.TaskId, ServiceName: draggedTask.ServiceName,
                 MaxResource: draggedTask.MaxResource,
                 Priority: targetPriority, EffortBreakdown: dragBreakdown, StrictDate: draggedTask.StrictDate,
-                DependsOnTaskIds: draggedTask.DependsOnTaskIds, IsNew: false,
+                Dependencies: draggedTask.Dependencies.Any() ? draggedTask.Dependencies.Select(d => new DependencyInput(d.PredecessorTaskId, d.Type, d.LagDays, d.OverlapPct)).ToList() : null,
+                IsNew: false,
                 Phase: draggedTask.Phase, PreferredResourceIds: draggedTask.PreferredResourceIds));
 
             var targetBreakdown = targetTask.EffortBreakdown.Select(e => new EffortBreakdownInput(e.Role, e.EstimationDays, e.OverlapPct)).ToList();
@@ -876,7 +921,8 @@ else
                 Id: targetTask.Id, TaskId: targetTask.TaskId, ServiceName: targetTask.ServiceName,
                 MaxResource: targetTask.MaxResource,
                 Priority: dragPriority, EffortBreakdown: targetBreakdown, StrictDate: targetTask.StrictDate,
-                DependsOnTaskIds: targetTask.DependsOnTaskIds, IsNew: false,
+                Dependencies: targetTask.Dependencies.Any() ? targetTask.Dependencies.Select(d => new DependencyInput(d.PredecessorTaskId, d.Type, d.LagDays, d.OverlapPct)).ToList() : null,
+                IsNew: false,
                 Phase: targetTask.Phase, PreferredResourceIds: targetTask.PreferredResourceIds));
 
             await LoadTasks();

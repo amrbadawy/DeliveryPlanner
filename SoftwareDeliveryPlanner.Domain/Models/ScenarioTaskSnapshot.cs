@@ -27,7 +27,7 @@ public class ScenarioTaskSnapshot
 
     // ── Allocation ───────────────────────────────────────────
     public string? AssignedResourceId { get; private set; }
-    public double? AssignedResource { get; private set; }
+    public double? PeakConcurrency { get; private set; }
     public double MaxResource { get; private set; }
 
     // ── Status ───────────────────────────────────────────────
@@ -56,13 +56,13 @@ public class ScenarioTaskSnapshot
         int? duration,
         DateTime? strictDate,
         string? assignedResourceId,
-        double? assignedResource,
+        double? peakConcurrency,
         double maxResource,
         string status,
         string deliveryRisk,
         string? dependsOnTaskIds,
         string? phase,
-        List<(string Role, double EstimationDays, double OverlapPct, int SortOrder)>? effortBreakdown = null)
+        List<EffortSnapshotSpec>? effortBreakdown = null)
     {
         if (string.IsNullOrWhiteSpace(taskId))
             throw new DomainException("Task ID is required for a snapshot.");
@@ -79,7 +79,7 @@ public class ScenarioTaskSnapshot
             Duration = duration,
             StrictDate = strictDate,
             AssignedResourceId = assignedResourceId,
-            AssignedResource = assignedResource,
+            PeakConcurrency = peakConcurrency,
             MaxResource = maxResource,
             Status = status ?? string.Empty,
             DeliveryRisk = deliveryRisk ?? string.Empty,
@@ -89,14 +89,14 @@ public class ScenarioTaskSnapshot
 
         if (effortBreakdown is not null)
         {
-            foreach (var (role, days, overlap, sortOrder) in effortBreakdown)
+            foreach (var spec in effortBreakdown)
             {
                 snapshot._effortSnapshots.Add(new ScenarioEffortSnapshot
                 {
-                    Role = role,
-                    EstimationDays = days,
-                    OverlapPct = overlap,
-                    SortOrder = sortOrder
+                    Role = spec.Role,
+                    EstimationDays = spec.EstimationDays,
+                    OverlapPct = spec.OverlapPct,
+                    SortOrder = spec.SortOrder
                 });
             }
         }

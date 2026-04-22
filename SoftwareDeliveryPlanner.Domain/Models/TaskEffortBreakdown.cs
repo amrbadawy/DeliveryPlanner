@@ -33,6 +33,9 @@ public class TaskEffortBreakdown
     /// </summary>
     public int SortOrder { get; private set; }
 
+    /// <summary>Minimum seniority level required for the resource assigned to this phase. Null means any seniority.</summary>
+    public string? MinSeniority { get; private set; }
+
     // ── Navigation ───────────────────────────────────────────
     public TaskItem? Task { get; private set; }
 
@@ -47,7 +50,8 @@ public class TaskEffortBreakdown
         string taskId,
         string role,
         double estimationDays,
-        double overlapPct = 0)
+        double overlapPct = 0,
+        string? minSeniority = null)
     {
         if (string.IsNullOrWhiteSpace(taskId))
             throw new DomainException("Task ID is required for effort breakdown.");
@@ -61,18 +65,22 @@ public class TaskEffortBreakdown
         if (overlapPct < 0 || overlapPct > 100)
             throw new DomainException($"Overlap percentage for role '{role}' must be between 0 and 100.");
 
+        if (minSeniority is not null && !DomainConstants.Seniority.IsValid(minSeniority))
+            throw new DomainException($"Invalid minimum seniority '{minSeniority}'. Valid levels: {string.Join(", ", DomainConstants.Seniority.Levels)}.");
+
         return new TaskEffortBreakdown
         {
             TaskId = taskId.Trim().ToUpperInvariant(),
             Role = role.ToUpperInvariant(),
             EstimationDays = estimationDays,
             OverlapPct = overlapPct,
-            SortOrder = DomainConstants.ResourceRole.GetPipelineSortOrder(role)
+            SortOrder = DomainConstants.ResourceRole.GetPipelineSortOrder(role),
+            MinSeniority = minSeniority
         };
     }
 
     /// <summary>Updates estimation and overlap for this breakdown entry.</summary>
-    internal void Update(double estimationDays, double overlapPct)
+    internal void Update(double estimationDays, double overlapPct, string? minSeniority = null)
     {
         if (estimationDays <= 0)
             throw new DomainException($"Estimation days for role '{Role}' must be greater than zero.");
@@ -80,7 +88,11 @@ public class TaskEffortBreakdown
         if (overlapPct < 0 || overlapPct > 100)
             throw new DomainException($"Overlap percentage for role '{Role}' must be between 0 and 100.");
 
+        if (minSeniority is not null && !DomainConstants.Seniority.IsValid(minSeniority))
+            throw new DomainException($"Invalid minimum seniority '{minSeniority}'. Valid levels: {string.Join(", ", DomainConstants.Seniority.Levels)}.");
+
         EstimationDays = estimationDays;
         OverlapPct = overlapPct;
+        MinSeniority = minSeniority;
     }
 }

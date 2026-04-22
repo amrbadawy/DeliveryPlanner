@@ -32,9 +32,6 @@ public sealed class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
         builder.Property(t => t.AssignedResourceId)
             .HasMaxLength(500);
 
-        builder.Property(t => t.DependsOnTaskIds)
-            .HasMaxLength(500);
-
         builder.Property(t => t.Comments)
             .HasMaxLength(1000);
 
@@ -52,6 +49,15 @@ public sealed class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
         builder.Metadata.FindNavigation("EffortBreakdown")!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 
+        builder.HasMany(t => t.Dependencies)
+            .WithOne(d => d.Task)
+            .HasForeignKey(d => d.TaskId)
+            .HasPrincipalKey(t => t.TaskId);
+
+        builder.Metadata.FindNavigation("Dependencies")!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.Ignore(t => t.DependsOnTaskIds);
         builder.Ignore(t => t.TotalEstimationDays);
 
         builder.HasIndex(t => t.TaskId)

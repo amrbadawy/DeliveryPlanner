@@ -108,7 +108,7 @@ public class Pipeline_UpsertTaskTests : PipelineFixture
             Priority: 5,
             EffortBreakdown: MakeEffortBreakdown(10),
             StrictDate: null,
-            DependsOnTaskIds: null,
+            Dependencies: null,
             IsNew: true);
 
         await mediator.Send(command);
@@ -131,7 +131,7 @@ public class Pipeline_UpsertTaskTests : PipelineFixture
             Priority: 5,
             EffortBreakdown: MakeEffortBreakdown(10),
             StrictDate: null,
-            DependsOnTaskIds: null,
+            Dependencies: null,
             IsNew: true);
 
         var ex = await Assert.ThrowsAsync<ValidationException>(() => mediator.Send(command));
@@ -156,7 +156,7 @@ public class Pipeline_UpsertTaskTests : PipelineFixture
                 new("QA", 0, 0)
             },
             StrictDate: null,
-            DependsOnTaskIds: null,
+            Dependencies: null,
             IsNew: true);
 
         await Assert.ThrowsAsync<ValidationException>(() => mediator.Send(command));
@@ -447,7 +447,7 @@ public class Pipeline_CrossEntityTests : PipelineFixture
             Priority: existing.Priority,
             EffortBreakdown: MakeEffortBreakdown(existing.TotalEstimationDays + 5),
             StrictDate: existing.StrictDate,
-            DependsOnTaskIds: null,
+            Dependencies: null,
             IsNew: false);
 
         await mediator.Send(command);
@@ -521,7 +521,7 @@ public class Pipeline_TaskDependencyTests : PipelineFixture
             Priority: 1,
             EffortBreakdown: MakeEffortBreakdown(5),
             StrictDate: null,
-            DependsOnTaskIds: null,
+            Dependencies: null,
             IsNew: true));
 
         // Create dependent task
@@ -533,7 +533,7 @@ public class Pipeline_TaskDependencyTests : PipelineFixture
             Priority: 1,
             EffortBreakdown: MakeEffortBreakdown(3),
             StrictDate: null,
-            DependsOnTaskIds: "PRE-001",
+            Dependencies: new List<DependencyInput> { new("PRE-001", "FS", 0, 0) },
             IsNew: true));
 
         // Verify the dependency is persisted
@@ -759,7 +759,7 @@ public class Pipeline_RoundTripTests : PipelineFixture
             Priority: 3,
             EffortBreakdown: MakeEffortBreakdown(5),
             StrictDate: null,
-            DependsOnTaskIds: null,
+            Dependencies: null,
             IsNew: true));
 
         // Run scheduler
@@ -794,7 +794,7 @@ public class Pipeline_RoundTripTests : PipelineFixture
             Priority: existing.Priority,
             EffortBreakdown: MakeEffortBreakdown(existing.TotalEstimationDays + 100),
             StrictDate: existing.StrictDate,
-            DependsOnTaskIds: existing.DependsOnTaskIds,
+            Dependencies: existing.Dependencies.Any() ? existing.Dependencies.Select(d => new DependencyInput(d.PredecessorTaskId, d.Type, d.LagDays, d.OverlapPct)).ToList() : null,
             IsNew: false));
 
         // Reschedule

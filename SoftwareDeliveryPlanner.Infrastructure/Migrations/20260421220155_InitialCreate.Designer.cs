@@ -12,7 +12,7 @@ using SoftwareDeliveryPlanner.Infrastructure.Data;
 namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 {
     [DbContext(typeof(PlannerDbContext))]
-    [Migration("20260421145118_InitialCreate")]
+    [Migration("20260421220155_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -90,6 +90,11 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     b.Property<bool>("IsComplete")
                         .HasColumnType("bit");
+
+                    b.Property<bool>("IsLocked")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("ResourceId")
                         .IsRequired()
@@ -714,9 +719,6 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<double?>("AssignedResource")
-                        .HasColumnType("float");
-
                     b.Property<string>("AssignedResourceId")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -734,6 +736,9 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<double>("MaxResource")
+                        .HasColumnType("float");
+
+                    b.Property<double?>("PeakConcurrency")
                         .HasColumnType("float");
 
                     b.Property<string>("Phase")
@@ -834,6 +839,43 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.ToTable("Settings", "scheduling");
                 });
 
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TaskDependency", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("LagDays")
+                        .HasColumnType("int");
+
+                    b.Property<double>("OverlapPct")
+                        .HasColumnType("float");
+
+                    b.Property<string>("PredecessorTaskId")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("TaskId")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("nvarchar(5)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TaskId", "PredecessorTaskId")
+                        .IsUnique();
+
+                    b.ToTable("TaskDependencies", "task");
+                });
+
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TaskEffortBreakdown", b =>
                 {
                     b.Property<int>("Id")
@@ -844,6 +886,10 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     b.Property<double>("EstimationDays")
                         .HasColumnType("float");
+
+                    b.Property<string>("MinSeniority")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<double>("OverlapPct")
                         .HasColumnType("float");
@@ -876,9 +922,6 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<double?>("AssignedResource")
-                        .HasColumnType("float");
-
                     b.Property<string>("AssignedResourceId")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -895,10 +938,6 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
-                    b.Property<string>("DependsOnTaskIds")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
                     b.Property<int?>("Duration")
                         .HasColumnType("int");
 
@@ -907,6 +946,9 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     b.Property<DateTime?>("OverrideStart")
                         .HasColumnType("datetime2");
+
+                    b.Property<double?>("PeakConcurrency")
+                        .HasColumnType("float");
 
                     b.Property<string>("Phase")
                         .HasMaxLength(50)
@@ -1034,6 +1076,13 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("SeniorityLevel")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Mid");
+
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("datetime2");
 
@@ -1041,6 +1090,10 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("WorkingWeek")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.HasKey("Id");
 
@@ -1096,6 +1149,18 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.Navigation("Scenario");
                 });
 
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TaskDependency", b =>
+                {
+                    b.HasOne("SoftwareDeliveryPlanner.Domain.Models.TaskItem", "Task")
+                        .WithMany("Dependencies")
+                        .HasForeignKey("TaskId")
+                        .HasPrincipalKey("TaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Task");
+                });
+
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TaskEffortBreakdown", b =>
                 {
                     b.HasOne("SoftwareDeliveryPlanner.Domain.Models.TaskItem", "Task")
@@ -1130,6 +1195,8 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TaskItem", b =>
                 {
+                    b.Navigation("Dependencies");
+
                     b.Navigation("EffortBreakdown");
                 });
 

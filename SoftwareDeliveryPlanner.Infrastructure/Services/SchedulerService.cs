@@ -120,6 +120,19 @@ internal sealed class SchedulerService : ServiceBase, ISchedulerService
             OnTrack: (int)kpis["on_track"],
             AtRisk: (int)kpis["at_risk"],
             Late: (int)kpis["late"],
-            AvgAssigned: (double)kpis["avg_assigned"]);
+            AvgAssigned: (double)kpis["avg_assigned"],
+            OverallocationCount: (int)kpis["overallocation_count"]);
+    }
+
+    public async Task<ScheduleDiffDto> PreviewScheduleAsync(CancellationToken cancellationToken = default)
+    {
+        using var engine = await EngineFactory.CreateAsync(cancellationToken);
+        return engine.PreviewSchedule();
+    }
+
+    public async Task FreezeBaselineAsync(CancellationToken cancellationToken = default)
+    {
+        using var engine = await EngineFactory.CreateAsync(cancellationToken);
+        engine.FreezeBaseline();
     }
 }
