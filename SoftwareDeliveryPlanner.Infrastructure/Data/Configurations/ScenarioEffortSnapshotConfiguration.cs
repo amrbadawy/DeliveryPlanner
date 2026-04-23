@@ -12,6 +12,7 @@ internal class ScenarioEffortSnapshotConfiguration : IEntityTypeConfiguration<Sc
         builder.Property(e => e.Role).IsRequired().HasMaxLength(10);
         builder.Property(e => e.EstimationDays);
         builder.Property(e => e.OverlapPct);
+        builder.Property(e => e.MaxFte).HasDefaultValue(1.0);
         builder.Property(e => e.SortOrder);
 
         builder.HasOne(e => e.TaskSnapshot)

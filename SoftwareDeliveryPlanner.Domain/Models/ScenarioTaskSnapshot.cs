@@ -28,7 +28,6 @@ public class ScenarioTaskSnapshot
     // ── Allocation ───────────────────────────────────────────
     public string? AssignedResourceId { get; private set; }
     public double? PeakConcurrency { get; private set; }
-    public double MaxResource { get; private set; }
 
     // ── Status ───────────────────────────────────────────────
     public string Status { get; private set; } = string.Empty;
@@ -57,7 +56,6 @@ public class ScenarioTaskSnapshot
         DateTime? strictDate,
         string? assignedResourceId,
         double? peakConcurrency,
-        double maxResource,
         string status,
         string deliveryRisk,
         string? dependsOnTaskIds,
@@ -80,7 +78,6 @@ public class ScenarioTaskSnapshot
             StrictDate = strictDate,
             AssignedResourceId = assignedResourceId,
             PeakConcurrency = peakConcurrency,
-            MaxResource = maxResource,
             Status = status ?? string.Empty,
             DeliveryRisk = deliveryRisk ?? string.Empty,
             DependsOnTaskIds = dependsOnTaskIds,
@@ -96,7 +93,8 @@ public class ScenarioTaskSnapshot
                     Role = spec.Role,
                     EstimationDays = spec.EstimationDays,
                     OverlapPct = spec.OverlapPct,
-                    SortOrder = spec.SortOrder
+                    SortOrder = spec.SortOrder,
+                    MaxFte = spec.MaxFte
                 });
             }
         }
@@ -116,6 +114,7 @@ public class ScenarioEffortSnapshot
     public double EstimationDays { get; set; }
     public double OverlapPct { get; set; }
     public int SortOrder { get; set; }
+    public double MaxFte { get; set; } = 1.0;
 
     public ScenarioTaskSnapshot? TaskSnapshot { get; set; }
 }

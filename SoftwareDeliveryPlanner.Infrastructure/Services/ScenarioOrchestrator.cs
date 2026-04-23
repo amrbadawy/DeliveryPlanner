@@ -65,7 +65,6 @@ internal sealed class ScenarioOrchestrator : ServiceBase, IScenarioOrchestrator
                 task.StrictDate,
                 task.AssignedResourceId,
                 task.PeakConcurrency,
-                task.MaxResource,
                 task.Status,
                 task.DeliveryRisk,
                 task.DependsOnTaskIds,

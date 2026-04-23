@@ -15,16 +15,16 @@ internal sealed class UpsertTaskCommandHandler : IRequestHandler<UpsertTaskComma
     public async Task<Result> Handle(UpsertTaskCommand request, CancellationToken cancellationToken)
     {
         var breakdown = request.EffortBreakdown
-            .Select(e => new EffortBreakdownSpec(e.Role, e.EstimationDays, e.OverlapPct, e.MinSeniority))
+            .Select(e => (e.Role, e.EstimationDays, e.OverlapPct, e.MaxFte))
             .ToList();
 
         var dependencies = request.Dependencies?
-            .Select(d => new DependencySpec(d.PredecessorTaskId, d.Type, d.LagDays, d.OverlapPct))
+            .Select(d => (d.PredecessorTaskId, d.Type, d.LagDays, d.OverlapPct))
             .ToList();
 
         await _orchestrator.UpsertTaskAsync(
             request.Id, request.TaskId, request.ServiceName,
-            request.MaxResource, request.Priority, breakdown,
+            request.Priority, breakdown,
             request.StrictDate, dependencies, request.IsNew,
             request.OverrideStart, request.Phase, request.PreferredResourceIds,
             cancellationToken);

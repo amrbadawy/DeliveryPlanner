@@ -687,6 +687,11 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.Property<double>("EstimationDays")
                         .HasColumnType("float");
 
+                    b.Property<double>("MaxFte")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("float")
+                        .HasDefaultValue(1.0);
+
                     b.Property<double>("OverlapPct")
                         .HasColumnType("float");
 
@@ -731,9 +736,6 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     b.Property<int?>("Duration")
                         .HasColumnType("int");
-
-                    b.Property<double>("MaxResource")
-                        .HasColumnType("float");
 
                     b.Property<double?>("PeakConcurrency")
                         .HasColumnType("float");
@@ -884,6 +886,11 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.Property<double>("EstimationDays")
                         .HasColumnType("float");
 
+                    b.Property<double>("MaxFte")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("float")
+                        .HasDefaultValue(1.0);
+
                     b.Property<string>("MinSeniority")
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
@@ -937,9 +944,6 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     b.Property<int?>("Duration")
                         .HasColumnType("int");
-
-                    b.Property<double>("MaxResource")
-                        .HasColumnType("float");
 
                     b.Property<DateTime?>("OverrideStart")
                         .HasColumnType("datetime2");

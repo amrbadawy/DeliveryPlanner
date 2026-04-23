@@ -23,16 +23,16 @@ internal sealed class BulkImportTasksCommandHandler : IRequestHandler<BulkImport
             var id = existing?.Id ?? 0;
 
             var breakdown = row.EffortBreakdown
-                .Select(e => new EffortBreakdownSpec(e.Role, e.EstimationDays, e.OverlapPct, e.MinSeniority))
+                .Select(e => (e.Role, e.EstimationDays, e.OverlapPct, e.MaxFte))
                 .ToList();
 
             var dependencies = row.Dependencies?
-                .Select(d => new DependencySpec(d.PredecessorTaskId, d.Type, d.LagDays, d.OverlapPct))
+                .Select(d => (d.PredecessorTaskId, d.Type, d.LagDays, d.OverlapPct))
                 .ToList();
 
             await _orchestrator.UpsertTaskAsync(
                 id, row.TaskId, row.ServiceName,
-                row.MaxResource, row.Priority, breakdown,
+                row.Priority, breakdown,
                 row.StrictDate, dependencies, isNew,
                 phase: row.Phase, preferredResourceIds: row.PreferredResourceIds,
                 cancellationToken: cancellationToken);

@@ -22,7 +22,7 @@ public class Enhancement14_PeakConcurrencyTests
     [Fact]
     public void TaskItem_HasPeakConcurrencyProperty_NotAssignedResource()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         Assert.Null(task.PeakConcurrency);
         // Verify the old name is gone at compile time — if it compiled, the rename is correct
         Assert.True(true);
@@ -33,7 +33,7 @@ public class Enhancement14_PeakConcurrencyTests
     {
         var snap = ScenarioTaskSnapshot.Create(1, "TSK-001", "Service", 5, null,
             null, null, null, null, null, peakConcurrency: 2.5,
-            maxResource: 3, status: "NotStarted", deliveryRisk: "OnTrack",
+            status: "NotStarted", deliveryRisk: "OnTrack",
             dependsOnTaskIds: null, phase: null);
         Assert.Equal(2.5, snap.PeakConcurrency);
     }
@@ -43,7 +43,7 @@ public class Enhancement14_PeakConcurrencyTests
     {
         var snap = ScenarioTaskSnapshot.Create(1, "TSK-002", "Service", 5, null,
             null, null, null, null, null, peakConcurrency: null,
-            maxResource: 1, status: "NotStarted", deliveryRisk: "OnTrack",
+            status: "NotStarted", deliveryRisk: "OnTrack",
             dependsOnTaskIds: null, phase: null);
         Assert.Null(snap.PeakConcurrency);
     }
@@ -169,7 +169,7 @@ public class Enhancement4_TaskDependencyEntityTests
     [InlineData("FF")]
     public void AddDependency_ValidTypes_Stored(string type)
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         task.AddDependency("PRE-001", type, lagDays: 0, overlapPct: 0);
         Assert.Single(task.Dependencies);
         Assert.Equal(type, task.Dependencies.First().Type);
@@ -178,7 +178,7 @@ public class Enhancement4_TaskDependencyEntityTests
     [Fact]
     public void AddDependency_WithLagDays_Stored()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         task.AddDependency("PRE-001", "FS", lagDays: 3, overlapPct: 0);
         Assert.Equal(3, task.Dependencies.First().LagDays);
     }
@@ -186,7 +186,7 @@ public class Enhancement4_TaskDependencyEntityTests
     [Fact]
     public void AddDependency_WithOverlapPct_Stored()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         task.AddDependency("PRE-001", "FS", lagDays: 0, overlapPct: 20);
         Assert.Equal(20, task.Dependencies.First().OverlapPct);
     }
@@ -194,28 +194,28 @@ public class Enhancement4_TaskDependencyEntityTests
     [Fact]
     public void AddDependency_InvalidType_ThrowsDomainException()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         Assert.Throws<DomainException>(() => task.AddDependency("PRE-001", "INVALID"));
     }
 
     [Fact]
     public void AddDependency_NegativeLagDays_ThrowsDomainException()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         Assert.Throws<DomainException>(() => task.AddDependency("PRE-001", "FS", lagDays: -1));
     }
 
     [Fact]
     public void AddDependency_OverlapPctOver100_ThrowsDomainException()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         Assert.Throws<DomainException>(() => task.AddDependency("PRE-001", "FS", lagDays: 0, overlapPct: 101));
     }
 
     [Fact]
     public void AddDependency_Duplicate_ThrowsDomainException()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         task.AddDependency("PRE-001");
         Assert.Throws<DomainException>(() => task.AddDependency("PRE-001"));
     }
@@ -223,14 +223,14 @@ public class Enhancement4_TaskDependencyEntityTests
     [Fact]
     public void AddDependency_SelfReference_ThrowsDomainException()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         Assert.Throws<DomainException>(() => task.AddDependency("SVC-001"));
     }
 
     [Fact]
     public void ClearDependencies_RemovesAll()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         task.AddDependency("PRE-001");
         task.AddDependency("PRE-002");
         task.ClearDependencies();
@@ -241,7 +241,7 @@ public class Enhancement4_TaskDependencyEntityTests
     [Fact]
     public void RemoveDependency_ExistingDep_RemovesIt()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         task.AddDependency("PRE-001");
         task.AddDependency("PRE-002");
         task.RemoveDependency("PRE-001");
@@ -252,14 +252,14 @@ public class Enhancement4_TaskDependencyEntityTests
     [Fact]
     public void RemoveDependency_NonExistent_ThrowsDomainException()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         Assert.Throws<DomainException>(() => task.RemoveDependency("MISSING-001"));
     }
 
     [Fact]
     public void DependsOnTaskIds_ComputedFromDependencies_AlphabeticOrder()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         task.AddDependency("ZZZ-001");
         task.AddDependency("AAA-001");
         // DependsOnTaskIds sorts alphabetically
@@ -442,7 +442,7 @@ public class Enhancement11_12_13_5_SchedulingServicesTests : IDisposable
         _db.SaveChanges();
 
         // A task with both DEV and QA phases - both should get allocations
-        _db.Tasks.Add(TaskItem.Create("PP-001", "Parallel Phase Task", 2, 1, B(10)));
+        _db.Tasks.Add(TaskItem.Create("PP-001", "Parallel Phase Task", 1, B(10)));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -461,7 +461,7 @@ public class Enhancement11_12_13_5_SchedulingServicesTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("PP-002", "Two Phase Task", 3, 1, B(5)));
+        _db.Tasks.Add(TaskItem.Create("PP-002", "Two Phase Task", 1, B(5)));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -509,7 +509,7 @@ public class Enhancement9_PerResourceWorkingWeek_EngineTests : IDisposable
             workingWeek: DomainConstants.WorkingWeek.MonFri);
         _db.Resources.Add(resource);
 
-        _db.Tasks.Add(TaskItem.Create("WW-001", "Working Week Task", 1, 1, B(10)));
+        _db.Tasks.Add(TaskItem.Create("WW-001", "Working Week Task", 1, B(10)));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -567,10 +567,10 @@ public class Enhancement1_Seniority_EngineTests : IDisposable
         _db.Resources.AddRange(junior, senior);
 
         // Task with Senior minimum for DEV phase — set via EffortBreakdownSpec
-        var task = TaskItem.Create("SR-001", "Senior Required", 1, 1,
+        var task = TaskItem.Create("SR-001", "Senior Required", 1,
             new List<EffortBreakdownSpec>
             {
-                new("DEV", 3, 0, DomainConstants.Seniority.Senior),
+                new("DEV", 3, 0, MinSeniority: DomainConstants.Seniority.Senior),
                 new("QA", 1, 0)
             });
 
@@ -654,9 +654,9 @@ public class Enhancement15_Strategy_EngineTests : IDisposable
 
         // Task with a near strict date (should be scheduled first)
         var urgentDate = new DateTime(2026, 6, 1);
-        _db.Tasks.Add(TaskItem.Create("DF-001", "Urgent Task", 1, 5, B(3), urgentDate));
+        _db.Tasks.Add(TaskItem.Create("DF-001", "Urgent Task", 5, B(3), urgentDate));
         // Task with no strict date (lower priority in deadline_first)
-        _db.Tasks.Add(TaskItem.Create("DF-002", "Non-Urgent Task", 1, 5, B(3)));
+        _db.Tasks.Add(TaskItem.Create("DF-002", "Non-Urgent Task", 5, B(3)));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -741,7 +741,7 @@ public class Enhancement4_DependencyPersistenceTests : OrchestratorFixture
     {
         var handler = new UpsertTaskCommandHandler(TaskOrchestrator);
         await handler.Handle(new UpsertTaskCommand(
-            Id: 0, TaskId: "FSD-001", ServiceName: "FS Task", MaxResource: 1, Priority: 1,
+            Id: 0, TaskId: "FSD-001", ServiceName: "FS Task", Priority: 1,
             EffortBreakdown: EB(3), StrictDate: null,
             Dependencies: new List<DependencyInput> { new("SVC-001", "FS", 0, 0) },
             IsNew: true), CancellationToken.None);
@@ -758,7 +758,7 @@ public class Enhancement4_DependencyPersistenceTests : OrchestratorFixture
     {
         var handler = new UpsertTaskCommandHandler(TaskOrchestrator);
         await handler.Handle(new UpsertTaskCommand(
-            Id: 0, TaskId: "SSD-001", ServiceName: "SS Task", MaxResource: 1, Priority: 1,
+            Id: 0, TaskId: "SSD-001", ServiceName: "SS Task", Priority: 1,
             EffortBreakdown: EB(3), StrictDate: null,
             Dependencies: new List<DependencyInput> { new("SVC-001", "SS", 2, 0) },
             IsNew: true), CancellationToken.None);
@@ -777,7 +777,7 @@ public class Enhancement4_DependencyPersistenceTests : OrchestratorFixture
 
         // Create with one dependency
         await handler.Handle(new UpsertTaskCommand(
-            Id: 0, TaskId: "UPD-001", ServiceName: "Update Task", MaxResource: 1, Priority: 1,
+            Id: 0, TaskId: "UPD-001", ServiceName: "Update Task", Priority: 1,
             EffortBreakdown: EB(3), StrictDate: null,
             Dependencies: new List<DependencyInput> { new("SVC-001", "FS", 0, 0) },
             IsNew: true), CancellationToken.None);
@@ -787,7 +787,7 @@ public class Enhancement4_DependencyPersistenceTests : OrchestratorFixture
 
         // Update with a different dependency
         await handler.Handle(new UpsertTaskCommand(
-            Id: created.Id, TaskId: "UPD-001", ServiceName: "Update Task", MaxResource: 1, Priority: 1,
+            Id: created.Id, TaskId: "UPD-001", ServiceName: "Update Task", Priority: 1,
             EffortBreakdown: EB(3), StrictDate: null,
             Dependencies: new List<DependencyInput> { new("SVC-002", "FS", 0, 0) },
             IsNew: false), CancellationToken.None);
@@ -806,7 +806,7 @@ public class Enhancement4_DependencyPersistenceTests : OrchestratorFixture
 
         // Create with dependencies
         await handler.Handle(new UpsertTaskCommand(
-            Id: 0, TaskId: "CLR-001", ServiceName: "Clear Deps", MaxResource: 1, Priority: 1,
+            Id: 0, TaskId: "CLR-001", ServiceName: "Clear Deps", Priority: 1,
             EffortBreakdown: EB(3), StrictDate: null,
             Dependencies: new List<DependencyInput> { new("SVC-001", "FS", 0, 0) },
             IsNew: true), CancellationToken.None);
@@ -816,7 +816,7 @@ public class Enhancement4_DependencyPersistenceTests : OrchestratorFixture
 
         // Update with null dependencies = clear all
         await handler.Handle(new UpsertTaskCommand(
-            Id: created.Id, TaskId: "CLR-001", ServiceName: "Clear Deps", MaxResource: 1, Priority: 1,
+            Id: created.Id, TaskId: "CLR-001", ServiceName: "Clear Deps", Priority: 1,
             EffortBreakdown: EB(3), StrictDate: null,
             Dependencies: null,
             IsNew: false), CancellationToken.None);
@@ -843,7 +843,7 @@ public class Enhancement5_FeasibilityTests : OrchestratorFixture
         // Create a task with a tight strict date but first remove all resources
         // so it cannot be completed — should be infeasible
         await using var db = await Factory.CreateDbContextAsync();
-        var task = TaskItem.Create("FEA-001", "Infeasible Task", 1, 1,
+        var task = TaskItem.Create("FEA-001", "Infeasible Task", 1,
             B(20), strictDate: DateTime.Today.AddDays(3));
         db.Tasks.Add(task);
         // Remove all resources so no one can do the work
@@ -876,7 +876,7 @@ public class Enhancement5_FeasibilityTests : OrchestratorFixture
     {
         // Create a task WITHOUT a strict date — feasibility should not include it
         await using var db = await Factory.CreateDbContextAsync();
-        var task = TaskItem.Create("FEA-003", "No Strict Date", 1, 1, B(5));
+        var task = TaskItem.Create("FEA-003", "No Strict Date", 1, B(5));
         db.Tasks.Add(task);
         await db.SaveChangesAsync();
 
@@ -889,7 +889,7 @@ public class Enhancement5_FeasibilityTests : OrchestratorFixture
     {
         // Create an impossibly large task with a very tight deadline
         await using var db = await Factory.CreateDbContextAsync();
-        var task = TaskItem.Create("FEA-004", "Bottleneck Task", 1, 1,
+        var task = TaskItem.Create("FEA-004", "Bottleneck Task", 1,
             B(200), strictDate: DateTime.Today.AddDays(5));
         db.Tasks.Add(task);
         await db.SaveChangesAsync();

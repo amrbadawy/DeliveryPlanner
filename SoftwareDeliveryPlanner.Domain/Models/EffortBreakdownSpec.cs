@@ -8,4 +8,5 @@ public sealed record EffortBreakdownSpec(
     string Role,
     double EstimationDays,
     double OverlapPct,
+    double MaxFte = 1.0,
     string? MinSeniority = null);

@@ -1,5 +1,6 @@
 @page "/gantt"
 @using MediatR
+@using SoftwareDeliveryPlanner.Application.Abstractions
 @using SoftwareDeliveryPlanner.Application.Tasks.Queries
 @using SoftwareDeliveryPlanner.Application.Planning.Commands
 @using SoftwareDeliveryPlanner.Domain.Models
@@ -57,8 +58,14 @@ else
         (@totalDays days)
     </div>
 
-    <!-- Legend -->
-    <div class="d-flex gap-3 mb-3" data-testid="gantt-legend">
+    <!-- Legend: role colors + status markers -->
+    <div class="d-flex gap-3 mb-3 flex-wrap" data-testid="gantt-legend">
+        <span class="fw-semibold text-muted">Roles:</span>
+        @foreach (var role in DomainConstants.ResourceRole.PipelineOrder)
+        {
+            <span><span class="badge gantt-role-@role.ToLowerInvariant()">&nbsp;&nbsp;</span> @DomainConstants.ResourceRole.GetDisplayName(role)</span>
+        }
+        <span class="ms-3 fw-semibold text-muted">Status:</span>
         <span><span class="badge gantt-bar-completed">&nbsp;&nbsp;</span> Completed</span>
         <span><span class="badge gantt-bar-inprogress">&nbsp;&nbsp;</span> In Progress</span>
         <span><span class="badge gantt-bar-notstarted">&nbsp;&nbsp;</span> Not Started</span>
@@ -91,12 +98,9 @@ else
         {
             var barStyle = GetBarStyle(task);
             var barClass = GetBarColorClass(task);
-            var tooltip = $"{task.TaskId}: {task.ServiceName}\n" +
-                          $"Start: {task.PlannedStart?.ToString("yyyy-MM-dd")}\n" +
-                          $"Finish: {task.PlannedFinish?.ToString("yyyy-MM-dd")}\n" +
-                          $"Duration: {task.Duration} days\n" +
-                          $"Status: {task.Status}\n" +
-                          $"Risk: {task.DeliveryRisk}";
+            var segments = GetSegmentsForTask(task.TaskId);
+            var visibleSegments = segments.Take(MaxVisibleLanes).ToList();
+            var hiddenCount = segments.Count - visibleSegments.Count;
 
             <div class="gantt-row" data-testid="gantt-row-@task.TaskId">
                 <div class="gantt-label-col clickable-row" title="@task.ServiceName"
@@ -109,11 +113,38 @@ else
                 <div class="gantt-timeline-col">
                     @if (task.PlannedStart.HasValue && task.PlannedFinish.HasValue)
                     {
-                        <div class="gantt-bar @barClass @(IsCriticalTask(task) ? "gantt-bar-critical" : "")" style="@barStyle" title="@tooltip"
+                        @* Shell bar: shows status/risk via border color *@
+                        <div class="gantt-shell @barClass @(IsCriticalTask(task) ? "gantt-bar-critical" : "")" style="@barStyle"
+                             title="@task.TaskId: @task.ServiceName&#10;Status: @task.Status | Risk: @task.DeliveryRisk&#10;@task.PlannedStart?.ToString("yyyy-MM-dd") - @task.PlannedFinish?.ToString("yyyy-MM-dd") (@task.Duration d)"
                              role="button" tabindex="0"
                              @onclick="() => NavigateToTask(task.TaskId)" @onclick:stopPropagation
                              @onkeydown="(e) => OnGanttKeyDown(e, task.TaskId)" @onkeydown:stopPropagation
                              data-testid="gantt-bar-@task.TaskId">
+
+                            @* Role sub-segments *@
+                            @foreach (var seg in visibleSegments)
+                            {
+                                var segStyle = GetSegmentStyle(task, seg);
+                                var segTooltip = $"{seg.Role}: {DomainConstants.ResourceRole.GetDisplayName(seg.Role)}\n" +
+                                                 $"Start: {seg.SegmentStart:yyyy-MM-dd}\n" +
+                                                 $"End: {seg.SegmentEnd:yyyy-MM-dd}\n" +
+                                                 $"Duration: {seg.DurationDays}d\n" +
+                                                 $"Max FTE: {seg.MaxFte}\n" +
+                                                 $"Resources: {string.Join(", ", seg.AssignedResources.Select(r => r.ResourceName))}";
+                                var laneIndex = visibleSegments.IndexOf(seg);
+                                <div class="gantt-segment gantt-role-@seg.Role.ToLowerInvariant()" style="@segStyle; top: @(laneIndex * 10)px;"
+                                     title="@segTooltip"
+                                     data-testid="gantt-segment-@task.TaskId-@seg.Role">
+                                </div>
+                            }
+
+                            @if (hiddenCount > 0)
+                            {
+                                var hiddenRoles = string.Join(", ", segments.Skip(MaxVisibleLanes).Select(s => s.Role));
+                                <span class="gantt-overflow-indicator" title="@hiddenRoles"
+                                      data-testid="gantt-overflow-@task.TaskId">+@hiddenCount</span>
+                            }
+
                             <span class="gantt-bar-label">@task.Duration d</span>
                         </div>
 
@@ -153,7 +184,10 @@ else
 }
 
 @code {
+    private const int MaxVisibleLanes = 2;
+
     private List<TaskItem> scheduledTasks = new();
+    private Dictionary<string, List<GanttRoleSegmentDto>> segmentsByTask = new(StringComparer.OrdinalIgnoreCase);
     private DateTime planStart;
     private DateTime planEnd;
     private int totalDays;
@@ -180,6 +214,11 @@ else
             .OrderBy(t => t.PlannedStart)
             .ThenBy(t => t.SchedulingRank)
             .ToList();
+
+        // Load role-based segments
+        var segResult = await Mediator.Send(new GetGanttSegmentsQuery());
+        segmentsByTask = segResult.Value
+            .ToDictionary(s => s.TaskId, s => s.Segments, StringComparer.OrdinalIgnoreCase);
 
         if (scheduledTasks.Any())
         {
@@ -218,6 +257,9 @@ else
         }
     }
 
+    private List<GanttRoleSegmentDto> GetSegmentsForTask(string taskId)
+        => segmentsByTask.GetValueOrDefault(taskId) ?? new();
+
     private double GetDatePercent(DateTime date)
     {
         if (totalDays <= 0) return 0;
@@ -235,6 +277,31 @@ else
         var widthPct = Math.Max(rightPct - leftPct, 0.5); // minimum visible width
 
         return $"left: {leftPct}%; width: {widthPct}%;";
+    }
+
+    /// <summary>
+    /// Computes position of a role segment relative to the shell bar (parent).
+    /// Returns left/width as percentages of the shell bar.
+    /// </summary>
+    private string GetSegmentStyle(TaskItem task, GanttRoleSegmentDto segment)
+    {
+        if (!task.PlannedStart.HasValue || !task.PlannedFinish.HasValue)
+            return "display: none;";
+
+        var taskStart = task.PlannedStart.Value;
+        var taskEnd = task.PlannedFinish.Value;
+        var taskSpan = (taskEnd - taskStart).TotalDays;
+        if (taskSpan < 1) taskSpan = 1;
+
+        var segLeftDays = (segment.SegmentStart - taskStart).TotalDays;
+        var segWidthDays = (segment.SegmentEnd - segment.SegmentStart).TotalDays + 1;
+
+        var leftPct = Math.Max(0, Math.Round(segLeftDays / taskSpan * 100, 2));
+        var widthPct = Math.Max(1, Math.Round(segWidthDays / taskSpan * 100, 2));
+        // Clamp to not overflow
+        if (leftPct + widthPct > 100) widthPct = 100 - leftPct;
+
+        return $"left: {leftPct}%; width: {widthPct}%";
     }
 
     private string GetBarColorClass(TaskItem task)
@@ -283,7 +350,7 @@ else
     }
 
     private static string Truncate(string text, int maxLength)
-        => text.Length <= maxLength ? text : text[..(maxLength - 1)] + "…";
+        => text.Length <= maxLength ? text : text[..(maxLength - 1)] + "\u2026";
 
     private void NavigateToTask(string taskId)
     {

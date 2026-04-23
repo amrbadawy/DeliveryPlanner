@@ -212,7 +212,6 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     TaskId = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
                     ServiceName = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: false),
-                    MaxResource = table.Column<double>(type: "float", nullable: false),
                     StrictDate = table.Column<DateTime>(type: "datetime2", nullable: true),
                     Priority = table.Column<int>(type: "int", nullable: false),
                     SchedulingRank = table.Column<int>(type: "int", nullable: true),
@@ -272,7 +271,6 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     StrictDate = table.Column<DateTime>(type: "datetime2", nullable: true),
                     AssignedResourceId = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     PeakConcurrency = table.Column<double>(type: "float", nullable: true),
-                    MaxResource = table.Column<double>(type: "float", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     DeliveryRisk = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     DependsOnTaskIds = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true)
@@ -391,6 +389,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     EstimationDays = table.Column<double>(type: "float", nullable: false),
                     OverlapPct = table.Column<double>(type: "float", nullable: false),
                     SortOrder = table.Column<int>(type: "int", nullable: false),
+                    MaxFte = table.Column<double>(type: "float", nullable: false, defaultValue: 1.0),
                     MinSeniority = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true)
                 },
                 constraints: table =>
@@ -416,7 +415,8 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     Role = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     EstimationDays = table.Column<double>(type: "float", nullable: false),
                     OverlapPct = table.Column<double>(type: "float", nullable: false),
-                    SortOrder = table.Column<int>(type: "int", nullable: false)
+                    SortOrder = table.Column<int>(type: "int", nullable: false),
+                    MaxFte = table.Column<double>(type: "float", nullable: false, defaultValue: 1.0)
                 },
                 constraints: table =>
                 {

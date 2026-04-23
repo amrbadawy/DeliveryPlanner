@@ -15,7 +15,7 @@ public class BulkImportTasksCommandValidatorTests
 
     private static BulkImportTasksCommand Valid() => new(new List<BulkTaskRowDto>
     {
-        new("SVC-001", "Test Service", 1.0, 1, ValidEB(), null, null)
+        new("SVC-001", "Test Service", 1, ValidEB(), null)
     });
 
     [Fact]
@@ -35,7 +35,7 @@ public class BulkImportTasksCommandValidatorTests
     [Fact]
     public void EmptyTaskId_FailsValidation()
     {
-        var command = Valid() with { Tasks = new List<BulkTaskRowDto> { new("", "Test Service", 1.0, 1, ValidEB(), null, null) } };
+        var command = Valid() with { Tasks = new List<BulkTaskRowDto> { new("", "Test Service", 1, ValidEB(), null) } };
         var result = _validator.TestValidate(command);
         Assert.False(result.IsValid);
     }
@@ -43,7 +43,7 @@ public class BulkImportTasksCommandValidatorTests
     [Fact]
     public void EmptyServiceName_FailsValidation()
     {
-        var command = Valid() with { Tasks = new List<BulkTaskRowDto> { new("SVC-001", "", 1.0, 1, ValidEB(), null, null) } };
+        var command = Valid() with { Tasks = new List<BulkTaskRowDto> { new("SVC-001", "", 1, ValidEB(), null) } };
         var result = _validator.TestValidate(command);
         Assert.False(result.IsValid);
     }
@@ -51,7 +51,7 @@ public class BulkImportTasksCommandValidatorTests
     [Fact]
     public void EffortBreakdownEmpty_FailsValidation()
     {
-        var command = Valid() with { Tasks = new List<BulkTaskRowDto> { new("SVC-001", "Test Service", 1.0, 1, new List<EffortBreakdownInput>(), null, null) } };
+        var command = Valid() with { Tasks = new List<BulkTaskRowDto> { new("SVC-001", "Test Service", 1, new List<EffortBreakdownInput>(), null) } };
         var result = _validator.TestValidate(command);
         Assert.False(result.IsValid);
     }
@@ -64,7 +64,7 @@ public class BulkImportTasksCommandValidatorTests
             new("DEV", 0, 0),
             new("QA", 0, 0)
         };
-        var command = Valid() with { Tasks = new List<BulkTaskRowDto> { new("SVC-001", "Test Service", 1.0, 1, badEB, null, null) } };
+        var command = Valid() with { Tasks = new List<BulkTaskRowDto> { new("SVC-001", "Test Service", 1, badEB, null) } };
         var result = _validator.TestValidate(command);
         Assert.False(result.IsValid);
     }

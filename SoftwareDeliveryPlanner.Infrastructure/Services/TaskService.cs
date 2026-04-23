@@ -41,27 +41,32 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
     }
 
     public async Task UpsertTaskAsync(
-        int id, string taskId, string serviceName, double maxResource, int priority,
-        List<EffortBreakdownSpec> effortBreakdown,
+        int id, string taskId, string serviceName,
+        int priority,
+        List<(string Role, double EstimationDays, double OverlapPct, double MaxFte)> effortBreakdown,
         DateTime? strictDate,
-        List<DependencySpec>? dependencies,
+        List<(string PredecessorTaskId, string Type, int LagDays, double OverlapPct)>? dependencies,
         bool isNew,
         DateTime? overrideStart = null, string? phase = null, string? preferredResourceIds = null,
         CancellationToken cancellationToken = default)
     {
         await using var db = await DbFactory.CreateDbContextAsync(cancellationToken);
 
+        var specs = effortBreakdown
+            .Select(e => new EffortBreakdownSpec(e.Role, e.EstimationDays, e.OverlapPct, e.MaxFte))
+            .ToList();
+
         TaskItem task;
         if (isNew)
         {
-            task = TaskItem.Create(taskId, serviceName, maxResource, priority, effortBreakdown,
+            task = TaskItem.Create(taskId, serviceName, priority, specs,
                 strictDate, overrideStart, phase, preferredResourceIds);
 
             // Add dependencies to the domain object BEFORE adding to EF so the
             // graph traversal at Add() time picks them up.
             if (dependencies != null)
-                foreach (var dep in dependencies)
-                    task.AddDependency(dep.PredecessorTaskId, dep.Type, dep.LagDays, dep.OverlapPct);
+                foreach (var (predId, type, lagDays, overlapPct) in dependencies)
+                    task.AddDependency(predId, type, lagDays, overlapPct);
 
             db.Tasks.Add(task);
         }
@@ -71,7 +76,7 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
                 .Include(t => t.EffortBreakdown)
                 .Include(t => t.Dependencies)
                 .FirstOrDefaultAsync(t => t.Id == id, cancellationToken))!;
-            task.Update(serviceName, maxResource, priority, effortBreakdown,
+            task.Update(serviceName, priority, specs,
                 strictDate, phase, preferredResourceIds);
 
             // For updates, EF can't detect Clear() on a private backing field,
@@ -82,9 +87,9 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
 
             if (dependencies != null)
             {
-                foreach (var dep in dependencies)
+                foreach (var (predId, type, lagDays, overlapPct) in dependencies)
                 {
-                    var newDep = task.AddDependency(dep.PredecessorTaskId, dep.Type, dep.LagDays, dep.OverlapPct);
+                    var newDep = task.AddDependency(predId, type, lagDays, overlapPct);
                     db.Set<TaskDependency>().Add(newDep);
                 }
             }

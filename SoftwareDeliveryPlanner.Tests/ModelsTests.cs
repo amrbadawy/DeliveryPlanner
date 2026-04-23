@@ -17,7 +17,6 @@ public class ModelsTests
         Assert.Equal(string.Empty, task.TaskId);
         Assert.Equal(string.Empty, task.ServiceName);
         Assert.Equal(0, task.TotalEstimationDays);
-        Assert.Equal(1.0, task.MaxResource);
         Assert.Equal(5, task.Priority);
         Assert.Equal("Not Started", task.Status);
         Assert.Equal("On Track", task.DeliveryRisk);
@@ -29,12 +28,11 @@ public class ModelsTests
     [Fact]
     public void TaskItem_CanSetProperties()
     {
-        var task = TaskItem.Create("TST-01", "API Development", 2, 1, B(10), strictDate: new DateTime(2026, 6, 1));
+        var task = TaskItem.Create("TST-01", "API Development", 1, B(10), strictDate: new DateTime(2026, 6, 1));
 
         Assert.Equal("TST-01", task.TaskId);
         Assert.Equal("API Development", task.ServiceName);
         Assert.True(task.TotalEstimationDays >= 10);
-        Assert.Equal(2, task.MaxResource);
         Assert.Equal(1, task.Priority);
         Assert.Equal(new DateTime(2026, 6, 1), task.StrictDate);
         Assert.Equal("Not Started", task.Status);
@@ -45,7 +43,7 @@ public class ModelsTests
     public void TaskItem_Timestamps_AreSetOnCreation()
     {
         var before = DateTime.Now.AddSeconds(-1);
-        var task = TaskItem.Create("TST-02", "Timestamp Test", 1, 5, B(1));
+        var task = TaskItem.Create("TST-02", "Timestamp Test", 5, B(1));
         var after = DateTime.Now.AddSeconds(1);
 
         Assert.True(task.CreatedAt >= before && task.CreatedAt <= after);

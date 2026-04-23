@@ -9,10 +9,10 @@ public interface ITaskOrchestrator
     Task<int> GetTaskCountAsync(CancellationToken cancellationToken = default);
     Task UpsertTaskAsync(
         int id, string taskId, string serviceName,
-        double maxResource, int priority,
-        List<EffortBreakdownSpec> effortBreakdown,
+        int priority,
+        List<(string Role, double EstimationDays, double OverlapPct, double MaxFte)> effortBreakdown,
         DateTime? strictDate,
-        List<DependencySpec>? dependencies,
+        List<(string PredecessorTaskId, string Type, int LagDays, double OverlapPct)>? dependencies,
         bool isNew,
         DateTime? overrideStart = null, string? phase = null,
         string? preferredResourceIds = null,
@@ -129,4 +129,5 @@ public interface IPlanningQueryService
     Task<List<OverallocationAlertDto>> GetOverallocationAlertsAsync(CancellationToken cancellationToken = default);
     Task<UtilizationForecastDto> GetUtilizationForecastAsync(int weeksAhead = 26, CancellationToken cancellationToken = default);
     Task<List<FeasibilityResultDto>> GetFeasibilityAsync(string? taskId = null, CancellationToken cancellationToken = default);
+    Task<List<TaskGanttSegmentsDto>> GetGanttSegmentsAsync(CancellationToken cancellationToken = default);
 }

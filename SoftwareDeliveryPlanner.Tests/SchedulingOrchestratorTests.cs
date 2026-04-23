@@ -143,7 +143,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         await using var db = await _factory.CreateDbContextAsync();
         db.Tasks.RemoveRange(db.Tasks);
         // Add a task with no planned finish
-        db.Tasks.Add(TaskItem.Create("SV-099", "No Finish Task", 1, 5, B(5)));
+        db.Tasks.Add(TaskItem.Create("SV-099", "No Finish Task", 5, B(5)));
         await db.SaveChangesAsync();
 
 
@@ -160,10 +160,10 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         var d1 = new DateTime(2026, 8, 1);
         var d2 = new DateTime(2026, 9, 15);
 
-        var t1 = TaskItem.Create("SVA-01", "Task A", 1, 5, B(5));
+        var t1 = TaskItem.Create("SVA-01", "Task A", 5, B(5));
         t1.ApplySchedulingResult(1.0, d1.AddDays(-5), d1, 5, "Completed", "On Track");
         db.Tasks.Add(t1);
-        var t2 = TaskItem.Create("SVB-02", "Task B", 1, 5, B(5));
+        var t2 = TaskItem.Create("SVB-02", "Task B", 5, B(5));
         t2.ApplySchedulingResult(1.0, d2.AddDays(-5), d2, 5, "Completed", "On Track");
         db.Tasks.Add(t2);
         await db.SaveChangesAsync();
@@ -511,7 +511,8 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     {
 
 
-        await _taskService.UpsertTaskAsync(0, "SVN-01", "New Test Task", 2, 5, B(10), null, null, true);
+        await _taskService.UpsertTaskAsync(0, "SVN-01", "New Test Task", 5,
+            B(10).Select(b => (b.Role, b.EstimationDays, b.OverlapPct, 1.0)).ToList(), null, null, true);
 
         await using var db = await _factory.CreateDbContextAsync();
         var persisted = await db.Tasks.FirstOrDefaultAsync(t => t.TaskId == "SVN-01");
@@ -528,7 +529,8 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         var existingId = existing.Id;
 
 
-        await _taskService.UpsertTaskAsync(existingId, existing.TaskId, "Updated Task Name", existing.MaxResource, 3, B(99), null, null, false);
+        await _taskService.UpsertTaskAsync(existingId, existing.TaskId, "Updated Task Name", 3,
+            B(99).Select(b => (b.Role, b.EstimationDays, b.OverlapPct, 1.0)).ToList(), null, null, false);
 
         await using var verifyDb = await _factory.CreateDbContextAsync();
         var reloaded = await verifyDb.Tasks.FirstOrDefaultAsync(t => t.Id == existingId);

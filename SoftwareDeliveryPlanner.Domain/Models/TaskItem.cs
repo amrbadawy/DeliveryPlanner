@@ -14,7 +14,6 @@ public class TaskItem : AggregateRoot
     public int Id { get; private set; }
     public string TaskId { get; private set; } = string.Empty;
     public string ServiceName { get; private set; } = string.Empty;
-    public double MaxResource { get; private set; } = 1.0;
     public DateTime? StrictDate { get; private set; }
     public int Priority { get; private set; } = 5;
     public int? SchedulingRank { get; private set; }
@@ -54,7 +53,6 @@ public class TaskItem : AggregateRoot
     public static TaskItem Create(
         string taskId,
         string serviceName,
-        double maxResource,
         int priority,
         List<EffortBreakdownSpec> effortBreakdown,
         DateTime? strictDate = null,
@@ -68,9 +66,6 @@ public class TaskItem : AggregateRoot
         if (string.IsNullOrWhiteSpace(serviceName))
             throw new DomainException("Service name must not be empty.");
 
-        if (maxResource <= 0)
-            throw new DomainException("Max resources must be greater than zero.");
-
         if (priority < 1 || priority > 10)
             throw new DomainException("Priority must be between 1 and 10.");
 
@@ -80,7 +75,6 @@ public class TaskItem : AggregateRoot
         {
             TaskId = normalizedId,
             ServiceName = serviceName.Trim(),
-            MaxResource = maxResource,
             Priority = priority,
             StrictDate = strictDate,
             OverrideStart = overrideStart,
@@ -99,7 +93,6 @@ public class TaskItem : AggregateRoot
     /// </summary>
     public void Update(
         string serviceName,
-        double maxResource,
         int priority,
         List<EffortBreakdownSpec> effortBreakdown,
         DateTime? strictDate = null,
@@ -109,14 +102,10 @@ public class TaskItem : AggregateRoot
         if (string.IsNullOrWhiteSpace(serviceName))
             throw new DomainException("Service name must not be empty.");
 
-        if (maxResource <= 0)
-            throw new DomainException("Max resources must be greater than zero.");
-
         if (priority < 1 || priority > 10)
             throw new DomainException("Priority must be between 1 and 10.");
 
         ServiceName = serviceName.Trim();
-        MaxResource = maxResource;
         Priority = priority;
         StrictDate = strictDate;
         Phase = string.IsNullOrWhiteSpace(phase) ? null : phase.Trim();
@@ -189,7 +178,7 @@ public class TaskItem : AggregateRoot
         _effortBreakdown.Clear();
         foreach (var spec in breakdown)
         {
-            _effortBreakdown.Add(TaskEffortBreakdown.Create(taskId, spec.Role, spec.EstimationDays, spec.OverlapPct, spec.MinSeniority));
+            _effortBreakdown.Add(TaskEffortBreakdown.Create(taskId, spec.Role, spec.EstimationDays, spec.OverlapPct, spec.MaxFte, spec.MinSeniority));
         }
 
         // Sort by pipeline order

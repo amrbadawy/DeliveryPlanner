@@ -24,7 +24,6 @@ public class ScenarioTaskSnapshotDomainTests
             strictDate: strict,
             assignedResourceId: "DEV-001",
             peakConcurrency: 1.0,
-            maxResource: 2.0,
             status: "InProgress",
             deliveryRisk: "OnTrack",
             dependsOnTaskIds: "TSK-000",
@@ -41,7 +40,6 @@ public class ScenarioTaskSnapshotDomainTests
         Assert.Equal(strict, snapshot.StrictDate);
         Assert.Equal("DEV-001", snapshot.AssignedResourceId);
         Assert.Equal(1.0, snapshot.PeakConcurrency);
-        Assert.Equal(2.0, snapshot.MaxResource);
         Assert.Equal("InProgress", snapshot.Status);
         Assert.Equal("OnTrack", snapshot.DeliveryRisk);
         Assert.Equal("TSK-000", snapshot.DependsOnTaskIds);
@@ -63,7 +61,6 @@ public class ScenarioTaskSnapshotDomainTests
             strictDate: null,
             assignedResourceId: null,
             peakConcurrency: null,
-            maxResource: 1.0,
             status: "NotStarted",
             deliveryRisk: "OnTrack",
             dependsOnTaskIds: null,
@@ -86,21 +83,21 @@ public class ScenarioTaskSnapshotDomainTests
     public void Create_EmptyTaskId_ThrowsDomainException(string taskId)
     {
         Assert.Throws<DomainException>(() => ScenarioTaskSnapshot.Create(
-            1, taskId, "Service", 5, null, null, null, null, null, null, null, 1.0, "NotStarted", "OnTrack", null, null));
+            1, taskId, "Service", 5, null, null, null, null, null, null, null, "NotStarted", "OnTrack", null, null));
     }
 
     [Fact]
     public void Create_NullTaskId_ThrowsDomainException()
     {
         Assert.Throws<DomainException>(() => ScenarioTaskSnapshot.Create(
-            1, null!, "Service", 5, null, null, null, null, null, null, null, 1.0, "NotStarted", "OnTrack", null, null));
+            1, null!, "Service", 5, null, null, null, null, null, null, null, "NotStarted", "OnTrack", null, null));
     }
 
     [Fact]
     public void Create_TrimsTaskIdAndServiceName()
     {
         var snapshot = ScenarioTaskSnapshot.Create(
-            1, "  TSK-003  ", "  Trimmed Service  ", 5, null, null, null, null, null, null, null, 1.0, "NotStarted", "OnTrack", null, null);
+            1, "  TSK-003  ", "  Trimmed Service  ", 5, null, null, null, null, null, null, null, "NotStarted", "OnTrack", null, null);
 
         Assert.Equal("TSK-003", snapshot.TaskId);
         Assert.Equal("Trimmed Service", snapshot.ServiceName);

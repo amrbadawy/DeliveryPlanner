@@ -21,8 +21,7 @@ test.describe('Tasks CRUD + edge cases', () => {
     await expectModalVisible(page, 'tasks-modal');
 
     await fillInputByTestId(page, 'tasks-service-name', serviceName);
-    await fillInputByTestId(page, 'tasks-dev-estimation', '4');
-    await fillInputByTestId(page, 'tasks-max-resource', '2');
+    await fillInputByTestId(page, 'effort-days-DEV', '4');
     await fillInputByTestId(page, 'tasks-priority', '3');
     await fillInputByTestId(page, 'tasks-strict-date', '2026-12-10');
 
@@ -37,7 +36,7 @@ test.describe('Tasks CRUD + edge cases', () => {
     await page.getByTestId(`tasks-edit-${taskId}`).click();
     await expectModalVisible(page, 'tasks-modal');
     await fillInputByTestId(page, 'tasks-service-name', updatedName);
-    await fillInputByTestId(page, 'tasks-dev-estimation', '6');
+    await fillInputByTestId(page, 'effort-days-DEV', '6');
     await page.getByTestId('tasks-save').click();
     await expect(page.getByTestId('tasks-modal')).toBeHidden();
     await expect(table.locator('tbody tr', { hasText: updatedName })).toHaveCount(1);

@@ -71,26 +71,76 @@
     color: var(--color-text-muted);
 }
 
-.gantt-bar {
+/* ── Shell bar (overall task span, colored by status/risk) ── */
+.gantt-shell {
     position: absolute;
-    height: 20px;
-    top: 6px;
+    height: 24px;
+    top: 4px;
     border-radius: var(--radius-sm);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-text-inverse);
     font-size: var(--font-size-xs);
     font-weight: 600;
     cursor: pointer;
     min-width: 2px;
     box-shadow: var(--shadow-sm);
     transition: filter 0.15s ease, transform 0.1s ease;
+    overflow: hidden;
+    /* Shell bar is semi-transparent to show segments underneath */
+    background: rgba(0, 0, 0, 0.06);
+    border: 2px solid transparent;
 }
 
-.gantt-bar:hover {
-    filter: brightness(1.15);
-    transform: scaleY(1.15);
+.gantt-shell:hover {
+    filter: brightness(1.05);
+    transform: scaleY(1.1);
+}
+
+/* Status/risk border colors on shell */
+.gantt-shell.gantt-bar-completed  { border-color: var(--color-success); }
+.gantt-shell.gantt-bar-inprogress { border-color: var(--color-info); }
+.gantt-shell.gantt-bar-notstarted { border-color: var(--color-neutral); }
+.gantt-shell.gantt-bar-atrisk     { border-color: var(--color-warning); }
+.gantt-shell.gantt-bar-late       { border-color: var(--color-danger); }
+
+/* ── Role sub-segments (inside shell bar) ──────────────────── */
+.gantt-segment {
+    position: absolute;
+    height: 8px;
+    border-radius: 3px;
+    min-width: 2px;
+    opacity: 0.9;
+    pointer-events: auto;
+}
+
+.gantt-segment:hover {
+    opacity: 1;
+    transform: scaleY(1.3);
+}
+
+/* ── Role-based colors ─────────────────────────────────────── */
+.gantt-role-ba  { background: #6366f1; } /* Indigo  */
+.gantt-role-sa  { background: #8b5cf6; } /* Violet  */
+.gantt-role-ux  { background: #ec4899; } /* Pink    */
+.gantt-role-dev { background: #3b82f6; } /* Blue    */
+.gantt-role-qa  { background: #10b981; } /* Emerald */
+.gantt-role-ops { background: #f59e0b; } /* Amber   */
+.gantt-role-pm  { background: #6b7280; } /* Gray    */
+
+/* ── Overflow indicator (+N roles) ─────────────────────────── */
+.gantt-overflow-indicator {
+    position: absolute;
+    right: 2px;
+    top: 0;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--color-text-secondary);
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 3px;
+    padding: 0 3px;
+    cursor: help;
+    z-index: 1;
 }
 
 .gantt-bar-label {
@@ -98,7 +148,18 @@
     overflow: hidden;
     text-overflow: ellipsis;
     padding: 0 4px;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    z-index: 1;
+    position: relative;
 }
+
+/* ── Legacy bar color classes (for legend badges) ──────────── */
+.gantt-bar-completed  { background: var(--color-success); }
+.gantt-bar-inprogress { background: var(--color-info); }
+.gantt-bar-notstarted { background: var(--color-neutral); }
+.gantt-bar-atrisk     { background: var(--color-warning); }
+.gantt-bar-late       { background: var(--color-danger); }
 
 .gantt-strict-marker {
     position: absolute;
@@ -144,13 +205,6 @@
     color: var(--color-accent);
     white-space: nowrap;
 }
-
-/* ── Gantt bar color classes ──────────────────────────────── */
-.gantt-bar-completed  { background: var(--color-success); }
-.gantt-bar-inprogress { background: var(--color-info); }
-.gantt-bar-notstarted { background: var(--color-neutral); }
-.gantt-bar-atrisk     { background: var(--color-warning); }
-.gantt-bar-late       { background: var(--color-danger); }
 
 /* ── Critical path highlight ─────────────────────────────── */
 .gantt-bar-critical {

@@ -12,7 +12,6 @@ public sealed class BulkImportTasksCommandValidator : AbstractValidator<BulkImpo
         {
             row.RuleFor(r => r.TaskId).NotEmpty().WithMessage("Task ID is required.");
             row.RuleFor(r => r.ServiceName).NotEmpty().WithMessage("Service Name is required.");
-            row.RuleFor(r => r.MaxResource).GreaterThanOrEqualTo(0).WithMessage("Max Resources must not be negative.");
             row.RuleFor(r => r.Priority).GreaterThan(0).WithMessage("Priority must be greater than zero.");
 
             row.RuleFor(r => r.EffortBreakdown)
@@ -32,6 +31,7 @@ public sealed class BulkImportTasksCommandValidator : AbstractValidator<BulkImpo
                 entry.RuleFor(e => e.Role).NotEmpty().WithMessage("Role is required.");
                 entry.RuleFor(e => e.EstimationDays).GreaterThan(0).WithMessage("EstimationDays must be greater than zero.");
                 entry.RuleFor(e => e.OverlapPct).InclusiveBetween(0, 100).WithMessage("OverlapPct must be between 0 and 100.");
+                entry.RuleFor(e => e.MaxFte).GreaterThan(0).WithMessage("Max FTE must be greater than zero.");
             });
         });
     }

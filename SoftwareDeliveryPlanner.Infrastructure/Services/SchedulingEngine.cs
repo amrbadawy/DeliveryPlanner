@@ -690,7 +690,7 @@ internal class SchedulingEngine : ISchedulingEngine
                     }
 
                     int resourcesAssigned = 0;
-                    var maxResources = (int)Math.Ceiling(task.MaxResource);
+                    var maxResources = (int)Math.Ceiling(phase.MaxFte);
 
                     while (eligible.Count > 0 && resourcesAssigned < maxResources && remainingHours > 0)
                     {

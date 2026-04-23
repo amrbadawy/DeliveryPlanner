@@ -106,15 +106,7 @@
                         }
                     </div>
                     <div class="row">
-                        <div class="col-md-4 mb-2">
-                            <label class="form-label">Max Resources:</label>
-                            <input class="form-control @(fieldErrors.ContainsKey("MaxResource") ? "is-invalid" : "")" type="number" min="0" step="0.5" @bind="taskForm.MaxResource" data-testid="tasks-max-resource" />
-                            @if (fieldErrors.ContainsKey("MaxResource"))
-                            {
-                                <div class="invalid-feedback">@fieldErrors["MaxResource"]</div>
-                            }
-                        </div>
-                        <div class="col-md-4 mb-2">
+                        <div class="col-md-6 mb-2">
                             <label class="form-label">Priority (1-10):</label>
                             <input class="form-control @(fieldErrors.ContainsKey("Priority") ? "is-invalid" : "")" type="number" min="1" max="10" @bind="taskForm.Priority" data-testid="tasks-priority" />
                             @if (fieldErrors.ContainsKey("Priority"))
@@ -122,7 +114,7 @@
                                 <div class="invalid-feedback">@fieldErrors["Priority"]</div>
                             }
                         </div>
-                        <div class="col-md-4 mb-2">
+                        <div class="col-md-6 mb-2">
                             <label class="form-label">Strict Date:</label>
                             <input class="form-control @(fieldErrors.ContainsKey("StrictDate") ? "is-invalid" : "")" type="date" @bind="strictDateValue" data-testid="tasks-strict-date" />
                             @if (fieldErrors.ContainsKey("StrictDate"))
@@ -135,7 +127,7 @@
                         <label class="form-label fw-semibold">Effort Breakdown <span class="text-danger">*</span></label>
                         <table class="table table-sm table-bordered mb-2">
                             <thead class="table-light">
-                                <tr><th>Role</th><th style="width:120px">Days</th><th style="width:120px">Overlap %</th><th style="width:130px">Min Seniority</th><th style="width:50px"></th></tr>
+                                <tr><th>Role</th><th style="width:120px">Days</th><th style="width:100px">Max FTE</th><th style="width:120px">Overlap %</th><th style="width:130px">Min Seniority</th><th style="width:50px"></th></tr>
                             </thead>
                             <tbody>
                                 @foreach (var entry in effortEntries)
@@ -151,6 +143,10 @@
                                         <td>
                                             <input type="number" class="form-control form-control-sm" min="0.5" step="0.5"
                                                    @bind="entry.EstimationDays" data-testid="effort-days-@entry.Role" />
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm" min="0.1" step="0.5"
+                                                   @bind="entry.MaxFte" data-testid="effort-maxfte-@entry.Role" />
                                         </td>
                                         <td>
                                             @if (isFirst)
@@ -270,7 +266,7 @@
                     {
                         <div class="alert alert-danger">@bulkError</div>
                     }
-                    <p class="text-muted small">Paste CSV with headers: <code>TaskId,ServiceName,DevEstDEV,DevEstQA,MaxResource,Priority,StrictDate,DependsOnTaskIds</code></p>
+                    <p class="text-muted small">Paste CSV with headers: <code>TaskId,ServiceName,DevEstDEV,DevEstQA,Priority,StrictDate,DependsOnTaskIds</code></p>
                     <textarea class="form-control font-monospace" rows="8" @bind="csvText" placeholder="SVC-010,Auth Service,15,2,3,,&#10;SVC-011,User API,20,3,5,2026-06-01,SVC-010" data-testid="bulk-import-csv"></textarea>
                     @if (parsedRows.Any())
                     {
@@ -279,7 +275,7 @@
                             <div class="table-responsive" style="max-height: 200px;">
                                 <table class="table table-sm table-bordered mb-0">
                                     <thead class="table-light">
-                                         <tr><th>ID</th><th>Name</th><th>DEV</th><th>QA</th><th>Max Res</th><th>Priority</th><th>Strict</th><th>Deps</th></tr>
+                                         <tr><th>ID</th><th>Name</th><th>DEV</th><th>QA</th><th>Priority</th><th>Strict</th><th>Deps</th></tr>
                                     </thead>
                                     <tbody>
                                         @foreach (var row in parsedRows)
@@ -288,7 +284,7 @@
                                                 <td>@row.TaskId</td><td>@row.ServiceName</td>
                                                 <td>@row.EffortBreakdown.FirstOrDefault(e => e.Role == "DEV")?.EstimationDays</td>
                                                 <td>@row.EffortBreakdown.FirstOrDefault(e => e.Role == "QA")?.EstimationDays</td>
-                                                <td>@row.MaxResource</td><td>@row.Priority</td>
+                                                <td>@row.Priority</td>
                                                 <td>@(row.StrictDate?.ToString("yyyy-MM-dd") ?? "")</td><td>@(row.Dependencies != null ? string.Join(",", row.Dependencies.Select(d => d.PredecessorTaskId)) : "")</td>
                                             </tr>
                                         }
@@ -356,7 +352,6 @@ else
                         <th role="button" @onclick='() => ApplySort("ServiceName")' aria-sort="@AriaSort("ServiceName")" data-testid="tasks-sort-name">Service @SortIndicator("ServiceName")</th>
                         <th role="button" @onclick='() => ApplySort("TotalEstimationDays")' aria-sort="@AriaSort("TotalEstimationDays")" data-testid="tasks-sort-est">Total Est. @SortIndicator("TotalEstimationDays")</th>
                         <th>Phase</th>
-                        <th>Max Res.</th>
                         <th role="button" @onclick='() => ApplySort("Priority")' aria-sort="@AriaSort("Priority")" data-testid="tasks-sort-priority">Priority @SortIndicator("Priority")</th>
                         <th role="button" @onclick='() => ApplySort("PlannedStart")' aria-sort="@AriaSort("PlannedStart")" data-testid="tasks-sort-start">Start @SortIndicator("PlannedStart")</th>
                         <th role="button" @onclick='() => ApplySort("PlannedFinish")' aria-sort="@AriaSort("PlannedFinish")" data-testid="tasks-sort-finish">Finish @SortIndicator("PlannedFinish")</th>
@@ -386,7 +381,6 @@ else
                             <td>@task.ServiceName</td>
                             <td>@task.TotalEstimationDays</td>
                             <td>@(task.Phase ?? "")</td>
-                            <td>@task.MaxResource</td>
                             <td>@task.Priority</td>
                             <td>@task.PlannedStart?.ToString("yyyy-MM-dd")</td>
                             <td>@task.PlannedFinish?.ToString("yyyy-MM-dd")</td>
@@ -473,6 +467,7 @@ else
     {
         public string Role { get; set; } = "";
         public double EstimationDays { get; set; }
+        public double MaxFte { get; set; } = 1.0;
         public double OverlapPct { get; set; }
         public string? MinSeniority { get; set; }
     }
@@ -482,7 +477,6 @@ else
         public int Id { get; set; }
         public string TaskId { get; set; } = string.Empty;
         public string ServiceName { get; set; } = string.Empty;
-        public double MaxResource { get; set; } = 1.0;
         public int Priority { get; set; } = 5;
         public DateTime? StrictDate { get; set; }
         public string? DependsOnTaskIds { get; set; }
@@ -623,8 +617,7 @@ else
         taskForm = new TaskFormModel
         {
             TaskId = $"SVC-{(count + 1):D3}",
-            Priority = 5,
-            MaxResource = 1
+            Priority = 5
         };
         strictDateValue = null;
         selectedDepDetails = new();
@@ -650,7 +643,6 @@ else
             Id = task.Id,
             TaskId = task.TaskId,
             ServiceName = task.ServiceName,
-            MaxResource = task.MaxResource,
             Priority = task.Priority,
             StrictDate = task.StrictDate,
             DependsOnTaskIds = task.DependsOnTaskIds
@@ -666,6 +658,7 @@ else
         {
             Role = e.Role,
             EstimationDays = e.EstimationDays,
+            MaxFte = e.MaxFte,
             OverlapPct = e.OverlapPct,
             MinSeniority = e.MinSeniority
         }).OrderBy(e => DomainConstants.ResourceRole.GetPipelineSortOrder(e.Role)).ToList();
@@ -690,12 +683,11 @@ else
         isSaving = true;
         try
         {
-            var breakdown = effortEntries.Select(e => new EffortBreakdownInput(e.Role, e.EstimationDays, e.OverlapPct, string.IsNullOrEmpty(e.MinSeniority) ? null : e.MinSeniority)).ToList();
+            var breakdown = effortEntries.Select(e => new EffortBreakdownInput(e.Role, e.EstimationDays, e.OverlapPct, e.MaxFte, string.IsNullOrEmpty(e.MinSeniority) ? null : e.MinSeniority)).ToList();
             var command = new UpsertTaskCommand(
                 Id: taskForm.Id,
                 TaskId: taskForm.TaskId,
                 ServiceName: taskForm.ServiceName,
-                MaxResource: taskForm.MaxResource,
                 Priority: taskForm.Priority,
                 EffortBreakdown: breakdown,
                 StrictDate: strictDateValue,
@@ -831,12 +823,11 @@ else
                 parsedRows.Add(new BulkTaskRowDto(
                     TaskId: parts[0].Trim(),
                     ServiceName: parts[1].Trim(),
-                    MaxResource: parts.Length > 4 && double.TryParse(parts[4].Trim(), out var maxResource) ? maxResource : 1,
-                    Priority: parts.Length > 5 && int.TryParse(parts[5].Trim(), out var pri) ? pri : 5,
+                    Priority: parts.Length > 4 && int.TryParse(parts[4].Trim(), out var pri) ? pri : 5,
                     EffortBreakdown: bulkEffort,
-                    StrictDate: parts.Length > 6 && DateTime.TryParse(parts[6].Trim(), out var sd) ? sd : null,
-                    Dependencies: parts.Length > 7 && !string.IsNullOrWhiteSpace(parts[7].Trim())
-                        ? parts[7].Trim().Split(',', StringSplitOptions.RemoveEmptyEntries).Select(id => new DependencyInput(id.Trim(), "FS", 0, 0)).ToList()
+                    StrictDate: parts.Length > 5 && DateTime.TryParse(parts[5].Trim(), out var sd) ? sd : null,
+                    Dependencies: parts.Length > 6 && !string.IsNullOrWhiteSpace(parts[6].Trim())
+                        ? parts[6].Trim().Split(',', StringSplitOptions.RemoveEmptyEntries).Select(id => new DependencyInput(id.Trim(), "FS", 0, 0)).ToList()
                         : null
                 ));
             }
@@ -907,19 +898,17 @@ else
 
         try
         {
-            var dragBreakdown = draggedTask.EffortBreakdown.Select(e => new EffortBreakdownInput(e.Role, e.EstimationDays, e.OverlapPct)).ToList();
+            var dragBreakdown = draggedTask.EffortBreakdown.Select(e => new EffortBreakdownInput(e.Role, e.EstimationDays, e.OverlapPct, e.MaxFte)).ToList();
             await Mediator.Send(new UpsertTaskCommand(
                 Id: draggedTask.Id, TaskId: draggedTask.TaskId, ServiceName: draggedTask.ServiceName,
-                MaxResource: draggedTask.MaxResource,
                 Priority: targetPriority, EffortBreakdown: dragBreakdown, StrictDate: draggedTask.StrictDate,
                 Dependencies: draggedTask.Dependencies.Any() ? draggedTask.Dependencies.Select(d => new DependencyInput(d.PredecessorTaskId, d.Type, d.LagDays, d.OverlapPct)).ToList() : null,
                 IsNew: false,
                 Phase: draggedTask.Phase, PreferredResourceIds: draggedTask.PreferredResourceIds));
 
-            var targetBreakdown = targetTask.EffortBreakdown.Select(e => new EffortBreakdownInput(e.Role, e.EstimationDays, e.OverlapPct)).ToList();
+            var targetBreakdown = targetTask.EffortBreakdown.Select(e => new EffortBreakdownInput(e.Role, e.EstimationDays, e.OverlapPct, e.MaxFte)).ToList();
             await Mediator.Send(new UpsertTaskCommand(
                 Id: targetTask.Id, TaskId: targetTask.TaskId, ServiceName: targetTask.ServiceName,
-                MaxResource: targetTask.MaxResource,
                 Priority: dragPriority, EffortBreakdown: targetBreakdown, StrictDate: targetTask.StrictDate,
                 Dependencies: targetTask.Dependencies.Any() ? targetTask.Dependencies.Select(d => new DependencyInput(d.PredecessorTaskId, d.Type, d.LagDays, d.OverlapPct)).ToList() : null,
                 IsNew: false,

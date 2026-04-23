@@ -71,19 +71,19 @@ internal static class TestDatabaseHelper
         );
 
         db.Tasks.AddRange(
-            TaskItem.Create("SVC-001", "ادارة المحتوى اخبار والحملات التوعوية", 3.5, 5, MakeBreakdown(43, 10)),
-            TaskItem.Create("SVC-002", "التكامل مع منصة تحميل المرحلة الثانية", 2.0, 5, MakeBreakdown(14, 4), strictDate: new DateTime(2026, 7, 23)),
-            TaskItem.Create("SVC-003", "اضافه / حذف موظف على جهة بعد اصدار الترخيص", 3.5, 5, MakeBreakdown(32, 8)),
-            TaskItem.Create("SVC-004", "التكامل مع نظام الموارد البشرية للملف الشخصي", 2.5, 5, MakeBreakdown(22, 5)),
-            TaskItem.Create("SVC-005", "طلب تغيير تعديل حقول تقرير الكشف والتسرب", 2.0, 5, MakeBreakdown(4, 1)),
-            TaskItem.Create("SVC-006", "تعديل التراخيص الاضافية", 2.0, 5, MakeBreakdown(8, 2)),
-            TaskItem.Create("SVC-007", "لوحات التحكم والرقابة", 2.5, 5, MakeBreakdown(16, 4)),
-            TaskItem.Create("SVC-008", "خدمة تنفيذ الاصلاحات", 4.5, 5, MakeBreakdown(74, 18)),
-            TaskItem.Create("SVC-009", "تجديد الترخيص منصة نما", 2.0, 5, MakeBreakdown(10, 2)),
-            TaskItem.Create("SVC-010", "ادارة المستخدمين", 2.5, 5, MakeBreakdown(18, 4)),
-            TaskItem.Create("SVC-011", "الغاء الترخيص", 3.0, 5, MakeBreakdown(30, 7)),
-            TaskItem.Create("SVC-012", "اتمتة الانذارات على الجهات المعتمدة", 2.0, 5, MakeBreakdown(12, 3)),
-            TaskItem.Create("SVC-013", "التكامل مع المؤسسة العامة للري", 3.0, 5, MakeBreakdown(23, 6))
+            TaskItem.Create("SVC-001", "ادارة المحتوى اخبار والحملات التوعوية", 5, MakeBreakdown(43, 10)),
+            TaskItem.Create("SVC-002", "التكامل مع منصة تحميل المرحلة الثانية", 5, MakeBreakdown(14, 4), strictDate: new DateTime(2026, 7, 23)),
+            TaskItem.Create("SVC-003", "اضافه / حذف موظف على جهة بعد اصدار الترخيص", 5, MakeBreakdown(32, 8)),
+            TaskItem.Create("SVC-004", "التكامل مع نظام الموارد البشرية للملف الشخصي", 5, MakeBreakdown(22, 5)),
+            TaskItem.Create("SVC-005", "طلب تغيير تعديل حقول تقرير الكشف والتسرب", 5, MakeBreakdown(4, 1)),
+            TaskItem.Create("SVC-006", "تعديل التراخيص الاضافية", 5, MakeBreakdown(8, 2)),
+            TaskItem.Create("SVC-007", "لوحات التحكم والرقابة", 5, MakeBreakdown(16, 4)),
+            TaskItem.Create("SVC-008", "خدمة تنفيذ الاصلاحات", 5, MakeBreakdown(74, 18)),
+            TaskItem.Create("SVC-009", "تجديد الترخيص منصة نما", 5, MakeBreakdown(10, 2)),
+            TaskItem.Create("SVC-010", "ادارة المستخدمين", 5, MakeBreakdown(18, 4)),
+            TaskItem.Create("SVC-011", "الغاء الترخيص", 5, MakeBreakdown(30, 7)),
+            TaskItem.Create("SVC-012", "اتمتة الانذارات على الجهات المعتمدة", 5, MakeBreakdown(12, 3)),
+            TaskItem.Create("SVC-013", "التكامل مع المؤسسة العامة للري", 5, MakeBreakdown(23, 6))
         );
 
         db.SaveChanges();

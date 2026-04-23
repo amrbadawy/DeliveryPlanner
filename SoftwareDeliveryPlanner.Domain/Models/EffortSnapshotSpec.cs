@@ -8,4 +8,5 @@ public sealed record EffortSnapshotSpec(
     string Role,
     double EstimationDays,
     double OverlapPct,
-    int SortOrder);
+    int SortOrder,
+    double MaxFte = 1.0);

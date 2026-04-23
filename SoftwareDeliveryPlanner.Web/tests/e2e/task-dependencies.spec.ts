@@ -15,16 +15,16 @@ test.describe('Task dependencies', () => {
     await waitForTableRows(page.getByTestId('tasks-table'));
   });
 
-  test('dependency multi-select is visible in add modal', async ({ page }) => {
+  test('dependency checkbox list is visible in add modal', async ({ page }) => {
     await page.getByTestId('tasks-add').click();
     await expectModalVisible(page, 'tasks-modal');
 
-    const depsSelect = page.getByTestId('tasks-depends-on');
-    await expect(depsSelect).toBeVisible();
+    const depsContainer = page.getByTestId('tasks-depends-on');
+    await expect(depsContainer).toBeVisible();
 
-    // Should list existing tasks as options
-    const optionCount = await depsSelect.locator('option').count();
-    expect(optionCount).toBeGreaterThan(0);
+    // Should list existing tasks as checkboxes
+    const checkboxCount = await depsContainer.locator('input[type="checkbox"]').count();
+    expect(checkboxCount).toBeGreaterThan(0);
   });
 
   test('add task with dependency and see badge in Deps column', async ({ page }) => {
@@ -40,16 +40,15 @@ test.describe('Task dependencies', () => {
     await expectModalVisible(page, 'tasks-modal');
 
     await fillInputByTestId(page, 'tasks-service-name', serviceName);
-    await fillInputByTestId(page, 'tasks-dev-estimation', '3');
-    await fillInputByTestId(page, 'tasks-max-resource', '1');
+    await fillInputByTestId(page, 'effort-days-DEV', '3');
     await fillInputByTestId(page, 'tasks-priority', '5');
 
-    // Select the dependency
-    const depsSelect = page.getByTestId('tasks-depends-on');
-    await depsSelect.selectOption({ value: depTaskId });
+    // Check the dependency checkbox
+    const depCheckbox = page.getByTestId(`dep-check-${depTaskId}`);
+    await depCheckbox.check();
 
-    // Verify the selected indicator
-    await expect(page.locator('small.text-muted', { hasText: depTaskId })).toBeVisible();
+    // Verify the dependency detail controls appear (type selector, lag input)
+    await expect(page.getByTestId(`dep-type-${depTaskId}`)).toBeVisible();
 
     // Save
     const taskId = (await page.getByTestId('tasks-task-id').inputValue()).trim();
@@ -78,7 +77,7 @@ test.describe('Task dependencies', () => {
 
     for (let i = 0; i < rowCount; i++) {
       const row = rows.nth(i);
-      const depsCell = row.locator('td').last().locator('..').locator('td').nth(10);
+      const depsCell = row.locator('td').nth(10);
       const badges = await depsCell.locator('.badge').count();
       if (badges === 0) {
         targetTaskId = (await row.locator('td').nth(0).innerText()).trim();
@@ -106,9 +105,9 @@ test.describe('Task dependencies', () => {
     await page.getByTestId(`tasks-edit-${targetTaskId}`).click();
     await expectModalVisible(page, 'tasks-modal');
 
-    // Select the dependency
-    const depsSelect = page.getByTestId('tasks-depends-on');
-    await depsSelect.selectOption({ value: depId });
+    // Check the dependency checkbox
+    const depCheckbox = page.getByTestId(`dep-check-${depId}`);
+    await depCheckbox.check();
 
     await page.getByTestId('tasks-save').click();
     await expect(page.getByTestId('tasks-modal')).toBeHidden({ timeout: 10_000 });
@@ -121,15 +120,9 @@ test.describe('Task dependencies', () => {
     await page.getByTestId(`tasks-edit-${targetTaskId}`).click();
     await expectModalVisible(page, 'tasks-modal');
 
-    // Deselect all options by selecting nothing (Ctrl+click to deselect is tricky,
-    // so we evaluate directly)
-    const depsSelect2 = page.getByTestId('tasks-depends-on');
-    await depsSelect2.evaluate((el: HTMLSelectElement) => {
-      for (const opt of el.options) {
-        opt.selected = false;
-      }
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    // Uncheck the dependency checkbox
+    const depCheckbox2 = page.getByTestId(`dep-check-${depId}`);
+    await depCheckbox2.uncheck();
 
     await page.getByTestId('tasks-save').click();
     await expect(page.getByTestId('tasks-modal')).toBeHidden();
@@ -153,13 +146,12 @@ test.describe('Task dependencies', () => {
     await expectModalVisible(page, 'tasks-modal');
 
     await fillInputByTestId(page, 'tasks-service-name', serviceName);
-    await fillInputByTestId(page, 'tasks-dev-estimation', '2');
-    await fillInputByTestId(page, 'tasks-max-resource', '1');
+    await fillInputByTestId(page, 'effort-days-DEV', '2');
     await fillInputByTestId(page, 'tasks-priority', '5');
 
-    // Select two dependencies
-    const depsSelect = page.getByTestId('tasks-depends-on');
-    await depsSelect.selectOption([{ value: taskIds[0] }, { value: taskIds[1] }]);
+    // Check two dependency checkboxes
+    await page.getByTestId(`dep-check-${taskIds[0]}`).check();
+    await page.getByTestId(`dep-check-${taskIds[1]}`).check();
 
     const newTaskId = (await page.getByTestId('tasks-task-id').inputValue()).trim();
     await page.getByTestId('tasks-save').click();

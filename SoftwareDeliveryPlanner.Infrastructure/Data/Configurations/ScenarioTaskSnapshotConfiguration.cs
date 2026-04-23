@@ -23,9 +23,6 @@ public sealed class ScenarioTaskSnapshotConfiguration : IEntityTypeConfiguration
         builder.Property(s => s.Priority)
             .IsRequired();
 
-        builder.Property(s => s.MaxResource)
-            .IsRequired();
-
         builder.Property(s => s.Phase)
             .HasMaxLength(50);
 

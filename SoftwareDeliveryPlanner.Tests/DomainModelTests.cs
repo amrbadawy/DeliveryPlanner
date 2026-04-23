@@ -16,12 +16,11 @@ public class TaskItemDomainTests
     [Fact]
     public void Create_ValidInputs_ReturnsPopulatedTaskItem()
     {
-        var task = TaskItem.Create("SVC-001", "My Service", 2, 5, B(10));
+        var task = TaskItem.Create("SVC-001", "My Service", 5, B(10));
 
         Assert.Equal("SVC-001", task.TaskId);
         Assert.Equal("My Service", task.ServiceName);
         Assert.Equal(10, task.TotalEstimationDays - 1); // DEV=10, QA=1 → total 11; just check DEV part via breakdown
-        Assert.Equal(2, task.MaxResource);
         Assert.Equal(5, task.Priority);
         Assert.Null(task.StrictDate);
     }
@@ -29,7 +28,7 @@ public class TaskItemDomainTests
     [Fact]
     public void Create_NormalizesTaskIdToUppercase()
     {
-        var task = TaskItem.Create("svc-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("svc-001", "Service", 5, B(5));
         Assert.Equal("SVC-001", task.TaskId);
     }
 
@@ -37,14 +36,14 @@ public class TaskItemDomainTests
     public void Create_WithStrictDate_SetsStrictDate()
     {
         var date = new DateTime(2026, 12, 31);
-        var task = TaskItem.Create("SVC-002", "Service", 1, 5, B(5), date);
+        var task = TaskItem.Create("SVC-002", "Service", 5, B(5), date);
         Assert.Equal(date, task.StrictDate);
     }
 
     [Fact]
     public void Create_WithDependsOnTaskIds_SetsDependencies()
     {
-        var task = TaskItem.Create("SVC-003", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-003", "Service", 5, B(5));
         task.AddDependency("SVC-001");
         task.AddDependency("SVC-002");
         Assert.Equal("SVC-001,SVC-002", task.DependsOnTaskIds);
@@ -53,21 +52,21 @@ public class TaskItemDomainTests
     [Fact]
     public void Create_WithNullDependsOnTaskIds_SetsNull()
     {
-        var task = TaskItem.Create("SVC-003", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-003", "Service", 5, B(5));
         Assert.Null(task.DependsOnTaskIds);
     }
 
     [Fact]
     public void Create_WithNoDependencies_ReturnsNullDependsOnTaskIds()
     {
-        var task = TaskItem.Create("SVC-003", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-003", "Service", 5, B(5));
         Assert.Null(task.DependsOnTaskIds);
     }
 
     [Fact]
     public void AddDependency_NormalizesAndStoresPredecessorId()
     {
-        var task = TaskItem.Create("SVC-003", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-003", "Service", 5, B(5));
         task.AddDependency("  SVC-001 ");
         task.AddDependency("  SVC-002  ");
         Assert.Equal("SVC-001,SVC-002", task.DependsOnTaskIds);
@@ -80,7 +79,7 @@ public class TaskItemDomainTests
     [InlineData("A-1")]
     public void Create_InvalidTaskId_ThrowsDomainException(string invalidId)
     {
-        Assert.Throws<DomainException>(() => TaskItem.Create(invalidId, "Service", 1, 5, B(5)));
+        Assert.Throws<DomainException>(() => TaskItem.Create(invalidId, "Service", 5, B(5)));
     }
 
     [Theory]
@@ -88,15 +87,7 @@ public class TaskItemDomainTests
     [InlineData("   ")]
     public void Create_EmptyServiceName_ThrowsDomainException(string name)
     {
-        Assert.Throws<DomainException>(() => TaskItem.Create("SVC-001", name, 1, 5, B(5)));
-    }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-0.5)]
-    public void Create_ZeroOrNegativeMaxResource_ThrowsDomainException(double maxResource)
-    {
-        Assert.Throws<DomainException>(() => TaskItem.Create("SVC-001", "Service", maxResource, 5, B(5)));
+        Assert.Throws<DomainException>(() => TaskItem.Create("SVC-001", name, 5, B(5)));
     }
 
     [Theory]
@@ -105,7 +96,7 @@ public class TaskItemDomainTests
     [InlineData(-1)]
     public void Create_InvalidPriority_ThrowsDomainException(int priority)
     {
-        Assert.Throws<DomainException>(() => TaskItem.Create("SVC-001", "Service", 1, priority, B(5)));
+        Assert.Throws<DomainException>(() => TaskItem.Create("SVC-001", "Service", priority, B(5)));
     }
 
     [Theory]
@@ -114,28 +105,28 @@ public class TaskItemDomainTests
     [InlineData(10)]
     public void Create_ValidPriority_DoesNotThrow(int priority)
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, priority, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", priority, B(5));
         Assert.Equal(priority, task.Priority);
     }
 
     [Fact]
     public void Create_TrimsServiceName()
     {
-        var task = TaskItem.Create("SVC-001", "  My Service  ", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "  My Service  ", 5, B(5));
         Assert.Equal("My Service", task.ServiceName);
     }
 
     [Fact]
     public void Create_BoundaryEstimation_SmallValue_DoesNotThrow()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(0.001));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(0.001));
         Assert.True(task.TotalEstimationDays > 0);
     }
 
     [Fact]
     public void Create_LargeEstimation_DoesNotThrow()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(10000));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(10000));
         Assert.True(task.TotalEstimationDays >= 10000);
     }
 
@@ -143,7 +134,7 @@ public class TaskItemDomainTests
     public void Create_NullServiceName_ThrowsDomainException()
     {
         Assert.Throws<DomainException>(() =>
-            TaskItem.Create("SVC-001", null!, 1, 5, B(5)));
+            TaskItem.Create("SVC-001", null!, 5, B(5)));
     }
 }
 
@@ -500,7 +491,7 @@ public class DomainExceptionTests
     {
         // Ensure it's specifically DomainException (not ArgumentException etc.)
         var ex = Assert.Throws<DomainException>(() =>
-            TaskItem.Create("BAD", "Service", 1, 5, B(5)));
+            TaskItem.Create("BAD", "Service", 5, B(5)));
         Assert.Contains("Task ID", ex.Message);
     }
 }
@@ -618,20 +609,20 @@ public class TaskItemDomainAdditionalTests
     public void Create_NullTaskId_ThrowsDomainException()
     {
         Assert.Throws<DomainException>(() =>
-            TaskItem.Create(null!, "Service", 1, 5, B(5)));
+            TaskItem.Create(null!, "Service", 5, B(5)));
     }
 
     [Fact]
     public void Create_Factory_SetsDefaultStatus_NotStarted()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         Assert.Equal(DomainConstants.TaskStatus.NotStarted, task.Status);
     }
 
     [Fact]
     public void Create_Factory_SetsDefaultDeliveryRisk_OnTrack()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         Assert.Equal(DomainConstants.DeliveryRisk.OnTrack, task.DeliveryRisk);
     }
 
@@ -639,7 +630,7 @@ public class TaskItemDomainAdditionalTests
     public void Create_Factory_SetsTimestamps()
     {
         var before = DateTime.Now.AddSeconds(-1);
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         var after = DateTime.Now.AddSeconds(1);
 
         Assert.True(task.CreatedAt >= before && task.CreatedAt <= after);
@@ -649,21 +640,21 @@ public class TaskItemDomainAdditionalTests
     [Fact]
     public void Create_Factory_SchedulingRank_DefaultsToNull()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         Assert.Null(task.SchedulingRank);
     }
 
     [Fact]
     public void Create_Factory_PeakConcurrency_DefaultsToNull()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         Assert.Null(task.PeakConcurrency);
     }
 
     [Fact]
     public void Create_Factory_PlannedDates_DefaultToNull()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         Assert.Null(task.PlannedStart);
         Assert.Null(task.PlannedFinish);
         Assert.Null(task.Duration);
@@ -673,7 +664,7 @@ public class TaskItemDomainAdditionalTests
     public void Create_CombinedBoundaries_Priority1_StrictDate_Dependencies()
     {
         var strict = new DateTime(2026, 12, 31);
-        var task = TaskItem.Create("SVC-001", "Service", 0.5, 1, B(0.001), strict);
+        var task = TaskItem.Create("SVC-001", "Service", 1, B(0.001), strict);
         task.AddDependency("SVC-002");
         task.AddDependency("SVC-003");
 
@@ -681,34 +672,12 @@ public class TaskItemDomainAdditionalTests
         Assert.Equal(strict, task.StrictDate);
         Assert.Equal("SVC-002,SVC-003", task.DependsOnTaskIds);
         Assert.True(task.TotalEstimationDays > 0);
-        Assert.Equal(0.5, task.MaxResource);
-    }
-
-    [Fact]
-    public void Create_NaN_MaxResource_ThrowsDomainException()
-    {
-        try
-        {
-            var task = TaskItem.Create("SVC-001", "Service", double.NaN, 5, B(5));
-            Assert.True(double.IsNaN(task.MaxResource));
-        }
-        catch (DomainException)
-        {
-            // Ideal behavior
-        }
-    }
-
-    [Fact]
-    public void Create_MaxResource_FractionalBoundary_SmallestPositive()
-    {
-        var task = TaskItem.Create("SVC-001", "Service", 0.001, 5, B(5));
-        Assert.Equal(0.001, task.MaxResource);
     }
 
     [Fact]
     public void AddDependency_AcceptsArbitraryPredecessorIds()
     {
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5));
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5));
         task.AddDependency("GARBAGE");
         Assert.Equal("GARBAGE", task.DependsOnTaskIds);
     }
@@ -717,7 +686,7 @@ public class TaskItemDomainAdditionalTests
     public void Create_StrictDateInPast_AcceptedWithoutValidation()
     {
         var pastDate = new DateTime(2020, 1, 1);
-        var task = TaskItem.Create("SVC-001", "Service", 1, 5, B(5), pastDate);
+        var task = TaskItem.Create("SVC-001", "Service", 5, B(5), pastDate);
         Assert.Equal(pastDate, task.StrictDate);
     }
 }

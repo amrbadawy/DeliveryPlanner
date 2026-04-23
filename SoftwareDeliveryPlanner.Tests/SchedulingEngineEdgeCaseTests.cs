@@ -41,7 +41,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         // Plan start is 2026-05-01 by default; set override to 2026-07-01
         var overrideDate = new DateTime(2026, 7, 1);
 
-        _db.Tasks.Add(TaskItem.Create("SV-100", "Override Start Test", 1, 5, B(5), overrideStart: overrideDate));
+        _db.Tasks.Add(TaskItem.Create("SV-100", "Override Start Test", 5, B(5), overrideStart: overrideDate));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -60,15 +60,14 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_MaxResourceConstraint_AllocationsRespectMaxResource()
+    public void RunScheduler_MaxFteConstraint_AllocationsRespectMaxFte()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        const double maxResource = 0.5;
-
-        _db.Tasks.Add(TaskItem.Create("SV-101", "Max Res Test", maxResource, 5, B(3)));
+        _db.Tasks.Add(TaskItem.Create("SV-101", "Max Res Test", 5,
+            new List<EffortBreakdownSpec> { new("DEV", 3, 0, MaxFte: 0.5), new("QA", 1, 0) }));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -115,7 +114,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
 
         _db.Resources.Add(TeamMember.Create("RES-10", "Expired", "DEV", "Default", 100, 1, new DateTime(2019, 1, 1), endDate: new DateTime(2020, 1, 1)));
         _db.Resources.Add(TeamMember.Create("QA-10", "Expired QA", "QA", "Default", 100, 1, new DateTime(2019, 1, 1), endDate: new DateTime(2020, 1, 1)));
-        _db.Tasks.Add(TaskItem.Create("SV-102", "No Capacity Task", 1, 5, B(5)));
+        _db.Tasks.Add(TaskItem.Create("SV-102", "No Capacity Task", 5, B(5)));
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
@@ -144,7 +143,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Resources.Add(TeamMember.Create("QA-11", "Adjustable QA", "QA", "Default", 100, 1, new DateTime(2026, 1, 1)));
         // Zero-capacity adjustment for the entire plan start month
         _db.Adjustments.Add(Adjustment.Create("RES-11", "Leave", 0, new DateTime(2026, 5, 1), new DateTime(2026, 5, 31), "Full leave"));
-        _db.Tasks.Add(TaskItem.Create("SV-103", "Zero Adj Task", 1, 5, B(3)));
+        _db.Tasks.Add(TaskItem.Create("SV-103", "Zero Adj Task", 5, B(3)));
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
@@ -171,7 +170,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("SV-104", "Zero Estimation", 1, 5, B(0.001)));
+        _db.Tasks.Add(TaskItem.Create("SV-104", "Zero Estimation", 5, B(0.001)));
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
@@ -208,7 +207,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("SV-105", "Not Assigned", 1, 5, B(5)));
+        _db.Tasks.Add(TaskItem.Create("SV-105", "Not Assigned", 5, B(5)));
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
@@ -231,7 +230,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         // Strict date in the very near future, but estimation is huge → will finish late
         var nearFuture = DateTime.Today.AddDays(2);
 
-        _db.Tasks.Add(TaskItem.Create("SV-106", "Late Task", 1, 5, B(500), strictDate: nearFuture));
+        _db.Tasks.Add(TaskItem.Create("SV-106", "Late Task", 5, B(500), strictDate: nearFuture));
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
@@ -252,8 +251,8 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("SV-107", "Priority 1", 1, 1, B(10)));
-        _db.Tasks.Add(TaskItem.Create("SV-108", "Priority 9", 1, 9, B(10)));
+        _db.Tasks.Add(TaskItem.Create("SV-107", "Priority 1", 1, B(10)));
+        _db.Tasks.Add(TaskItem.Create("SV-108", "Priority 9", 9, B(10)));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -278,8 +277,8 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("SV-109", "Same Priority A", 1, 5, B(3)));
-        _db.Tasks.Add(TaskItem.Create("SV-110", "Same Priority B", 1, 5, B(3)));
+        _db.Tasks.Add(TaskItem.Create("SV-109", "Same Priority A", 5, B(3)));
+        _db.Tasks.Add(TaskItem.Create("SV-110", "Same Priority B", 5, B(3)));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -302,7 +301,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("SV-111", "Max Dev Overflow", 100, 5, B(10)));
+        _db.Tasks.Add(TaskItem.Create("SV-111", "Max Dev Overflow", 5, B(10)));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -329,7 +328,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         // Add a single inactive resource
         _db.Resources.Add(TeamMember.Create("RES-12", "Inactive Dev", "DEV", "Default", 100, 1, new DateTime(2026, 1, 1), active: "No"));
         _db.Resources.Add(TeamMember.Create("QA-12", "Inactive QA", "QA", "Default", 100, 1, new DateTime(2026, 1, 1), active: "No"));
-        _db.Tasks.Add(TaskItem.Create("SV-112", "Inactive Resources Task", 1, 5, B(5)));
+        _db.Tasks.Add(TaskItem.Create("SV-112", "Inactive Resources Task", 5, B(5)));
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
@@ -350,7 +349,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("SV-113", "No Strict Date", 1, 5, B(3)));
+        _db.Tasks.Add(TaskItem.Create("SV-113", "No Strict Date", 5, B(3)));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -370,8 +369,8 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("SV-114", "Later Deadline", 1, 5, B(5), strictDate: new DateTime(2026, 12, 1)));
-        _db.Tasks.Add(TaskItem.Create("SV-115", "Earlier Deadline", 1, 5, B(5), strictDate: new DateTime(2026, 8, 1)));
+        _db.Tasks.Add(TaskItem.Create("SV-114", "Later Deadline", 5, B(5), strictDate: new DateTime(2026, 12, 1)));
+        _db.Tasks.Add(TaskItem.Create("SV-115", "Earlier Deadline", 5, B(5), strictDate: new DateTime(2026, 8, 1)));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -417,10 +416,10 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         // Task A: no dependencies, estimated 5 days
-        _db.Tasks.Add(TaskItem.Create("DEP-001", "Prerequisite Task", 1, 1, B(5)));
+        _db.Tasks.Add(TaskItem.Create("DEP-001", "Prerequisite Task", 1, B(5)));
 
         // Task B: depends on DEP-001, estimated 3 days
-        var dep002 = TaskItem.Create("DEP-002", "Dependent Task", 1, 1, B(3));
+        var dep002 = TaskItem.Create("DEP-002", "Dependent Task", 1, B(3));
         dep002.AddDependency("DEP-001");
         _db.Tasks.Add(dep002);
         _db.SaveChanges();
@@ -447,13 +446,13 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         // Task A: 3 days
-        _db.Tasks.Add(TaskItem.Create("DEP-010", "Prereq A", 1, 1, B(3)));
+        _db.Tasks.Add(TaskItem.Create("DEP-010", "Prereq A", 1, B(3)));
 
         // Task B: 5 days
-        _db.Tasks.Add(TaskItem.Create("DEP-011", "Prereq B", 1, 1, B(5)));
+        _db.Tasks.Add(TaskItem.Create("DEP-011", "Prereq B", 1, B(5)));
 
         // Task C: depends on both A and B
-        var dep012 = TaskItem.Create("DEP-012", "Final Task", 1, 1, B(2));
+        var dep012 = TaskItem.Create("DEP-012", "Final Task", 1, B(2));
         dep012.AddDependency("DEP-010");
         dep012.AddDependency("DEP-011");
         _db.Tasks.Add(dep012);
@@ -485,7 +484,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("DEP-020", "Independent Task", 1, 1, B(3)));
+        _db.Tasks.Add(TaskItem.Create("DEP-020", "Independent Task", 1, B(3)));
         _db.SaveChanges();
 
         _engine.RunScheduler();
@@ -503,11 +502,11 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         // Chain: A -> B -> C
-        _db.Tasks.Add(TaskItem.Create("CHN-001", "Chain First", 1, 1, B(2)));
-        var chn002 = TaskItem.Create("CHN-002", "Chain Second", 1, 1, B(2));
+        _db.Tasks.Add(TaskItem.Create("CHN-001", "Chain First", 1, B(2)));
+        var chn002 = TaskItem.Create("CHN-002", "Chain Second", 1, B(2));
         chn002.AddDependency("CHN-001");
         _db.Tasks.Add(chn002);
-        var chn003 = TaskItem.Create("CHN-003", "Chain Third", 1, 1, B(2));
+        var chn003 = TaskItem.Create("CHN-003", "Chain Third", 1, B(2));
         chn003.AddDependency("CHN-002");
         _db.Tasks.Add(chn003);
         _db.SaveChanges();
@@ -535,7 +534,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         // Depends on a task that doesn't exist — can never be satisfied
-        var dep030 = TaskItem.Create("DEP-030", "Orphan Dependency", 1, 1, B(3));
+        var dep030 = TaskItem.Create("DEP-030", "Orphan Dependency", 1, B(3));
         dep030.AddDependency("MISSING-999");
         _db.Tasks.Add(dep030);
         _db.SaveChanges();
@@ -559,10 +558,10 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Allocations.RemoveRange(_db.Allocations);
         _db.SaveChanges();
 
-        var cir001 = TaskItem.Create("CIR-001", "Circular A", 1, 1, B(3));
+        var cir001 = TaskItem.Create("CIR-001", "Circular A", 1, B(3));
         cir001.AddDependency("CIR-002");
         _db.Tasks.Add(cir001);
-        var cir002 = TaskItem.Create("CIR-002", "Circular B", 1, 1, B(3));
+        var cir002 = TaskItem.Create("CIR-002", "Circular B", 1, B(3));
         cir002.AddDependency("CIR-001");
         _db.Tasks.Add(cir002);
         _db.SaveChanges();
@@ -592,7 +591,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
 
         // Domain correctly forbids self-referencing deps, so bypass it and insert directly
         // to test that the engine handles corrupt/injected data gracefully.
-        var self001 = TaskItem.Create("SELF-001", "Self Referencing", 1, 1, B(3));
+        var self001 = TaskItem.Create("SELF-001", "Self Referencing", 1, B(3));
         _db.Tasks.Add(self001);
         _db.SaveChanges();
 
@@ -624,7 +623,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         // but working days remaining <= 5.
         var strictDate = DateTime.Today.AddDays(3); // Very close deadline
 
-        _db.Tasks.Add(TaskItem.Create("SV-116", "At Risk Task", 1, 1, B(0.5), strictDate: strictDate));
+        _db.Tasks.Add(TaskItem.Create("SV-116", "At Risk Task", 1, B(0.5), strictDate: strictDate));
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
@@ -648,7 +647,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         // No resources → no capacity → task won't be scheduled → no PlannedFinish
-        _db.Tasks.Add(TaskItem.Create("SV-117", "Unschedulable With Strict", 1, 1, B(10), strictDate: DateTime.Today.AddDays(30)));
+        _db.Tasks.Add(TaskItem.Create("SV-117", "Unschedulable With Strict", 1, B(10), strictDate: DateTime.Today.AddDays(30)));
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
@@ -745,7 +744,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Adjustments.Add(Adjustment.Create("RES-13", "Training", 75, new DateTime(2026, 5, 1), new DateTime(2026, 5, 31)));
         _db.Adjustments.Add(Adjustment.Create("RES-13", "Other", 75, new DateTime(2026, 5, 1), new DateTime(2026, 5, 31)));
 
-        _db.Tasks.Add(TaskItem.Create("SV-118", "Multi Stack Task", 10, 5, B(5)));
+        _db.Tasks.Add(TaskItem.Create("SV-118", "Multi Stack Task", 5, B(5)));
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
@@ -778,7 +777,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
 
         _db.Resources.Add(TeamMember.Create("RES-14", "Future Dev", "DEV", "Default", 100, 1, new DateTime(2026, 8, 1)));
         _db.Resources.Add(TeamMember.Create("QA-14", "Future QA", "QA", "Default", 100, 1, new DateTime(2026, 8, 1)));
-        _db.Tasks.Add(TaskItem.Create("SV-119", "Future Resource Task", 1, 5, B(3)));
+        _db.Tasks.Add(TaskItem.Create("SV-119", "Future Resource Task", 5, B(3)));
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
@@ -820,7 +819,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
 
         for (int i = 1; i <= 10; i++)
         {
-            _db.Tasks.Add(TaskItem.Create($"SV-{200 + i:D3}", $"Strict Task {i}", 1, 5, B(3), strictDate: DateTime.Today.AddDays(i * 10)));
+            _db.Tasks.Add(TaskItem.Create($"SV-{200 + i:D3}", $"Strict Task {i}", 5, B(3), strictDate: DateTime.Today.AddDays(i * 10)));
         }
         _db.SaveChanges();
 
@@ -842,8 +841,8 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.SaveChanges();
 
-        _db.Tasks.Add(TaskItem.Create("SV-211", "Later Strict", 1, 5, B(3), strictDate: DateTime.Today.AddDays(60)));
-        _db.Tasks.Add(TaskItem.Create("SV-212", "Earlier Strict", 1, 5, B(3), strictDate: DateTime.Today.AddDays(10)));
+        _db.Tasks.Add(TaskItem.Create("SV-211", "Later Strict", 5, B(3), strictDate: DateTime.Today.AddDays(60)));
+        _db.Tasks.Add(TaskItem.Create("SV-212", "Earlier Strict", 5, B(3), strictDate: DateTime.Today.AddDays(10)));
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);

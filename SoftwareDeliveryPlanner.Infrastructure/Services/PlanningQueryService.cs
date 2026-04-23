@@ -512,7 +512,7 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
                 var phaseHours = phase.EstimationDays * DomainConstants.HoursPerDay;
                 if (eligibleByRole.TryGetValue(phase.Role, out var roleRes) && roleRes.Count > 0)
                 {
-                    var maxDailyHours = Math.Min((int)task.MaxResource, roleRes.Count) * DomainConstants.HoursPerDay;
+                    var maxDailyHours = Math.Min((int)Math.Ceiling(phase.MaxFte), roleRes.Count) * DomainConstants.HoursPerDay;
                     var phaseDays = (int)Math.Ceiling(phaseHours / maxDailyHours);
                     // Account for overlap with previous phase
                     var overlapReduction = phase.OverlapPct > 0 ? (int)(phaseDays * phase.OverlapPct / 100.0) : 0;
@@ -581,5 +581,71 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
         }
 
         return results;
+    }
+
+    public async Task<List<TaskGanttSegmentsDto>> GetGanttSegmentsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await ReadOnlyDbFactory.CreateDbContextAsync(cancellationToken);
+
+        // Load all allocations grouped by (TaskId, Role) to derive segment date windows
+        var allocations = await db.Allocations
+            .Where(a => a.HoursAllocated > 0)
+            .OrderBy(a => a.CalendarDate)
+            .ToListAsync(cancellationToken);
+
+        // Load tasks with effort breakdown for MaxFte
+        var tasks = await db.Tasks
+            .Include(t => t.EffortBreakdown)
+            .ToListAsync(cancellationToken);
+
+        var effortByTask = tasks.ToDictionary(
+            t => t.TaskId,
+            t => t.EffortBreakdown.ToDictionary(e => e.Role, e => e.MaxFte, StringComparer.OrdinalIgnoreCase),
+            StringComparer.OrdinalIgnoreCase);
+
+        // Load resources for names
+        var resources = await db.Resources.ToListAsync(cancellationToken);
+        var resourceNames = resources.ToDictionary(r => r.ResourceId, r => r.ResourceName, StringComparer.OrdinalIgnoreCase);
+
+        var grouped = allocations
+            .GroupBy(a => a.TaskId, StringComparer.OrdinalIgnoreCase)
+            .Select(taskGroup =>
+            {
+                var segments = taskGroup
+                    .GroupBy(a => a.Role, StringComparer.OrdinalIgnoreCase)
+                    .Select(roleGroup =>
+                    {
+                        var segStart = roleGroup.Min(a => a.CalendarDate);
+                        var segEnd = roleGroup.Max(a => a.CalendarDate);
+                        var duration = (int)(segEnd - segStart).TotalDays + 1;
+                        var maxFte = effortByTask.GetValueOrDefault(taskGroup.Key)
+                            ?.GetValueOrDefault(roleGroup.Key) ?? 1.0;
+
+                        var assignedResources = roleGroup
+                            .Select(a => a.ResourceId)
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .Select(rid => new GanttSegmentResourceDto(
+                                rid,
+                                resourceNames.GetValueOrDefault(rid) ?? rid))
+                            .ToList();
+
+                        return new GanttRoleSegmentDto(
+                            taskGroup.Key,
+                            roleGroup.Key,
+                            segStart,
+                            segEnd,
+                            duration,
+                            maxFte,
+                            assignedResources);
+                    })
+                    .OrderBy(s => s.SegmentStart)
+                    .ThenBy(s => s.Role)
+                    .ToList();
+
+                return new TaskGanttSegmentsDto(taskGroup.Key, segments);
+            })
+            .ToList();
+
+        return grouped;
     }
 }

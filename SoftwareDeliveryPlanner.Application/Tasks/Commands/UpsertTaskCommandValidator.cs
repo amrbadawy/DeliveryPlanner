@@ -8,7 +8,6 @@ public sealed class UpsertTaskCommandValidator : AbstractValidator<UpsertTaskCom
     {
         RuleFor(c => c.TaskId).NotEmpty().WithMessage("Service ID is required.");
         RuleFor(c => c.ServiceName).NotEmpty().WithMessage("Service Name is required.");
-        RuleFor(c => c.MaxResource).GreaterThan(0).WithMessage("Max Resources must be greater than zero.");
         RuleFor(c => c.Priority).InclusiveBetween(1, 10).WithMessage("Priority must be between 1 and 10.");
 
         RuleFor(c => c.EffortBreakdown)
@@ -32,6 +31,7 @@ public sealed class UpsertTaskCommandValidator : AbstractValidator<UpsertTaskCom
             entry.RuleFor(e => e.Role).NotEmpty().WithMessage("Role is required.");
             entry.RuleFor(e => e.EstimationDays).GreaterThan(0).WithMessage("EstimationDays must be greater than zero.");
             entry.RuleFor(e => e.OverlapPct).InclusiveBetween(0, 100).WithMessage("OverlapPct must be between 0 and 100.");
+            entry.RuleFor(e => e.MaxFte).GreaterThan(0).WithMessage("Max FTE must be greater than zero.");
         });
 
         When(c => c.Dependencies is not null, () =>

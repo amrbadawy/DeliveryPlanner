@@ -133,7 +133,7 @@ public class GetTaskCountQueryHandlerTests : OrchestratorFixture
     public async Task Handle_AfterAddingTask_CountIncreases()
     {
         await using var db = await Factory.CreateDbContextAsync();
-        db.Tasks.Add(TaskItem.Create("TST-99", "Extra", 1, 5, B(1)));
+        db.Tasks.Add(TaskItem.Create("TST-99", "Extra", 5, B(1)));
         await db.SaveChangesAsync();
 
         var handler = new GetTaskCountQueryHandler(TaskOrchestrator);
@@ -159,7 +159,6 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             Id: 0,
             TaskId: "NEW-01",
             ServiceName: "New Service",
-            MaxResource: 2,
             Priority: 3,
             EffortBreakdown: EB(10),
             StrictDate: null,
@@ -184,7 +183,6 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             Id: existing.Id,
             TaskId: existing.TaskId,
             ServiceName: "Updated Service Name",
-            MaxResource: existing.MaxResource,
             Priority: existing.Priority,
             EffortBreakdown: EB(existing.TotalEstimationDays),
             StrictDate: null,
@@ -207,7 +205,6 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             Id: 0,
             TaskId: "STR-01",
             ServiceName: "Strict Task",
-            MaxResource: 1,
             Priority: 1,
             EffortBreakdown: EB(5),
             StrictDate: strictDate,
@@ -227,7 +224,6 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             Id: 0,
             TaskId: "DEP-01",
             ServiceName: "Dependent Task",
-            MaxResource: 1,
             Priority: 1,
             EffortBreakdown: EB(5),
             StrictDate: null,
@@ -247,7 +243,6 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             Id: 0,
             TaskId: "NDP-01",
             ServiceName: "No Deps Task",
-            MaxResource: 1,
             Priority: 1,
             EffortBreakdown: EB(3),
             StrictDate: null,
@@ -304,7 +299,7 @@ public class UpsertTaskCommandValidatorTests
 
     private static UpsertTaskCommand Valid() => new(
         Id: 0, TaskId: "SVC-001", ServiceName: "My Service",
-        MaxResource: 2, Priority: 5, EffortBreakdown: ValidEB(),
+        Priority: 5, EffortBreakdown: ValidEB(),
         StrictDate: null, Dependencies: null, IsNew: true);
 
     [Fact]
@@ -351,11 +346,16 @@ public class UpsertTaskCommandValidatorTests
     [Theory]
     [InlineData(0)]
     [InlineData(-0.5)]
-    public void ZeroOrNegativeMaxResource_FailsValidation(double maxResource)
+    public void ZeroOrNegativeMaxFte_FailsValidation(double maxFte)
     {
-        var result = _validator.Validate(Valid() with { MaxResource = maxResource });
+        var badEB = new List<EffortBreakdownInput>
+        {
+            new("DEV", 5, 0, maxFte),
+            new("QA", 1, 0)
+        };
+        var result = _validator.Validate(Valid() with { EffortBreakdown = badEB });
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.MaxResource));
+        Assert.Contains(result.Errors, e => e.PropertyName.Contains("MaxFte"));
     }
 
     [Theory]
@@ -1530,7 +1530,7 @@ public class UpsertTaskCommandValidatorAdditionalTests
 
     private static UpsertTaskCommand Valid() => new(
         Id: 0, TaskId: "SVC-001", ServiceName: "My Service",
-        MaxResource: 2, Priority: 5, EffortBreakdown: ValidEB(),
+        Priority: 5, EffortBreakdown: ValidEB(),
         StrictDate: null, Dependencies: null, IsNew: true);
 
     [Fact]
@@ -1562,9 +1562,14 @@ public class UpsertTaskCommandValidatorAdditionalTests
     }
 
     [Fact]
-    public void BoundaryMaxResource_SmallPositive_PassesValidation()
+    public void BoundaryMaxFte_SmallPositive_PassesValidation()
     {
-        var result = _validator.Validate(Valid() with { MaxResource = 0.001 });
+        var eb = new List<EffortBreakdownInput>
+        {
+            new("DEV", 5, 0, 0.001),
+            new("QA", 1, 0)
+        };
+        var result = _validator.Validate(Valid() with { EffortBreakdown = eb });
         Assert.True(result.IsValid);
     }
 
@@ -1581,14 +1586,12 @@ public class UpsertTaskCommandValidatorAdditionalTests
             TaskId = "",
             ServiceName = "",
             EffortBreakdown = badEB,
-            MaxResource = -1,
             Priority = 0
         });
         Assert.False(result.IsValid);
-        Assert.True(result.Errors.Count >= 4);
+        Assert.True(result.Errors.Count >= 3);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.TaskId));
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.ServiceName));
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.MaxResource));
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertTaskCommand.Priority));
     }
 
