@@ -80,7 +80,7 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
 
             days.Add(new TaskAssignmentDayDto(
                 Date: current,
-                DateDisplay: $"{current.Day} {current:ddd}",
+                DateDisplay: current.ToString("dd MMMM yyyy"),
                 IsWorkingDay: !isWeekend && !isHoliday,
                 StatusText: statusText,
                 AssignedResources: assignedResources));

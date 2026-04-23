@@ -18,6 +18,12 @@ test.describe('Task Details + Notes', () => {
     await expect(page.getByTestId('td-service-name')).toBeVisible();
     await expect(page.getByTestId('td-dev-estimation')).toBeVisible();
     await expect(page.getByTestId('td-priority')).toBeVisible();
+
+    // Effort breakdown table should be visible with at least one row
+    const effortTable = page.getByTestId('td-effort-breakdown');
+    await expect(effortTable).toBeVisible();
+    const effortRows = effortTable.locator('tbody tr');
+    expect(await effortRows.count()).toBeGreaterThan(0);
   });
 
   test('add and delete a note', async ({ page }) => {
