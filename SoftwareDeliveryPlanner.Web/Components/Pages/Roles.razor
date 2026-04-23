@@ -105,7 +105,7 @@
                 {
                     <tr data-testid="roles-row-@role.Code">
                         <td>@role.Code</td>
-                        <td>@role.DisplayName</td>
+                        <td><a href="/roles/@role.Code" class="text-decoration-none" data-testid="roles-link-@role.Code">@role.DisplayName</a></td>
                         <td>@role.SortOrder</td>
                         <td>
                             <span class="badge bg-@(role.IsActive ? "success" : "secondary")">@(role.IsActive ? "Yes" : "No")</span>

@@ -1,0 +1,303 @@
+@page "/roles/{Code}"
+@using MediatR
+@using FluentValidation
+@using SoftwareDeliveryPlanner.Application.Roles.Queries
+@using SoftwareDeliveryPlanner.Application.Roles.Commands
+@using SoftwareDeliveryPlanner.Application.Resources.Queries
+@using SoftwareDeliveryPlanner.Domain.Models
+@inject IMediator Mediator
+@inject NavigationManager NavigationManager
+
+<PageTitle>Role Details - @Code</PageTitle>
+
+@if (isLoading)
+{
+    <SkeletonLoader Variant="block" TestId="role-details-skeleton" />
+}
+else if (role == null)
+{
+    <div class="empty-state">
+        <div class="empty-icon"><i class="bi bi-person-badge"></i></div>
+        <h5>Role not found</h5>
+        <p>The role "@Code" does not exist or may have been deleted.</p>
+        <button class="btn btn-secondary" @onclick="GoBack" data-testid="role-details-back">
+            <i class="bi bi-arrow-left me-1"></i> Back to Roles
+        </button>
+    </div>
+}
+else
+{
+    @if (showModal)
+    {
+        <div class="modal d-block modal-backdrop-custom" role="dialog" aria-modal="true" aria-labelledby="role-detail-modal-title" data-testid="role-detail-modal">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="role-detail-modal-title">Edit Role</h5>
+                        <button type="button" class="btn-close" @onclick="CloseModal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (!string.IsNullOrWhiteSpace(modalError))
+                        {
+                            <div class="alert alert-danger" data-testid="role-detail-error">@modalError</div>
+                        }
+                        <div class="mb-2">
+                            <label class="form-label">Code:<span class="required-indicator">*</span></label>
+                            <input class="form-control @(fieldErrors.ContainsKey("Code") ? "is-invalid" : "")" @bind="roleForm.Code" data-testid="role-detail-code" />
+                            @if (fieldErrors.ContainsKey("Code"))
+                            {
+                                <div class="invalid-feedback">@fieldErrors["Code"]</div>
+                            }
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Name:<span class="required-indicator">*</span></label>
+                            <input class="form-control @(fieldErrors.ContainsKey("DisplayName") ? "is-invalid" : "")" @bind="roleForm.DisplayName" data-testid="role-detail-display-name" />
+                            @if (fieldErrors.ContainsKey("DisplayName"))
+                            {
+                                <div class="invalid-feedback">@fieldErrors["DisplayName"]</div>
+                            }
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label">Sort Order:</label>
+                                <input class="form-control @(fieldErrors.ContainsKey("SortOrder") ? "is-invalid" : "")" type="number" min="1" @bind="roleForm.SortOrder" data-testid="role-detail-sort-order" />
+                                @if (fieldErrors.ContainsKey("SortOrder"))
+                                {
+                                    <div class="invalid-feedback">@fieldErrors["SortOrder"]</div>
+                                }
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label">Active:</label>
+                                <select class="form-select" @bind="roleForm.IsActive" data-testid="role-detail-active">
+                                    <option value="true">Yes</option>
+                                    <option value="false">No</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-primary" @onclick="SaveRole" disabled="@isSaving" data-testid="role-detail-save">Save</button>
+                        <button class="btn btn-secondary" @onclick="CloseModal" disabled="@isSaving" data-testid="role-detail-cancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="d-flex justify-content-between align-items-start mb-4 page-header">
+        <div>
+            <h3 class="mb-1"><i class="bi bi-person-badge me-2"></i>@role.DisplayName</h3>
+            <p class="page-subtitle">@role.Code</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-warning" @onclick="ShowEditModal" data-testid="role-detail-edit">
+                <i class="bi bi-pencil me-1"></i> Edit
+            </button>
+            <button class="btn btn-secondary" @onclick="GoBack" data-testid="role-details-back">
+                <i class="bi bi-arrow-left me-1"></i> Back to Roles
+            </button>
+        </div>
+    </div>
+
+    <!-- Role Details Card -->
+    <div class="card border-0 shadow-sm mb-4" data-testid="role-details-card">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Code</dt>
+                <dd class="col-sm-9" data-testid="role-detail-val-code">@role.Code</dd>
+
+                <dt class="col-sm-3">Display Name</dt>
+                <dd class="col-sm-9" data-testid="role-detail-val-name">@role.DisplayName</dd>
+
+                <dt class="col-sm-3">Sort Order</dt>
+                <dd class="col-sm-9" data-testid="role-detail-val-sort">@role.SortOrder</dd>
+
+                <dt class="col-sm-3">Status</dt>
+                <dd class="col-sm-9" data-testid="role-detail-val-active">
+                    <span class="badge bg-@(role.IsActive ? "success" : "secondary")">@(role.IsActive ? "Active" : "Inactive")</span>
+                </dd>
+            </dl>
+        </div>
+        <div class="card-footer">
+            <button class="btn btn-secondary" @onclick="GoBack" data-testid="role-details-back-bottom">
+                <i class="bi bi-arrow-left me-1"></i> Back to Roles
+            </button>
+        </div>
+    </div>
+
+    <!-- Assigned Resources Section -->
+    <h4 class="mt-4 mb-3"><i class="bi bi-people me-2"></i>Assigned Resources</h4>
+    @if (isResourcesLoading)
+    {
+        <div class="text-center py-3">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Loading resources...</span>
+            </div>
+        </div>
+    }
+    else if (!assignedResources.Any())
+    {
+        <div class="text-center py-3">
+            <i class="bi bi-people display-6 text-muted"></i>
+            <p class="text-muted mt-2">No resources are currently assigned to this role.</p>
+        </div>
+    }
+    else
+    {
+        <div class="card border-0 shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover table-sm mb-0" data-testid="role-resources-table">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Resource ID</th>
+                            <th>Name</th>
+                            <th>Team</th>
+                            <th>Availability %</th>
+                            <th>Seniority</th>
+                            <th>Active</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var res in assignedResources)
+                        {
+                            <tr data-testid="role-resource-row-@res.ResourceId">
+                                <td>
+                                    <a href="/resources/@res.ResourceId" class="text-decoration-none" data-testid="role-resource-link-@res.ResourceId">@res.ResourceId</a>
+                                </td>
+                                <td>@res.ResourceName</td>
+                                <td>@res.Team</td>
+                                <td>@res.AvailabilityPct.ToString("F0")%</td>
+                                <td>@res.SeniorityLevel</td>
+                                <td>
+                                    <span class="badge bg-@(res.Active == "Yes" ? "success" : "secondary")">@res.Active</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}
+
+<ToastNotification @ref="toast" TestId="role-details-toast" />
+
+@code {
+    [Parameter] public string Code { get; set; } = string.Empty;
+
+    private Role? role;
+    private List<TeamMember> assignedResources = new();
+    private bool isLoading = true;
+    private bool isResourcesLoading = true;
+    private bool showModal;
+    private bool isSaving;
+    private string modalError = string.Empty;
+    private Dictionary<string, string> fieldErrors = new();
+    private RoleFormModel roleForm = new();
+    private ToastNotification toast = default!;
+
+    private class RoleFormModel
+    {
+        public int Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public bool IsActive { get; set; } = true;
+        public int SortOrder { get; set; } = 1;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRole();
+        isLoading = false;
+
+        if (role != null)
+            await LoadResources();
+        isResourcesLoading = false;
+    }
+
+    private async Task LoadRole()
+    {
+        var result = await Mediator.Send(new GetRolesQuery(true));
+        if (result.IsSuccess)
+            role = result.Value.FirstOrDefault(r => r.Code == Code);
+    }
+
+    private async Task LoadResources()
+    {
+        var result = await Mediator.Send(new GetResourcesQuery());
+        if (result.IsSuccess)
+            assignedResources = result.Value
+                .Where(r => r.Role == Code)
+                .OrderBy(r => r.ResourceId)
+                .ToList();
+    }
+
+    private void ShowEditModal()
+    {
+        if (role == null) return;
+        roleForm = new RoleFormModel
+        {
+            Id = role.Id,
+            Code = role.Code,
+            DisplayName = role.DisplayName,
+            IsActive = role.IsActive,
+            SortOrder = role.SortOrder
+        };
+        modalError = string.Empty;
+        fieldErrors.Clear();
+        showModal = true;
+    }
+
+    private async Task SaveRole()
+    {
+        modalError = string.Empty;
+        fieldErrors.Clear();
+        isSaving = true;
+        try
+        {
+            var newCode = roleForm.Code.Trim();
+            await Mediator.Send(new UpsertRoleCommand(
+                roleForm.Id,
+                newCode,
+                roleForm.DisplayName,
+                roleForm.IsActive,
+                roleForm.SortOrder,
+                false));
+
+            CloseModal();
+            toast.Show("Role updated successfully.");
+
+            // If the code changed, navigate to the updated URL; otherwise reload in place
+            if (!string.Equals(newCode, Code, StringComparison.OrdinalIgnoreCase))
+            {
+                NavigationManager.NavigateTo($"/roles/{newCode}");
+            }
+            else
+            {
+                await LoadRole();
+            }
+        }
+        catch (ValidationException ex)
+        {
+            foreach (var error in ex.Errors)
+                fieldErrors[error.PropertyName] = error.ErrorMessage;
+            modalError = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        modalError = string.Empty;
+        fieldErrors.Clear();
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/roles");
+    }
+}
