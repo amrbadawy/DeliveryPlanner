@@ -11,23 +11,27 @@
     background: var(--color-sidebar);
     color: var(--color-text-inverse);
     font-size: var(--font-size-sm);
-    min-width: 800px;
+    min-width: 840px;
 }
 
 .gantt-label-col {
-    min-width: 200px;
-    max-width: 200px;
+    min-width: 240px;
+    max-width: 240px;
     padding: 6px 10px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     border-right: 1px solid var(--color-border);
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--color-bg-primary);
 }
 
 .gantt-timeline-col {
     flex: 1;
     position: relative;
-    min-height: 32px;
+    min-height: 36px;
     padding: 4px 0;
 }
 
@@ -48,7 +52,7 @@
 .gantt-row {
     display: flex;
     border-bottom: 1px solid var(--color-border-light);
-    min-width: 800px;
+    min-width: 840px;
 }
 
 .gantt-row:nth-child(even) {
@@ -74,8 +78,8 @@
 /* ── Shell bar (overall task span, colored by status/risk) ── */
 .gantt-shell {
     position: absolute;
-    height: 24px;
-    top: 4px;
+    height: 28px;
+    top: 2px;
     border-radius: var(--radius-sm);
     display: flex;
     align-items: center;
@@ -107,7 +111,7 @@
 /* ── Role sub-segments (inside shell bar) ──────────────────── */
 .gantt-segment {
     position: absolute;
-    height: 8px;
+    height: 14px;
     border-radius: 3px;
     min-width: 2px;
     opacity: 0.9;
@@ -120,13 +124,12 @@
 }
 
 /* ── Role-based colors ─────────────────────────────────────── */
-.gantt-role-ba  { background: #6366f1; } /* Indigo  */
-.gantt-role-sa  { background: #8b5cf6; } /* Violet  */
-.gantt-role-ux  { background: #ec4899; } /* Pink    */
-.gantt-role-dev { background: #3b82f6; } /* Blue    */
-.gantt-role-qa  { background: #10b981; } /* Emerald */
-.gantt-role-ops { background: #f59e0b; } /* Amber   */
-.gantt-role-pm  { background: #6b7280; } /* Gray    */
+.gantt-role-ba  { background: #0d9488; } /* Teal    */
+.gantt-role-sa  { background: #6366f1; } /* Indigo  */
+.gantt-role-ux  { background: #e11d48; } /* Rose    */
+.gantt-role-ui  { background: #d97706; } /* Amber   */
+.gantt-role-dev { background: #2563eb; } /* Blue    */
+.gantt-role-qa  { background: #059669; } /* Emerald */
 
 /* ── Overflow indicator (+N roles) ─────────────────────────── */
 .gantt-overflow-indicator {
@@ -204,6 +207,54 @@
     font-size: var(--font-size-xs);
     color: var(--color-accent);
     white-space: nowrap;
+}
+
+/* ── CSS-only tooltips ─────────────────────────────────────── */
+.gantt-tooltip {
+    position: relative;
+}
+
+.gantt-tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--color-sidebar, #1e293b);
+    color: var(--color-text-inverse, #fff);
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 400;
+    white-space: pre-line;
+    line-height: 1.4;
+    z-index: 10;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    max-width: 280px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.gantt-tooltip:hover::after {
+    opacity: 1;
+}
+
+/* Position tooltip below for segments (they're small) */
+.gantt-segment.gantt-tooltip::after {
+    bottom: auto;
+    top: calc(100% + 4px);
+}
+
+/* ── Week grid lines ───────────────────────────────────────── */
+.gantt-week-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--color-border-light);
+    z-index: 0;
+    pointer-events: none;
 }
 
 /* ── Critical path highlight ─────────────────────────────── */

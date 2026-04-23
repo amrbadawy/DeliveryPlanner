@@ -54,27 +54,31 @@ else if (!scheduledTasks.Any())
 else
 {
     <div class="mb-2 text-muted" data-testid="gantt-range">
-        Plan range: <strong>@planStart.ToString("yyyy-MM-dd")</strong> to <strong>@planEnd.ToString("yyyy-MM-dd")</strong>
+        Plan range: <strong>@planStart.ToString("dd MMMM yyyy")</strong> to <strong>@planEnd.ToString("dd MMMM yyyy")</strong>
         (@totalDays days)
     </div>
 
     <!-- Legend: role colors + status markers -->
-    <div class="d-flex gap-3 mb-3 flex-wrap" data-testid="gantt-legend">
-        <span class="fw-semibold text-muted">Roles:</span>
-        @foreach (var role in DomainConstants.ResourceRole.PipelineOrder)
-        {
-            <span><span class="badge gantt-role-@role.ToLowerInvariant()">&nbsp;&nbsp;</span> @DomainConstants.ResourceRole.GetDisplayName(role)</span>
-        }
-        <span class="ms-3 fw-semibold text-muted">Status:</span>
-        <span><span class="badge gantt-bar-completed">&nbsp;&nbsp;</span> Completed</span>
-        <span><span class="badge gantt-bar-inprogress">&nbsp;&nbsp;</span> In Progress</span>
-        <span><span class="badge gantt-bar-notstarted">&nbsp;&nbsp;</span> Not Started</span>
-        <span><span class="badge gantt-bar-atrisk">&nbsp;&nbsp;</span> At Risk</span>
-        <span><span class="badge gantt-bar-late">&nbsp;&nbsp;</span> Late</span>
-        @if (showCriticalPath)
-        {
-            <span><span class="badge gantt-bar-critical">&nbsp;&nbsp;</span> Critical Path</span>
-        }
+    <div class="mb-3" data-testid="gantt-legend">
+        <div class="d-flex gap-3 flex-wrap mb-1">
+            <span class="fw-semibold text-muted">Roles:</span>
+            @foreach (var role in DomainConstants.ResourceRole.PipelineOrder)
+            {
+                <span><span class="badge gantt-role-@role.ToLowerInvariant()">&nbsp;&nbsp;</span> @DomainConstants.ResourceRole.GetDisplayName(role)</span>
+            }
+        </div>
+        <div class="d-flex gap-3 flex-wrap">
+            <span class="fw-semibold text-muted">Status:</span>
+            <span><span class="badge gantt-bar-completed">&nbsp;&nbsp;</span> Completed</span>
+            <span><span class="badge gantt-bar-inprogress">&nbsp;&nbsp;</span> In Progress</span>
+            <span><span class="badge gantt-bar-notstarted">&nbsp;&nbsp;</span> Not Started</span>
+            <span><span class="badge gantt-bar-atrisk">&nbsp;&nbsp;</span> At Risk</span>
+            <span><span class="badge gantt-bar-late">&nbsp;&nbsp;</span> Late</span>
+            @if (showCriticalPath)
+            {
+                <span><span class="badge gantt-bar-critical">&nbsp;&nbsp;</span> Critical Path</span>
+            }
+        </div>
     </div>
 
     <!-- Month headers -->
@@ -93,6 +97,12 @@ else
             </div>
         </div>
 
+        @* Week grid lines *@
+        @foreach (var weekPct in GetWeekMarkers())
+        {
+            <div class="gantt-week-line" style="left: calc(240px + (@weekPct * (100% - 240px) / 100));"></div>
+        }
+
         <!-- Task rows -->
         @foreach (var task in scheduledTasks)
         {
@@ -108,14 +118,14 @@ else
                      @onclick="() => NavigateToTask(task.TaskId)"
                      @onkeydown="(e) => OnGanttKeyDown(e, task.TaskId)">
                     <span class="gantt-task-id">@task.TaskId</span>
-                    <span class="gantt-task-name">@Truncate(task.ServiceName, 18)</span>
+                    <span class="gantt-task-name">@Truncate(task.ServiceName, 24)</span>
                 </div>
                 <div class="gantt-timeline-col">
                     @if (task.PlannedStart.HasValue && task.PlannedFinish.HasValue)
                     {
                         @* Shell bar: shows status/risk via border color *@
-                        <div class="gantt-shell @barClass @(IsCriticalTask(task) ? "gantt-bar-critical" : "")" style="@barStyle"
-                             title="@task.TaskId: @task.ServiceName&#10;Status: @task.Status | Risk: @task.DeliveryRisk&#10;@task.PlannedStart?.ToString("yyyy-MM-dd") - @task.PlannedFinish?.ToString("yyyy-MM-dd") (@task.Duration d)"
+                        <div class="gantt-shell gantt-tooltip @barClass @(IsCriticalTask(task) ? "gantt-bar-critical" : "")" style="@barStyle"
+                             data-tooltip="@task.TaskId: @task.ServiceName&#10;Status: @task.Status | Risk: @task.DeliveryRisk&#10;@task.PlannedStart?.ToString("dd MMM yyyy") — @task.PlannedFinish?.ToString("dd MMM yyyy") (@task.Duration d)"
                              role="button" tabindex="0"
                              @onclick="() => NavigateToTask(task.TaskId)" @onclick:stopPropagation
                              @onkeydown="(e) => OnGanttKeyDown(e, task.TaskId)" @onkeydown:stopPropagation
@@ -132,8 +142,8 @@ else
                                                  $"Max FTE: {seg.MaxFte}\n" +
                                                  $"Resources: {string.Join(", ", seg.AssignedResources.Select(r => r.ResourceName))}";
                                 var laneIndex = visibleSegments.IndexOf(seg);
-                                <div class="gantt-segment gantt-role-@seg.Role.ToLowerInvariant()" style="@segStyle; top: @(laneIndex * 10)px;"
-                                     title="@segTooltip"
+                                <div class="gantt-segment gantt-tooltip gantt-role-@seg.Role.ToLowerInvariant()" style="@segStyle; top: @(laneIndex * 16)px;"
+                                     data-tooltip="@segTooltip"
                                      data-testid="gantt-segment-@task.TaskId-@seg.Role">
                                 </div>
                             }
@@ -175,7 +185,7 @@ else
             var todayPct = GetDatePercent(DateTime.Today);
             if (todayPct >= 0 && todayPct <= 100)
             {
-                <div class="gantt-today-line" style="left: calc(200px + (@todayPct% * (100% - 200px) / 100));"
+                <div class="gantt-today-line" style="left: calc(240px + (@todayPct% * (100% - 240px) / 100));"
                      data-testid="gantt-today" title="Today: @DateTime.Today.ToString("yyyy-MM-dd")">
                 </div>
             }
@@ -427,5 +437,24 @@ else
         public string Label { get; init; } = "";
         public double LeftPct { get; init; }
         public double WidthPct { get; init; }
+    }
+
+    private List<double> GetWeekMarkers()
+    {
+        var markers = new List<double>();
+        if (totalDays <= 0) return markers;
+
+        // Find first Monday after planStart
+        var current = planStart;
+        while (current.DayOfWeek != DayOfWeek.Monday)
+            current = current.AddDays(1);
+
+        while (current <= planEnd)
+        {
+            markers.Add(GetDatePercent(current));
+            current = current.AddDays(7);
+        }
+
+        return markers;
     }
 }
