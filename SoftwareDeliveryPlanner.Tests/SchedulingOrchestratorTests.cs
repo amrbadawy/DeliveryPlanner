@@ -512,7 +512,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
 
 
         await _taskService.UpsertTaskAsync(0, "SVN-01", "New Test Task", 5,
-            B(10).Select(b => (b.Role, b.EstimationDays, b.OverlapPct, 1.0)).ToList(), null, null, true);
+            B(10).Select(b => (b.Role, b.EstimationDays, b.OverlapPct, 1.0, b.MinSeniority)).ToList(), null, null, true);
 
         await using var db = await _factory.CreateDbContextAsync();
         var persisted = await db.Tasks.FirstOrDefaultAsync(t => t.TaskId == "SVN-01");
@@ -530,7 +530,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
 
 
         await _taskService.UpsertTaskAsync(existingId, existing.TaskId, "Updated Task Name", 3,
-            B(99).Select(b => (b.Role, b.EstimationDays, b.OverlapPct, 1.0)).ToList(), null, null, false);
+            B(99).Select(b => (b.Role, b.EstimationDays, b.OverlapPct, 1.0, b.MinSeniority)).ToList(), null, null, false);
 
         await using var verifyDb = await _factory.CreateDbContextAsync();
         var reloaded = await verifyDb.Tasks.FirstOrDefaultAsync(t => t.Id == existingId);

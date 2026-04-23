@@ -123,14 +123,6 @@
     transform: scaleY(1.3);
 }
 
-/* ── Role-based colors ─────────────────────────────────────── */
-.gantt-role-ba  { background: #0d9488; } /* Teal    */
-.gantt-role-sa  { background: #6366f1; } /* Indigo  */
-.gantt-role-ux  { background: #e11d48; } /* Rose    */
-.gantt-role-ui  { background: #d97706; } /* Amber   */
-.gantt-role-dev { background: #2563eb; } /* Blue    */
-.gantt-role-qa  { background: #059669; } /* Emerald */
-
 /* ── Overflow indicator (+N roles) ─────────────────────────── */
 .gantt-overflow-indicator {
     position: absolute;

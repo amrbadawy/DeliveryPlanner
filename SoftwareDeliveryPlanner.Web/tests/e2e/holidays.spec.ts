@@ -244,9 +244,9 @@ test.describe('Holidays CRUD + edge cases', () => {
     const table = page.getByTestId('holidays-table');
     await waitForTableRows(table);
 
-    // 7 seeded holidays should be visible
+    // 4 holidays are seeded (Saudi Founding Day, Eid Al-Fitr, Arafat+Eid Al-Adha, National Day)
     const rowCount = await table.locator('tbody tr').count();
-    expect(rowCount).toBeGreaterThanOrEqual(7);
+    expect(rowCount).toBeGreaterThanOrEqual(4);
   });
 
   test('seeded National Day shows as single day', async ({ page }) => {

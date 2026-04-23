@@ -160,6 +160,9 @@ test.describe('Resources search, filter, and sort', () => {
 
     await page.getByTestId('resources-filter-role').selectOption('Developer');
     const rows = table.locator('tbody tr');
+    // Wait for Blazor to finish re-rendering the filtered list before snapshotting
+    // the count — without this the count() races with the async DOM update.
+    await expect(rows.first()).toContainText('Developer');
     const count = await rows.count();
     expect(count).toBeGreaterThan(0);
 
@@ -186,8 +189,12 @@ test.describe('Resources search, filter, and sort', () => {
     await page.getByTestId('resources-filter-role').selectOption('Developer');
     await page.getByTestId('resources-clear-filters').click();
 
-    const afterClear = await table.locator('tbody tr').count();
-    expect(afterClear).toBe(allRows);
+    // Poll until the full unfiltered list is restored — Blazor re-renders async
+    // so a snapshot count() immediately after click() can still see the filtered DOM.
+    await expect.poll(
+      async () => table.locator('tbody tr').count(),
+      { timeout: 5_000 }
+    ).toBe(allRows);
     await expect(page.getByTestId('resources-search')).toHaveValue('');
   });
 

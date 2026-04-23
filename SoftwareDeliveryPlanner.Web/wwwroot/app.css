@@ -550,6 +550,34 @@ th[role="button"] {
     font-size: var(--font-size-xs);
 }
 
+.role-badge {
+    color: #fff !important;
+}
+
+.role-badge-dev,
+.gantt-role-dev { background: #2563eb; }
+
+.role-badge-qa,
+.gantt-role-qa { background: #059669; }
+
+.role-badge-ba,
+.gantt-role-ba { background: #0d9488; }
+
+.role-badge-sa,
+.gantt-role-sa { background: #6366f1; }
+
+.role-badge-ux,
+.gantt-role-ux { background: #e11d48; }
+
+.role-badge-ui,
+.gantt-role-ui { background: #d97706; }
+
+.role-badge-ops,
+.gantt-role-ops { background: #f59e0b; }
+
+.role-badge-pm,
+.gantt-role-pm { background: #6b7280; }
+
 /* ══════════════════════════════════════════════════════════
    Modal Backdrop (shared)
    ══════════════════════════════════════════════════════════ */

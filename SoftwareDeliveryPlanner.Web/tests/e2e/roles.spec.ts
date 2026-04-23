@@ -3,6 +3,9 @@ import { expectModalVisible, fillInputByTestId, gotoPage } from './helpers';
 
 test.describe('Roles CRUD + constraints', () => {
   test('add, edit, block delete when in use, then delete after unassign', async ({ page }) => {
+    // This test spans 4 page navigations and ~12 interactions — give it extra headroom.
+    test.setTimeout(60_000);
+
     await gotoPage(page, '/roles');
 
     const roleCode = `E2E-ROLE-${Date.now()}`;
@@ -57,5 +60,13 @@ test.describe('Roles CRUD + constraints', () => {
     await page.getByTestId('roles-delete-modal-confirm').click();
     await expect(page.getByTestId('roles-delete-modal')).toBeHidden();
     await expect(page.getByTestId(`roles-row-${roleCode}`)).toHaveCount(0);
+
+    // Clean up the resource so it doesn't pollute other specs.
+    await gotoPage(page, '/resources');
+    await page.getByTestId(`resources-delete-${resourceId}`).click();
+    await expectModalVisible(page, 'resources-delete-modal');
+    await page.getByTestId('resources-delete-modal-confirm').click();
+    await expect(page.getByTestId('resources-delete-modal')).toBeHidden();
+    await expect(page.getByTestId(`resources-row-${resourceId}`)).toHaveCount(0);
   });
 });

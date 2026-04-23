@@ -25,6 +25,7 @@ using SoftwareDeliveryPlanner.Application.TaskNotes.Queries;
 using SoftwareDeliveryPlanner.Application.Timeline.Queries;
 using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Infrastructure.Services;
+using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.Domain.Models;
 using SoftwareDeliveryPlanner.SharedKernel;
 using SoftwareDeliveryPlanner.Tests.Infrastructure;
@@ -283,6 +284,64 @@ public class DeleteTaskCommandHandlerTests : OrchestratorFixture
     }
 }
 
+[Collection(DatabaseCollection.Name)]
+public class UpdateTaskEffortBreakdownCommandHandlerTests : OrchestratorFixture
+{
+    public UpdateTaskEffortBreakdownCommandHandlerTests(SqlServerFixture fixture) : base(fixture) { }
+
+    [Fact]
+    public async Task Handle_UpdatesEffortBreakdownOnly_WithoutChangingOtherFields()
+    {
+        await using var db = await Factory.CreateDbContextAsync();
+        var existing = await db.Tasks
+            .Include(t => t.EffortBreakdown)
+            .Include(t => t.Dependencies)
+            .FirstAsync();
+
+        var originalServiceName = existing.ServiceName;
+        var originalPriority = existing.Priority;
+        var originalStrictDate = existing.StrictDate;
+        var originalPhase = existing.Phase;
+        var originalPreferredResources = existing.PreferredResourceIds;
+        var originalDependsOn = existing.DependsOnTaskIds;
+
+        var command = new UpdateTaskEffortBreakdownCommand(
+            existing.TaskId,
+            new List<EffortBreakdownInput>
+            {
+                new("DEV", 11, 0, 1.5, "Senior"),
+                new("QA", 3, 20, 1.0, null)
+            },
+            RunScheduler: false);
+
+        var handler = new UpdateTaskEffortBreakdownCommandHandler(TaskOrchestrator);
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        await using var verifyDb = await Factory.CreateDbContextAsync();
+        var updated = await verifyDb.Tasks
+            .Include(t => t.EffortBreakdown)
+            .Include(t => t.Dependencies)
+            .FirstAsync(t => t.Id == existing.Id);
+
+        Assert.Equal(originalServiceName, updated.ServiceName);
+        Assert.Equal(originalPriority, updated.Priority);
+        Assert.Equal(originalStrictDate, updated.StrictDate);
+        Assert.Equal(originalPhase, updated.Phase);
+        Assert.Equal(originalPreferredResources, updated.PreferredResourceIds);
+        Assert.Equal(originalDependsOn, updated.DependsOnTaskIds);
+
+        var dev = updated.EffortBreakdown.First(e => e.Role == "DEV");
+        var qa = updated.EffortBreakdown.First(e => e.Role == "QA");
+        Assert.Equal(11, dev.EstimationDays);
+        Assert.Equal(1.5, dev.MaxFte);
+        Assert.Equal("Senior", dev.MinSeniority);
+        Assert.Equal(3, qa.EstimationDays);
+        Assert.Equal(20, qa.OverlapPct);
+    }
+}
+
 // ============================================================
 // Tasks — Validators
 // ============================================================
@@ -377,6 +436,44 @@ public class UpsertTaskCommandValidatorTests
     {
         var result = _validator.Validate(Valid() with { Priority = priority });
         Assert.True(result.IsValid);
+    }
+}
+
+public class UpdateTaskEffortBreakdownCommandValidatorTests
+{
+    private readonly UpdateTaskEffortBreakdownCommandValidator _validator = new();
+
+    [Fact]
+    public void Valid_Command_PassesValidation()
+    {
+        var command = new UpdateTaskEffortBreakdownCommand(
+            "SVC-001",
+            new List<EffortBreakdownInput>
+            {
+                new("DEV", 5, 0, 1.0),
+                new("QA", 2, 20, 1.0)
+            },
+            RunScheduler: true);
+
+        var result = _validator.Validate(command);
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void MissingRequiredRole_FailsValidation()
+    {
+        var command = new UpdateTaskEffortBreakdownCommand(
+            "SVC-001",
+            new List<EffortBreakdownInput>
+            {
+                new("DEV", 5, 0, 1.0),
+                new("BA", 1, 0, 1.0)
+            },
+            RunScheduler: false);
+
+        var result = _validator.Validate(command);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("QA entry", StringComparison.OrdinalIgnoreCase));
     }
 }
 
@@ -2146,6 +2243,55 @@ public class GetTaskAllocationsQueryHandlerTests : OrchestratorFixture
         var result = await handler.Handle(new GetTaskAllocationsQuery("NON_EXISTENT_TASK"), CancellationToken.None);
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value);
+    }
+}
+
+[Collection(DatabaseCollection.Name)]
+public class GetTaskTimelineQueryHandlerTests : OrchestratorFixture
+{
+    public GetTaskTimelineQueryHandlerTests(SqlServerFixture fixture) : base(fixture) { }
+
+    [Fact]
+    public async Task Handle_WithScheduledTask_ComputesAllocationPctFromCapacity()
+    {
+        await SchedulerService.RunSchedulerAsync();
+
+        await using var db = await Factory.CreateDbContextAsync();
+        var taskId = await db.Allocations.Select(a => a.TaskId).FirstAsync();
+
+        var handler = new GetTaskTimelineQueryHandler(PlanningQueryService);
+        var result = await handler.Handle(new GetTaskTimelineQuery(taskId), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+
+        var dayWithAssigned = result.Value.Days.First(d => d.AssignedResources.Any());
+        var assigned = dayWithAssigned.AssignedResources.First();
+
+        var dayHours = await db.Allocations
+            .Where(a => a.TaskId == taskId
+                        && a.ResourceId == assigned.ResourceId
+                        && a.Role == assigned.Role
+                        && a.CalendarDate.Date == dayWithAssigned.Date.Date)
+            .SumAsync(a => a.HoursAllocated);
+
+        var resource = await db.Resources.FirstAsync(r => r.ResourceId == assigned.ResourceId);
+        var effectiveCapacity = resource.DailyCapacity * (resource.AvailabilityPct / 100.0) * DomainConstants.HoursPerDay;
+
+        var adjustment = await db.Adjustments.FirstOrDefaultAsync(a =>
+            a.ResourceId == assigned.ResourceId
+            && a.AdjStart.Date <= dayWithAssigned.Date.Date
+            && a.AdjEnd.Date >= dayWithAssigned.Date.Date);
+
+        if (adjustment != null)
+            effectiveCapacity *= adjustment.AvailabilityPct / 100.0;
+
+        var expectedPct = effectiveCapacity > 0
+            ? Math.Round((dayHours / effectiveCapacity) * 100.0, 1)
+            : 0;
+
+        Assert.Equal(Math.Round(dayHours, 2), assigned.HoursAllocated);
+        Assert.Equal(expectedPct, assigned.AllocationPct);
     }
 }
 

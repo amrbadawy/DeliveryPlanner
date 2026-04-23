@@ -44,4 +44,11 @@ internal abstract class ServiceBase
         using var engine = await EngineFactory.CreateAsync(cancellationToken);
         engine.RunScheduler();
     }
+
+    protected async Task SaveAndDispatchAsync(
+        PlannerDbContext db, CancellationToken cancellationToken)
+    {
+        await db.SaveChangesAsync(cancellationToken);
+        await db.DispatchDomainEventsAsync(Publisher, cancellationToken);
+    }
 }

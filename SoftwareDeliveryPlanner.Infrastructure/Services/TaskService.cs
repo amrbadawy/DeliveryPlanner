@@ -43,7 +43,7 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
     public async Task UpsertTaskAsync(
         int id, string taskId, string serviceName,
         int priority,
-        List<(string Role, double EstimationDays, double OverlapPct, double MaxFte)> effortBreakdown,
+        List<(string Role, double EstimationDays, double OverlapPct, double MaxFte, string? MinSeniority)> effortBreakdown,
         DateTime? strictDate,
         List<(string PredecessorTaskId, string Type, int LagDays, double OverlapPct)>? dependencies,
         bool isNew,
@@ -53,7 +53,7 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
         await using var db = await DbFactory.CreateDbContextAsync(cancellationToken);
 
         var specs = effortBreakdown
-            .Select(e => new EffortBreakdownSpec(e.Role, e.EstimationDays, e.OverlapPct, e.MaxFte))
+            .Select(e => new EffortBreakdownSpec(e.Role, e.EstimationDays, e.OverlapPct, e.MaxFte, e.MinSeniority))
             .ToList();
 
         TaskItem task;
@@ -96,6 +96,31 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
         }
 
         await SaveDispatchAndRescheduleAsync(db, cancellationToken);
+    }
+
+    public async Task UpdateTaskEffortBreakdownAsync(
+        string taskId,
+        List<(string Role, double EstimationDays, double OverlapPct, double MaxFte, string? MinSeniority)> effortBreakdown,
+        bool runScheduler,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync(cancellationToken);
+
+        var task = await db.Tasks
+            .Include(t => t.EffortBreakdown)
+            .FirstOrDefaultAsync(t => t.TaskId == taskId, cancellationToken)
+            ?? throw new InvalidOperationException($"Task '{taskId}' was not found.");
+
+        var specs = effortBreakdown
+            .Select(e => new EffortBreakdownSpec(e.Role, e.EstimationDays, e.OverlapPct, e.MaxFte, e.MinSeniority))
+            .ToList();
+
+        task.Update(task.ServiceName, task.Priority, specs, task.StrictDate, task.Phase, task.PreferredResourceIds);
+
+        if (runScheduler)
+            await SaveDispatchAndRescheduleAsync(db, cancellationToken);
+        else
+            await SaveAndDispatchAsync(db, cancellationToken);
     }
 
     public async Task DeleteTaskAsync(int id, CancellationToken cancellationToken = default)

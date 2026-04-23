@@ -23,7 +23,7 @@ internal sealed class BulkImportTasksCommandHandler : IRequestHandler<BulkImport
             var id = existing?.Id ?? 0;
 
             var breakdown = row.EffortBreakdown
-                .Select(e => (e.Role, e.EstimationDays, e.OverlapPct, e.MaxFte))
+                .Select(e => (e.Role, e.EstimationDays, e.OverlapPct, e.MaxFte, e.MinSeniority))
                 .ToList();
 
             var dependencies = row.Dependencies?

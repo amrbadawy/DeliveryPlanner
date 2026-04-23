@@ -46,11 +46,13 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
             weekSetting?.Value ?? DomainConstants.WorkingWeek.SunThu);
 
         var holidays = await db.Holidays.ToListAsync(cancellationToken);
+        var adjustments = await db.Adjustments.ToListAsync(cancellationToken);
 
-        var resourcesList = await db.Resources
+        var resources = await db.Resources
             .Where(r => r.Active == DomainConstants.ActiveStatus.Yes)
             .OrderBy(r => r.ResourceName)
             .ToListAsync(cancellationToken);
+        var resourcesById = resources.ToDictionary(r => r.ResourceId, StringComparer.OrdinalIgnoreCase);
 
         var allocations = await db.Allocations
             .Where(a => a.TaskId == taskId)
@@ -71,11 +73,34 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
 
             var dayAllocs = allocations.Where(a => a.CalendarDate.Date == current.Date).ToList();
             var assignedResources = dayAllocs
-                .GroupBy(a => a.ResourceId)
+                .GroupBy(a => new { a.ResourceId, a.Role })
                 .Select(g =>
                 {
-                    var res = resourcesList.FirstOrDefault(r => r.ResourceId == g.Key);
-                    return new AssignedResourceInfo(g.Key, res?.ResourceName ?? g.Key, g.First().Role);
+                    var res = resourcesById.GetValueOrDefault(g.Key.ResourceId);
+                    var dayHours = g.Sum(a => a.HoursAllocated);
+
+                    double effectiveCapacity = 0;
+                    if (res != null)
+                    {
+                        effectiveCapacity = res.DailyCapacity * (res.AvailabilityPct / 100.0) * DomainConstants.HoursPerDay;
+                        var adjustment = adjustments.FirstOrDefault(a =>
+                            a.ResourceId.Equals(res.ResourceId, StringComparison.OrdinalIgnoreCase) &&
+                            a.AdjStart.Date <= current.Date &&
+                            a.AdjEnd.Date >= current.Date);
+                        if (adjustment != null)
+                            effectiveCapacity *= adjustment.AvailabilityPct / 100.0;
+                    }
+
+                    var allocationPct = effectiveCapacity > 0
+                        ? (dayHours / effectiveCapacity) * 100.0
+                        : 0;
+
+                    return new AssignedResourceInfo(
+                        g.Key.ResourceId,
+                        res?.ResourceName ?? g.Key.ResourceId,
+                        g.Key.Role,
+                        Math.Round(allocationPct, 1),
+                        Math.Round(dayHours, 2));
                 }).ToList();
 
             days.Add(new TaskAssignmentDayDto(

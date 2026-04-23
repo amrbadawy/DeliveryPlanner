@@ -10,12 +10,17 @@ public interface ITaskOrchestrator
     Task UpsertTaskAsync(
         int id, string taskId, string serviceName,
         int priority,
-        List<(string Role, double EstimationDays, double OverlapPct, double MaxFte)> effortBreakdown,
+        List<(string Role, double EstimationDays, double OverlapPct, double MaxFte, string? MinSeniority)> effortBreakdown,
         DateTime? strictDate,
         List<(string PredecessorTaskId, string Type, int LagDays, double OverlapPct)>? dependencies,
         bool isNew,
         DateTime? overrideStart = null, string? phase = null,
         string? preferredResourceIds = null,
+        CancellationToken cancellationToken = default);
+    Task UpdateTaskEffortBreakdownAsync(
+        string taskId,
+        List<(string Role, double EstimationDays, double OverlapPct, double MaxFte, string? MinSeniority)> effortBreakdown,
+        bool runScheduler,
         CancellationToken cancellationToken = default);
     Task DeleteTaskAsync(int id, CancellationToken cancellationToken = default);
 }

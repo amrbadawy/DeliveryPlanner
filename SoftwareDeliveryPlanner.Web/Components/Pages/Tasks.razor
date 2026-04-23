@@ -10,6 +10,7 @@
 @inject NavigationManager NavigationManager
 @inject SoftwareDeliveryPlanner.Web.Services.AutoScheduleService autoSchedule
 @implements IDisposable
+@using Microsoft.AspNetCore.Components
 
 <PageTitle>Task Register</PageTitle>
 
@@ -602,6 +603,14 @@ else
 
         await LoadTasks();
         isLoaded = true;
+
+        var editTaskId = query["editTaskId"];
+        if (!string.IsNullOrWhiteSpace(editTaskId))
+        {
+            var taskToEdit = tasks.FirstOrDefault(t => t.TaskId.Equals(editTaskId, StringComparison.OrdinalIgnoreCase));
+            if (taskToEdit != null)
+                EditTask(taskToEdit);
+        }
     }
 
     private async Task LoadTasks()

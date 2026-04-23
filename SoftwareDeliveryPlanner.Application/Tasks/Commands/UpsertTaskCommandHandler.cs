@@ -15,7 +15,7 @@ internal sealed class UpsertTaskCommandHandler : IRequestHandler<UpsertTaskComma
     public async Task<Result> Handle(UpsertTaskCommand request, CancellationToken cancellationToken)
     {
         var breakdown = request.EffortBreakdown
-            .Select(e => (e.Role, e.EstimationDays, e.OverlapPct, e.MaxFte))
+            .Select(e => (e.Role, e.EstimationDays, e.OverlapPct, e.MaxFte, e.MinSeniority))
             .ToList();
 
         var dependencies = request.Dependencies?

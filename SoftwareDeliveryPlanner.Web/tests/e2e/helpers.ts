@@ -27,7 +27,9 @@ export async function fillInputByTestId(page: Page, testId: string, value: strin
 
   const tagName = await element.evaluate((el) => el.tagName.toLowerCase());
   if (tagName === 'select') {
-    await element.selectOption({ label: value }).catch(async () => {
+    // Try matching by visible label first; use a short timeout so we fall through quickly
+    // to a value-based match when the caller passes a code/key rather than a display name.
+    await element.selectOption({ label: value }, { timeout: 1_000 }).catch(async () => {
       await element.selectOption({ value });
     });
     await page.waitForTimeout(150);
