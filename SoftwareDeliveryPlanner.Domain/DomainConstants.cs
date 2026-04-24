@@ -104,8 +104,13 @@ public static class DomainConstants
         public static readonly IReadOnlySet<string> AllRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { BA, SA, UX, UI, Developer, QA };
 
         /// <summary>Returns the pipeline sort order for a role (lower = earlier).</summary>
-        public static int GetPipelineSortOrder(string role) =>
-            PipelineOrder is List<string> list ? (list.IndexOf(role) is int idx and >= 0 ? idx + 1 : int.MaxValue) : int.MaxValue;
+        public static int GetPipelineSortOrder(string role)
+        {
+            for (int i = 0; i < PipelineOrder.Count; i++)
+                if (string.Equals(PipelineOrder[i], role, StringComparison.OrdinalIgnoreCase))
+                    return i + 1;
+            return int.MaxValue;
+        }
 
         /// <summary>Human-readable display name for a role code.</summary>
         public static string GetDisplayName(string role) => role switch
