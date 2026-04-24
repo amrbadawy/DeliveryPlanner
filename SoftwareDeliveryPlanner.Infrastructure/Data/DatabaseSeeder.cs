@@ -72,33 +72,36 @@ internal sealed class DatabaseSeeder : IDatabaseSeeder
 
     private static void SeedTasks(PlannerDbContext db)
     {
+        // DEV MaxFte: random integer 1–4 per task
+        // Non-DEV EstimationDays: DEV days × 30%
+        // Non-DEV MaxFte: max(DEV MaxFte × 30%, 1.0)
         db.Tasks.AddRange(
             TaskItem.Create("SVC-001", "ادارة المحتوى اخبار والحملات التوعوية", 5,
-                [new EffortBreakdownSpec("DEV", 40, 0, 3.5), new EffortBreakdownSpec("QA", 10, 20, 3.5)], phase: "Phase 1"),
+                [new EffortBreakdownSpec("DEV", 40, 0, 3), new EffortBreakdownSpec("QA", 12.0, 20, 1.0)], phase: "Phase 1"),
             TaskItem.Create("SVC-002", "التكامل مع منصة تحميل المرحلة الثانية", 5,
-                [new EffortBreakdownSpec("DEV", 14, 0, 2.0), new EffortBreakdownSpec("QA", 4, 25, 2.0)], strictDate: new DateTime(2026, 7, 23), phase: "Phase 1"),
+                [new EffortBreakdownSpec("DEV", 14, 0, 2), new EffortBreakdownSpec("QA", 4.2, 25, 1.0)], strictDate: new DateTime(2026, 7, 23), phase: "Phase 1"),
             TaskItem.Create("SVC-003", "اضافه / حذف موظف على جهة بعد اصدار الترخيص", 5,
-                [new EffortBreakdownSpec("BA", 2, 0, 3.5), new EffortBreakdownSpec("DEV", 30, 0, 3.5), new EffortBreakdownSpec("QA", 8, 20, 3.5)], phase: "Phase 1"),
+                [new EffortBreakdownSpec("BA", 9.0, 0, 1.0), new EffortBreakdownSpec("DEV", 30, 0, 3), new EffortBreakdownSpec("QA", 9.0, 20, 1.0)], phase: "Phase 1"),
             TaskItem.Create("SVC-004", "التكامل مع نظام الموارد البشرية للملف الشخصي", 5,
-                [new EffortBreakdownSpec("SA", 2, 0, 2.5), new EffortBreakdownSpec("DEV", 20, 0, 2.5), new EffortBreakdownSpec("QA", 5, 20, 2.5)], phase: "Phase 1"),
+                [new EffortBreakdownSpec("SA", 6.0, 0, 1.0), new EffortBreakdownSpec("DEV", 20, 0, 2), new EffortBreakdownSpec("QA", 6.0, 20, 1.0)], phase: "Phase 1"),
             TaskItem.Create("SVC-005", "طلب تغيير تعديل حقول تقرير الكشف والتسرب", 5,
-                [new EffortBreakdownSpec("DEV", 3, 0, 2.0), new EffortBreakdownSpec("QA", 2, 0, 2.0)], phase: "Phase 1"),
+                [new EffortBreakdownSpec("DEV", 3, 0, 1), new EffortBreakdownSpec("QA", 0.9, 0, 1.0)], phase: "Phase 1"),
             TaskItem.Create("SVC-006", "تعديل التراخيص الاضافية", 5,
-                [new EffortBreakdownSpec("DEV", 7, 0, 2.0), new EffortBreakdownSpec("QA", 3, 0, 2.0)], phase: "Phase 1"),
+                [new EffortBreakdownSpec("DEV", 7, 0, 2), new EffortBreakdownSpec("QA", 2.1, 0, 1.0)], phase: "Phase 1"),
             TaskItem.Create("SVC-007", "لوحات التحكم والرقابة", 5,
-                [new EffortBreakdownSpec("DEV", 15, 0, 2.5), new EffortBreakdownSpec("QA", 5, 20, 2.5)], phase: "Phase 2"),
+                [new EffortBreakdownSpec("DEV", 15, 0, 2), new EffortBreakdownSpec("QA", 4.5, 20, 1.0)], phase: "Phase 2"),
             TaskItem.Create("SVC-008", "خدمة تنفيذ الاصلاحات", 5,
-                [new EffortBreakdownSpec("BA", 5, 0, 4.5), new EffortBreakdownSpec("UX", 7, 0, 4.5), new EffortBreakdownSpec("DEV", 60, 0, 4.5), new EffortBreakdownSpec("QA", 20, 15, 4.5)], phase: "Phase 2"),
+                [new EffortBreakdownSpec("BA", 18.0, 0, 1.2), new EffortBreakdownSpec("UX", 18.0, 0, 1.2), new EffortBreakdownSpec("DEV", 60, 0, 4), new EffortBreakdownSpec("QA", 18.0, 15, 1.2)], phase: "Phase 2"),
             TaskItem.Create("SVC-009", "تجديد الترخيص منصة نما", 5,
-                [new EffortBreakdownSpec("DEV", 9, 0, 2.0), new EffortBreakdownSpec("QA", 3, 0, 2.0)], phase: "Phase 2"),
+                [new EffortBreakdownSpec("DEV", 9, 0, 1), new EffortBreakdownSpec("QA", 2.7, 0, 1.0)], phase: "Phase 2"),
             TaskItem.Create("SVC-010", "ادارة المستخدمين", 5,
-                [new EffortBreakdownSpec("DEV", 16, 0, 2.5), new EffortBreakdownSpec("QA", 6, 20, 2.5)], phase: "Phase 2"),
+                [new EffortBreakdownSpec("DEV", 16, 0, 2), new EffortBreakdownSpec("QA", 4.8, 20, 1.0)], phase: "Phase 2"),
             TaskItem.Create("SVC-011", "الغاء الترخيص", 5,
-                [new EffortBreakdownSpec("DEV", 28, 0, 3.0), new EffortBreakdownSpec("QA", 9, 20, 3.0)], phase: "Phase 2"),
+                [new EffortBreakdownSpec("DEV", 28, 0, 3), new EffortBreakdownSpec("QA", 8.4, 20, 1.0)], phase: "Phase 2"),
             TaskItem.Create("SVC-012", "اتمتة الانذارات على الجهات المعتمدة", 5,
-                [new EffortBreakdownSpec("DEV", 11, 0, 2.0), new EffortBreakdownSpec("QA", 4, 0, 2.0)], phase: "Phase 2"),
+                [new EffortBreakdownSpec("DEV", 11, 0, 2), new EffortBreakdownSpec("QA", 3.3, 0, 1.0)], phase: "Phase 2"),
             TaskItem.Create("SVC-013", "التكامل مع المؤسسة العامة للري", 5,
-                [new EffortBreakdownSpec("DEV", 22, 0, 3.0), new EffortBreakdownSpec("QA", 7, 20, 3.0)], phase: "Phase 2")
+                [new EffortBreakdownSpec("DEV", 22, 0, 3), new EffortBreakdownSpec("QA", 6.6, 20, 1.0)], phase: "Phase 2")
         );
     }
 }
