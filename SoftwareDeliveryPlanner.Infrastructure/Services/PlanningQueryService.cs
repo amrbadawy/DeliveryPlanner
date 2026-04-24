@@ -618,10 +618,16 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
             .OrderBy(a => a.CalendarDate)
             .ToListAsync(cancellationToken);
 
+        
+
         // Load tasks with effort breakdown for MaxFte
         var tasks = await db.Tasks
             .Include(t => t.EffortBreakdown)
             .ToListAsync(cancellationToken);
+
+        // DEBUG: Log effort breakdown per task
+        var effortByTaskDebug = tasks.ToDictionary(t => t.TaskId, t => t.EffortBreakdown.Select(e => $"{e.Role}({e.EstimationDays}d)").ToList());
+        System.Diagnostics.Debug.WriteLine($"[QUERY] Tasks with effort: {tasks.Count}. Sample: {string.Join("; ", effortByTaskDebug.Select(kv => $"{kv.Key}:[{string.Join(",", kv.Value)}]").Take(5))}");
 
         var effortByTask = tasks.ToDictionary(
             t => t.TaskId,
@@ -670,6 +676,72 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
                 return new TaskGanttSegmentsDto(taskGroup.Key, segments);
             })
             .ToList();
+
+        // Build a lookup of tasks that already have allocation-based segments
+        var tasksWithSegments = grouped.ToDictionary(g => g.TaskId, g => g.Segments.Select(s => s.Role).ToHashSet(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+
+        // For tasks that have EffortBreakdown roles without allocations, synthesize estimated segments
+        foreach (var task in tasks)
+        {
+            // Get roles that already have allocation-based segments
+            var alreadySegmentedRoles = tasksWithSegments.GetValueOrDefault(task.TaskId) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // Calculate missing roles (in effort but not allocated)
+            var missingEfforts = task.EffortBreakdown
+                .Where(e => e.EstimationDays > 0)
+                .Where(e => !alreadySegmentedRoles.Contains(e.Role))
+                .OrderBy(e => e.SortOrder)
+                .ToList();
+
+            if (missingEfforts.Count == 0)
+                continue;
+
+            // Calculate segment dates
+            var segmentStart = task.PlannedStart ?? task.StrictDate ?? task.CreatedAt.Date;
+            var totalDays = task.TotalEstimationDays;
+            DateTime segmentEnd;
+            if (task.PlannedFinish.HasValue)
+            {
+                segmentEnd = task.PlannedFinish.Value;
+            }
+            else if (totalDays > 0)
+            {
+                var calculatedDays = Math.Ceiling(totalDays * 2.0);
+                segmentEnd = segmentStart.AddDays(calculatedDays);
+            }
+            else
+            {
+                segmentEnd = segmentStart.AddDays(30.0);
+            }
+
+            var estimatedSegments = missingEfforts.Select(effort =>
+                new GanttRoleSegmentDto(
+                    task.TaskId,
+                    effort.Role,
+                    segmentStart,
+                    segmentEnd,
+                    (int)Math.Ceiling(effort.EstimationDays),
+                    effort.MaxFte,
+                    new List<GanttSegmentResourceDto>(),
+                    IsEstimated: true))
+                .ToList();
+
+            var existing = grouped.FirstOrDefault(g => string.Equals(g.TaskId, task.TaskId, StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
+            {
+                // Append estimated segments to existing task entry
+                existing.Segments.AddRange(estimatedSegments);
+            }
+            else
+            {
+                // Create a new entry for this task (all segments are estimated)
+                grouped.Add(new TaskGanttSegmentsDto(task.TaskId, estimatedSegments));
+            }
+        }
+
+        System.Diagnostics.Debug.WriteLine($"[QueryService] GetGanttSegmentsAsync: {grouped.Count} tasks, {grouped.Sum(g => g.Segments.Count)} segments total. " +
+            $"Roles: {string.Join(",", grouped.SelectMany(g => g.Segments).Select(s => s.Role).Distinct().OrderBy(r => r))}. " +
+            $"Estimated: {grouped.Sum(g => g.Segments.Count(s => s.IsEstimated))}");
 
         return grouped;
     }

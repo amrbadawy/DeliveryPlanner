@@ -4,6 +4,7 @@
 @using SoftwareDeliveryPlanner.Application.Holidays.Queries
 @using SoftwareDeliveryPlanner.Application.Holidays.Commands
 @using SoftwareDeliveryPlanner.Application.Planning.Commands
+@using SoftwareDeliveryPlanner.Application.Settings.Queries
 @using SoftwareDeliveryPlanner.Application.Abstractions
 @using SoftwareDeliveryPlanner.Domain.Models
 @using SoftwareDeliveryPlanner.Domain
@@ -361,6 +362,7 @@ else
     private Holiday? editingHoliday;
     private string modalError = string.Empty;
     private Dictionary<string, string> fieldErrors = new();
+    private string workingWeekCode = DomainConstants.WorkingWeek.SunThu;
     private ToastNotification toast = default!;
     private bool isSaving = false;
     private bool isDeleting = false;
@@ -431,6 +433,11 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        // Load settings for working week config
+        var settingsResult = await Mediator.Send(new GetSettingsQuery());
+        if (settingsResult.IsSuccess && !string.IsNullOrEmpty(settingsResult.Value.GlobalWorkingWeek))
+            workingWeekCode = settingsResult.Value.GlobalWorkingWeek;
+
         await LoadHolidays();
         isLoading = false;
     }
@@ -451,15 +458,15 @@ else
         copyToYear = (availableYears.Any() ? availableYears.Max() : DateTime.Today.Year) + 1;
     }
 
-    /// <summary>Client-side working-day counter (Sun-Thu). Used for impact preview and KPI.</summary>
+    /// <summary>Client-side working-day counter using configured working week. Used for impact preview and KPI.</summary>
     private int CountWorkingDaysInRange(DateTime start, DateTime end)
     {
+        var weekendDays = DomainConstants.WorkingWeek.GetWeekendDays(workingWeekCode);
         int count = 0;
         var current = start.Date;
         while (current <= end.Date)
         {
-            var dow = (int)current.DayOfWeek;
-            if (dow != 5 && dow != 6) count++;
+            if (!weekendDays.Contains(current.DayOfWeek)) count++;
             current = current.AddDays(1);
         }
         return count;

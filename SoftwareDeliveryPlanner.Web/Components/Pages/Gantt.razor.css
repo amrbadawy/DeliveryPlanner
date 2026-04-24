@@ -1,3 +1,7 @@
+/* ══════════════════════════════════════════════════════════
+   Gantt Chart — Scoped Styles
+   ══════════════════════════════════════════════════════════ */
+
 .gantt-container {
     position: relative;
     border: 1px solid var(--color-border);
@@ -5,13 +9,23 @@
     overflow-x: auto;
 }
 
+/* ── Two-tier header (months + weeks) ──────────────────────── */
 .gantt-header {
     display: flex;
-    border-bottom: 2px solid var(--color-sidebar);
     background: var(--color-sidebar);
     color: var(--color-text-inverse);
     font-size: var(--font-size-sm);
-    min-width: 840px;
+    min-width: 900px;
+}
+
+.gantt-header-months {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.gantt-header-weeks {
+    border-bottom: 2px solid var(--color-sidebar);
+    font-size: var(--font-size-xs);
+    min-height: 32px;
 }
 
 .gantt-label-col {
@@ -26,6 +40,10 @@
     left: 0;
     z-index: 2;
     background: var(--color-bg-primary);
+}
+
+.gantt-label-col-header {
+    background: var(--color-sidebar);
 }
 
 .gantt-timeline-col {
@@ -49,10 +67,48 @@
     border-left: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+.gantt-weeks {
+    display: flex;
+    position: relative;
+    height: 100%;
+}
+
+.gantt-week {
+    position: absolute;
+    text-align: center;
+    font-size: 10px;
+    padding: 2px 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.8);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.2;
+    overflow: hidden;
+}
+
+.gantt-week-number {
+    font-weight: 700;
+    font-size: 10px;
+}
+
+.gantt-week-dates {
+    font-size: 8px;
+    opacity: 0.7;
+    white-space: nowrap;
+}
+
+.gantt-week-label-col {
+    padding: 2px 10px;
+    background: var(--color-sidebar);
+}
+
+/* ── Task rows ─────────────────────────────────────────────── */
 .gantt-row {
     display: flex;
     border-bottom: 1px solid var(--color-border-light);
-    min-width: 840px;
+    min-width: 900px;
 }
 
 .gantt-row:nth-child(even) {
@@ -63,19 +119,71 @@
     background: var(--color-accent-light);
 }
 
+/* ── Label column content ──────────────────────────────────── */
+.gantt-label-content {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
 .gantt-task-id {
     font-weight: 600;
     font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
-    margin-right: 6px;
+    flex-shrink: 0;
 }
 
 .gantt-task-name {
     font-size: var(--font-size-sm);
     color: var(--color-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* ── Shell bar (overall task span, colored by status/risk) ── */
+/* ── Status dot (in label column) ──────────────────────────── */
+.gantt-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: inline-block;
+}
+
+.gantt-status-completed  { background: var(--color-success); }
+.gantt-status-inprogress { background: var(--color-info); }
+.gantt-status-notstarted { background: var(--color-neutral); }
+.gantt-status-atrisk     { background: var(--color-warning); }
+.gantt-status-late       { background: var(--color-danger); }
+.gantt-status-critical   { background: var(--color-danger); outline: 2px solid var(--color-danger); outline-offset: 1px; }
+
+/* ── Priority badge ────────────────────────────────────────── */
+.gantt-priority-badge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 0 4px;
+    border-radius: 3px;
+    line-height: 16px;
+    flex-shrink: 0;
+}
+
+.gantt-priority-high {
+    background: var(--color-danger-light);
+    color: var(--color-danger);
+    border: 1px solid var(--color-danger);
+}
+
+/* ── Dependency subtitle ───────────────────────────────────── */
+.gantt-dep-subtitle {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    padding-left: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+/* ── Shell bar (transparent container for role segments) ───── */
 .gantt-shell {
     position: absolute;
     /* height is set dynamically via inline style */
@@ -83,106 +191,124 @@
     border-radius: var(--radius-sm);
     display: flex;
     align-items: flex-end;
-    justify-content: center;
+    justify-content: flex-end;
     font-size: var(--font-size-xs);
     font-weight: 600;
     cursor: pointer;
-    min-width: 2px;
+    min-width: 4px;
     box-shadow: var(--shadow-sm);
-    transition: filter 0.15s ease, transform 0.1s ease;
+    transition: filter 0.15s ease;
     overflow: hidden;
-    /* Shell bar is semi-transparent to show segments underneath */
-    background: rgba(0, 0, 0, 0.04);
-    border: 2px solid transparent;
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
 }
 
 .gantt-shell:hover {
-    filter: brightness(1.05);
-    transform: scaleY(1.1);
+    filter: brightness(1.03);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
-/* Status/risk border colors on shell */
-.gantt-shell.gantt-bar-completed  { border-color: var(--color-success); }
-.gantt-shell.gantt-bar-inprogress { border-color: var(--color-info); }
-.gantt-shell.gantt-bar-notstarted { border-color: var(--color-neutral); }
-.gantt-shell.gantt-bar-atrisk     { border-color: var(--color-warning); }
-.gantt-shell.gantt-bar-late       { border-color: var(--color-danger); }
-
-/* ── Role sub-segments (inside shell bar) ──────────────────── */
+/* ── Role sub-segments (full-height colored bars) ──────────── */
 .gantt-segment {
     position: absolute;
-    height: 8px;
-    border-radius: 4px;
-    min-width: 3px;
-    opacity: 0.95;
+    height: 16px;
+    border-radius: 3px;
+    min-width: 4px;
+    opacity: 0.92;
     pointer-events: auto;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+    display: flex;
+    align-items: center;
+    overflow: hidden;
 }
 
 .gantt-segment:hover {
     opacity: 1;
-    transform: scaleY(1.4);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    z-index: 1;
+}
+
+.gantt-segment-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.9);
+    padding: 0 4px;
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 /* ── Overflow indicator (+N roles) ─────────────────────────── */
 .gantt-overflow-indicator {
     position: absolute;
     right: 2px;
-    top: 0;
+    top: 1px;
     font-size: 9px;
     font-weight: 700;
     color: var(--color-text-secondary);
-    background: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.85);
     border-radius: 3px;
     padding: 0 3px;
     cursor: help;
     z-index: 1;
 }
 
+/* ── Bar duration label ────────────────────────────────────── */
 .gantt-bar-label {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     padding: 0 4px;
     color: var(--color-text-secondary);
-    font-size: var(--font-size-xs);
+    font-size: 10px;
+    font-weight: 600;
     z-index: 1;
     position: relative;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 2px;
+    margin: 1px 2px;
+    line-height: 14px;
 }
 
-/* ── Legacy bar color classes (for legend badges) ──────────── */
-.gantt-bar-completed  { background: var(--color-success); }
-.gantt-bar-inprogress { background: var(--color-info); }
-.gantt-bar-notstarted { background: var(--color-neutral); }
-.gantt-bar-atrisk     { background: var(--color-warning); }
-.gantt-bar-late       { background: var(--color-danger); }
-
+/* ── Strict date marker (deadline flag) ────────────────────── */
 .gantt-strict-marker {
     position: absolute;
     top: 0;
     bottom: 0;
     width: 2px;
-    background: var(--color-danger);
     z-index: 2;
 }
 
-.gantt-strict-marker::after {
-    content: "\25BC";
+.gantt-strict-ok {
+    background: var(--color-success);
+}
+
+.gantt-strict-overdue {
+    background: var(--color-danger);
+}
+
+.gantt-strict-flag {
     position: absolute;
     top: -2px;
-    left: -5px;
-    font-size: var(--font-size-xs);
+    left: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    white-space: nowrap;
+    padding: 0 3px;
+    border-radius: 2px;
+    line-height: 14px;
+}
+
+.gantt-strict-ok .gantt-strict-flag {
+    color: var(--color-success);
+    background: var(--color-success-light);
+}
+
+.gantt-strict-overdue .gantt-strict-flag {
     color: var(--color-danger);
+    background: var(--color-danger-light);
 }
 
-.gantt-dep-indicator {
-    position: absolute;
-    right: 4px;
-    top: 8px;
-    font-size: var(--font-size-xs);
-}
-
+/* ── Today line ────────────────────────────────────────────── */
 .gantt-today-line {
     position: absolute;
     top: 0;
@@ -201,6 +327,46 @@
     font-size: var(--font-size-xs);
     color: var(--color-accent);
     white-space: nowrap;
+    font-weight: 600;
+}
+
+/* ── Legend ─────────────────────────────────────────────────── */
+.gantt-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 8px 12px;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-sm);
+}
+
+.gantt-legend-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.gantt-legend-title {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.gantt-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.gantt-legend-swatch {
+    width: 14px;
+    height: 10px;
+    border-radius: 2px;
+    display: inline-block;
 }
 
 /* ── CSS-only tooltips ─────────────────────────────────────── */
@@ -226,7 +392,7 @@
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.15s ease;
-    max-width: 280px;
+    max-width: 300px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
@@ -234,7 +400,7 @@
     opacity: 1;
 }
 
-/* Position tooltip below for segments (they're small) */
+/* Position tooltip below for segments (they're inside the bar) */
 .gantt-segment.gantt-tooltip::after {
     bottom: auto;
     top: calc(100% + 4px);
@@ -261,4 +427,64 @@
 @keyframes critical-pulse {
     0%, 100% { outline-color: var(--color-danger, #dc3545); }
     50% { outline-color: transparent; }
+}
+
+/* ── Estimated segment styling (dashed, lower opacity) ──── */
+.gantt-segment-estimated {
+    opacity: 0.55;
+    border: 2px dashed rgba(255, 255, 255, 0.7);
+    background-image: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 3px,
+        rgba(255, 255, 255, 0.15) 3px,
+        rgba(255, 255, 255, 0.15) 6px
+    );
+}
+
+.gantt-segment-estimated:hover {
+    opacity: 0.8;
+}
+
+/* ── Legend: estimated/allocated swatch indicators ─────── */
+.gantt-legend-estimated-swatch {
+    background: var(--color-text-muted, #94a3b8);
+    border: 2px dashed var(--color-text-secondary, #64748b);
+    opacity: 0.6;
+}
+
+.gantt-legend-allocated-swatch {
+    background: var(--color-info, #3b82f6);
+}
+
+/* ── Role toggle buttons in legend ─────────────────────── */
+.gantt-legend-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    background: transparent;
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-sm);
+    padding: 2px 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    line-height: 1.4;
+}
+
+.gantt-legend-toggle:hover {
+    background: var(--color-accent-light);
+    border-color: var(--color-border);
+}
+
+.gantt-legend-toggle-off {
+    opacity: 0.4;
+    text-decoration: line-through;
+    border-style: dashed;
+}
+
+.gantt-legend-toggle-off .gantt-legend-swatch {
+    filter: grayscale(1);
+    opacity: 0.4;
 }

@@ -165,6 +165,17 @@ public static class DomainConstants
                 MonFri => new HashSet<DayOfWeek> { DayOfWeek.Saturday, DayOfWeek.Sunday },
                 _ => new HashSet<DayOfWeek> { DayOfWeek.Friday, DayOfWeek.Saturday }   // SunThu default
             };
+
+        /// <summary>
+        /// Returns the first day of the working week for the given code.
+        /// Sun-Thu → Sunday, Mon-Fri → Monday.
+        /// </summary>
+        public static DayOfWeek GetWeekStartDay(string workingWeekCode) =>
+            workingWeekCode switch
+            {
+                MonFri => DayOfWeek.Monday,
+                _ => DayOfWeek.Sunday  // SunThu default
+            };
     }
 
     /// <summary>Seniority levels for team members.</summary>
