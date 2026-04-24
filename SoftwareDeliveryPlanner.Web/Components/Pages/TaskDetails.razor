@@ -217,7 +217,7 @@ else
                                         {
                                             <a href="/resources/@res.ResourceId"
                                                class="badge role-badge role-badge-@res.Role.ToLowerInvariant() me-1 text-decoration-none"
-                                               data-testid="timeline-res-@res.ResourceId">@res.ResourceName · @DomainConstants.ResourceRole.GetDisplayName(res.Role) · @res.AllocationPct.ToString("F0")%</a>
+                                                data-testid="timeline-res-@res.ResourceId">@res.ResourceName · @res.AllocationPct.ToString("F0")%</a>
                                         }
                                     }
                                     else if (day.IsWorkingDay)
