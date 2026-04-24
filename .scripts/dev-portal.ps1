@@ -47,6 +47,15 @@ function Reset-DevDatabase {
 if (-not $RunOnly) {
     Write-Host "Killing running BE/FE processes by common dev ports..."
     Stop-ByPort -Ports $PortsToKill
+
+    $remaining = Get-Process | Where-Object { $_.ProcessName -like "*SoftwareDeliveryPlanner*" }
+    if ($remaining) {
+        Write-Host "Force-killing remaining SoftwareDeliveryPlanner processes not caught by port scan..."
+        $remaining | ForEach-Object {
+            Write-Host "Force-stopping process $($_.Id) ($($_.ProcessName))"
+            Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 if ($ResetDb) {
