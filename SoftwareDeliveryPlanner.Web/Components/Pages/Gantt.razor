@@ -106,11 +106,12 @@ else
         <!-- Task rows -->
         @foreach (var task in scheduledTasks)
         {
-            var barStyle = GetBarStyle(task);
-            var barClass = GetBarColorClass(task);
             var segments = GetSegmentsForTask(task.TaskId);
             var visibleSegments = segments.Take(MaxVisibleLanes).ToList();
             var hiddenCount = segments.Count - visibleSegments.Count;
+            var shellHeight = Math.Max(28, visibleSegments.Count * LaneSpacing + 6);
+            var barStyle = GetBarStyle(task, shellHeight);
+            var barClass = GetBarColorClass(task);
 
             <div class="gantt-row" data-testid="gantt-row-@task.TaskId">
                 <div class="gantt-label-col clickable-row" title="@task.ServiceName"
@@ -142,7 +143,7 @@ else
                                                  $"Max FTE: {seg.MaxFte}\n" +
                                                  $"Resources: {string.Join(", ", seg.AssignedResources.Select(r => r.ResourceName))}";
                                 var laneIndex = visibleSegments.IndexOf(seg);
-                                <div class="gantt-segment gantt-tooltip gantt-role-@seg.Role.ToLowerInvariant()" style="@segStyle; top: @(laneIndex * 16)px;"
+                                <div class="gantt-segment gantt-tooltip gantt-role-@seg.Role.ToLowerInvariant()" style="@segStyle; top: @(laneIndex * LaneSpacing + 3)px;"
                                      data-tooltip="@segTooltip"
                                      data-testid="gantt-segment-@task.TaskId-@seg.Role">
                                 </div>
@@ -194,7 +195,9 @@ else
 }
 
 @code {
-    private const int MaxVisibleLanes = 2;
+    private const int MaxVisibleLanes = 6;
+    private const int SegmentHeight = 8;
+    private const int LaneSpacing = 10; // SegmentHeight + 2px gap
 
     private List<TaskItem> scheduledTasks = new();
     private Dictionary<string, List<GanttRoleSegmentDto>> segmentsByTask = new(StringComparer.OrdinalIgnoreCase);
@@ -277,7 +280,7 @@ else
         return Math.Round(dayOffset / totalDays * 100, 2);
     }
 
-    private string GetBarStyle(TaskItem task)
+    private string GetBarStyle(TaskItem task, int shellHeight)
     {
         if (!task.PlannedStart.HasValue || !task.PlannedFinish.HasValue)
             return "display: none;";
@@ -286,7 +289,7 @@ else
         var rightPct = GetDatePercent(task.PlannedFinish.Value);
         var widthPct = Math.Max(rightPct - leftPct, 0.5); // minimum visible width
 
-        return $"left: {leftPct}%; width: {widthPct}%;";
+        return $"left: {leftPct}%; width: {widthPct}%; height: {shellHeight}px;";
     }
 
     /// <summary>

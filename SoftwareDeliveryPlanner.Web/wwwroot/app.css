@@ -555,28 +555,28 @@ th[role="button"] {
 }
 
 .role-badge-dev,
-.gantt-role-dev { background: #2563eb; }
+.gantt-role-dev { background: #3b82f6; }   /* Blue */
 
 .role-badge-qa,
-.gantt-role-qa { background: #059669; }
+.gantt-role-qa { background: #22c55e; }    /* Green */
 
 .role-badge-ba,
-.gantt-role-ba { background: #0d9488; }
+.gantt-role-ba { background: #a855f7; }    /* Purple */
 
 .role-badge-sa,
-.gantt-role-sa { background: #6366f1; }
+.gantt-role-sa { background: #06b6d4; }    /* Cyan */
 
 .role-badge-ux,
-.gantt-role-ux { background: #e11d48; }
+.gantt-role-ux { background: #f43f5e; }    /* Rose */
 
 .role-badge-ui,
-.gantt-role-ui { background: #d97706; }
+.gantt-role-ui { background: #f97316; }    /* Orange */
 
 .role-badge-ops,
-.gantt-role-ops { background: #f59e0b; }
+.gantt-role-ops { background: #eab308; }   /* Yellow */
 
 .role-badge-pm,
-.gantt-role-pm { background: #6b7280; }
+.gantt-role-pm { background: #64748b; }    /* Slate */
 
 /* ══════════════════════════════════════════════════════════
    Modal Backdrop (shared)
