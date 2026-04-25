@@ -508,9 +508,14 @@ internal class SchedulingEngine : ISchedulingEngine
         // taskResourceIds[taskId] = set of assigned resource IDs
         var taskResourceIds = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
 
-        // Build resource lookup by role
+        // Build resource lookup by role — only include resources whose active
+        // period overlaps the scheduling window [planStart, endDate].  Resources
+        // that join after the plan ends or leave before it starts can never be
+        // allocated, so excluding them lets the auto-skip logic fire correctly.
         var resourcesByRole = resources
             .Where(r => r.Active == DomainConstants.ActiveStatus.Yes)
+            .Where(r => r.StartDate <= endDate)
+            .Where(r => !r.EndDate.HasValue || r.EndDate.Value >= planStart)
             .GroupBy(r => r.Role, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 

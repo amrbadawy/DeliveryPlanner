@@ -99,4 +99,19 @@ internal static class TestDatabaseHelper
             new EffortBreakdownSpec("QA", qaDays > 0 ? qaDays : 1, overlapPct)
         ];
     }
+
+    /// <summary>
+    /// Helper to create multi-role effort breakdown specs (always includes DEV + QA as required).
+    /// <paramref name="extras"/> are prepended in pipeline order before DEV + QA.
+    /// </summary>
+    internal static List<EffortBreakdownSpec> MakeMultiRoleBreakdown(
+        double devDays,
+        double qaDays,
+        params (string Role, double Days)[] extras)
+    {
+        var list = extras.Select(e => new EffortBreakdownSpec(e.Role, e.Days, 0, 1.0)).ToList();
+        list.Add(new EffortBreakdownSpec("DEV", devDays, 0));
+        list.Add(new EffortBreakdownSpec("QA", qaDays > 0 ? qaDays : 1, 0));
+        return list;
+    }
 }
