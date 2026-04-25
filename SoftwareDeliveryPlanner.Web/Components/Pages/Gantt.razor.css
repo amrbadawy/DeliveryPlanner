@@ -222,6 +222,14 @@
     overflow: hidden;
 }
 
+/* Role color mapping for segments (explicit colors to ensure QA bars visible) */
+.gantt-role-ba { background: #8b5cf6; }
+.gantt-role-sa { background: #f59e0b; }
+.gantt-role-ux { background: #8b5cf6; }
+.gantt-role-ui { background: #3b82f6; }
+.gantt-role-dev { background: #1d4ed8; }
+.gantt-role-qa { background: #10b981; }
+
 .gantt-segment:hover {
     opacity: 1;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
