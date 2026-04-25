@@ -56,7 +56,11 @@ internal sealed class DatabaseSeeder : IDatabaseSeeder
             TeamMember.Create("DEV-005", "Developer 5", DomainConstants.ResourceRole.Developer, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 6, 1), notes: "Phase 2", seniorityLevel: DomainConstants.Seniority.Junior),
             TeamMember.Create("QA-001", "QA Engineer 1", DomainConstants.ResourceRole.QA, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 4, 12), notes: "Initial team", seniorityLevel: DomainConstants.Seniority.Senior),
             TeamMember.Create("QA-002", "QA Engineer 2", DomainConstants.ResourceRole.QA, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 4, 12), notes: "Initial team", seniorityLevel: DomainConstants.Seniority.Mid),
-            TeamMember.Create("QA-003", "QA Engineer 3", DomainConstants.ResourceRole.QA, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 6, 1), notes: "Phase 2", seniorityLevel: DomainConstants.Seniority.Junior)
+            TeamMember.Create("QA-003", "QA Engineer 3", DomainConstants.ResourceRole.QA, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 6, 1), notes: "Phase 2", seniorityLevel: DomainConstants.Seniority.Junior),
+            TeamMember.Create("BA-001", "Business Analyst 1", DomainConstants.ResourceRole.BA, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 4, 12), notes: "Initial team", seniorityLevel: DomainConstants.Seniority.Senior),
+            TeamMember.Create("SA-001", "Solution Architect 1", DomainConstants.ResourceRole.SA, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 4, 12), notes: "Initial team", seniorityLevel: DomainConstants.Seniority.Senior),
+            TeamMember.Create("UX-001", "UX Designer 1", DomainConstants.ResourceRole.UX, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 4, 12), notes: "Initial team", seniorityLevel: DomainConstants.Seniority.Mid),
+            TeamMember.Create("UI-001", "UI Designer 1", DomainConstants.ResourceRole.UI, DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 4, 12), notes: "Initial team", seniorityLevel: DomainConstants.Seniority.Mid)
         );
     }
 

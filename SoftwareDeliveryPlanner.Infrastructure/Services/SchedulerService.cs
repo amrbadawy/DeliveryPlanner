@@ -111,11 +111,15 @@ internal sealed class SchedulerService : ServiceBase, ISchedulerService
         var rawFinish = kpis["overall_finish"] as DateTime?;
         var overallFinish = rawFinish.HasValue && rawFinish.Value > DateTime.MinValue ? rawFinish : null;
 
-        return new DashboardKpisDto(
+        var rawStart = kpis["earliest_start"] as DateTime?;
+        var earliestStart = rawStart.HasValue && rawStart.Value > DateTime.MinValue ? rawStart : null;
+
+        var dto = new DashboardKpisDto(
             TotalServices: (int)kpis["total_services"],
             TotalEstimation: (double)kpis["total_estimation"],
             ActiveResources: (int)kpis["active_resources"],
             TotalCapacity: (double)kpis["total_capacity"],
+            EarliestStart: earliestStart,
             OverallFinish: overallFinish,
             OnTrack: (int)kpis["on_track"],
             AtRisk: (int)kpis["at_risk"],
@@ -123,6 +127,12 @@ internal sealed class SchedulerService : ServiceBase, ISchedulerService
             Unscheduled: (int)kpis["unscheduled"],
             AvgAssigned: (double)kpis["avg_assigned"],
             OverallocationCount: (int)kpis["overallocation_count"]);
+
+        Debug.Assert(
+            dto.OnTrack + dto.AtRisk + dto.Late + dto.Unscheduled == dto.TotalServices,
+            $"KPI sum invariant violated: {dto.OnTrack} + {dto.AtRisk} + {dto.Late} + {dto.Unscheduled} != {dto.TotalServices}");
+
+        return dto;
     }
 
     public async Task<ScheduleDiffDto> PreviewScheduleAsync(CancellationToken cancellationToken = default)

@@ -41,6 +41,10 @@ public class PlanScenario
             throw new DomainException("Unscheduled count must not be negative.");
         if (onTrack + atRisk + late + unscheduled != totalTasks)
             throw new DomainException("Status counts (on track + at risk + late + unscheduled) must equal total tasks.");
+        if (totalEstimation < 0)
+            throw new DomainException("Total estimation must not be negative.");
+        if (earliestStart.HasValue && latestFinish.HasValue && earliestStart.Value > latestFinish.Value)
+            throw new DomainException("Earliest start must not be after latest finish.");
 
         return new PlanScenario
         {

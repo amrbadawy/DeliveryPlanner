@@ -53,6 +53,11 @@ test.describe('Scenario Gantt Chart', () => {
     await expect(kpis).toContainText('Unscheduled');
     await expect(kpis).toContainText('Latest Finish');
     await expect(kpis).toContainText('Total Est.');
+
+    // Unscheduled KPI card should be directly addressable by testid
+    const unschedCard = page.getByTestId('scenario-gantt-kpi-unscheduled');
+    await expect(unschedCard).toBeVisible();
+    await expect(unschedCard).toContainText('Unscheduled');
   });
 
   test('scenario gantt chart renders with bars', async ({ page }) => {

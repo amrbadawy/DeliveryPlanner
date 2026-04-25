@@ -115,6 +115,63 @@ public class PlanScenarioDomainTests
         Assert.Equal(onTrack + atRisk + late + unscheduled, scenario.TotalTasks);
     }
 
+    [Theory]
+    [InlineData(-0.1)]
+    [InlineData(-100)]
+    public void Create_NegativeTotalEstimation_ThrowsDomainException(double estimation)
+    {
+        var ex = Assert.Throws<DomainException>(() =>
+            PlanScenario.Create("Test", 0, 0, 0, 0, 0, null, null, estimation, null, TestTimestamp));
+
+        Assert.Contains("estimation", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("negative", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Create_ZeroTotalEstimation_Succeeds()
+    {
+        var scenario = PlanScenario.Create("Test", 0, 0, 0, 0, 0, null, null, 0, null, TestTimestamp);
+        Assert.Equal(0, scenario.TotalEstimation);
+    }
+
+    [Fact]
+    public void Create_InvertedDateRange_ThrowsDomainException()
+    {
+        var start = new DateTime(2026, 7, 1);
+        var finish = new DateTime(2026, 6, 1); // before start
+
+        var ex = Assert.Throws<DomainException>(() =>
+            PlanScenario.Create("Test", 5, 5, 0, 0, 0, start, finish, 10, null, TestTimestamp));
+
+        Assert.Contains("earliest start", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(false, false)] // both null
+    [InlineData(false, true)]  // only finish
+    [InlineData(true, false)]  // only start
+    [InlineData(true, true)]   // both present, start <= finish
+    public void Create_ValidDateCombinations_Succeeds(bool hasStart, bool hasFinish)
+    {
+        var start = hasStart ? new DateTime(2026, 5, 1) : (DateTime?)null;
+        var finish = hasFinish ? new DateTime(2026, 6, 30) : (DateTime?)null;
+
+        var scenario = PlanScenario.Create("Test", 3, 3, 0, 0, 0, start, finish, 10, null, TestTimestamp);
+
+        Assert.Equal(start, scenario.EarliestStart);
+        Assert.Equal(finish, scenario.LatestFinish);
+    }
+
+    [Fact]
+    public void Create_SameDayStartAndFinish_Succeeds()
+    {
+        var date = new DateTime(2026, 6, 15);
+        var scenario = PlanScenario.Create("Same Day", 1, 1, 0, 0, 0, date, date, 1, null, TestTimestamp);
+
+        Assert.Equal(date, scenario.EarliestStart);
+        Assert.Equal(date, scenario.LatestFinish);
+    }
+
     [Fact]
     public void AddTaskSnapshot_AddsToCollection()
     {

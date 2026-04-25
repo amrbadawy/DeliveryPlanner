@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { fillInputByTestId, gotoPage, runSchedulerFromDashboard, uniqueSuffix, waitForTableRows } from './helpers';
+import { expectModalVisible, fillInputByTestId, gotoPage, runSchedulerFromDashboard, uniqueSuffix, waitForTableRows } from './helpers';
 
 test.describe('Task Details + Notes', () => {
   test('task details page loads for a valid task', async ({ page }) => {
@@ -119,81 +119,183 @@ test.describe('Task Details + Notes', () => {
   });
 
   test('task detail warnings card shows for task with resource gap', async ({ page }) => {
-    // Navigate to tasks page and find a task that has a resource gap
-    // (seed data has tasks with BA/SA/UX roles but no BA/SA/UX resources)
+    // Create a task with UX role to guarantee a resource gap (no UX resources in seed data)
     await gotoPage(page, '/tasks');
     const table = page.getByTestId('tasks-table');
     await waitForTableRows(table);
 
-    // Look for a task with a resource gap icon in the tasks table
-    const gapIcon = page.locator('[data-testid^="resource-gap-warning-"]').first();
-    const hasGap = await gapIcon.isVisible().catch(() => false);
+    const serviceName = uniqueSuffix('DetailGap');
+    await page.getByTestId('tasks-add').click();
+    await expectModalVisible(page, 'tasks-modal');
+    await fillInputByTestId(page, 'tasks-service-name', serviceName);
+    await fillInputByTestId(page, 'effort-days-DEV', '3');
+    await fillInputByTestId(page, 'effort-days-QA', '1');
+    await page.getByTestId('effort-add-role-select').selectOption('UX');
+    await page.getByTestId('effort-add-btn').click();
+    await fillInputByTestId(page, 'effort-days-UX', '2');
+    await page.getByTestId('tasks-save').click();
+    await expect(page.getByTestId('tasks-modal')).toBeHidden();
 
-    if (hasGap) {
-      // Get the row and click through to the detail page
-      const row = gapIcon.locator('xpath=ancestor::tr');
-      const taskLink = row.locator('a').first();
-      await taskLink.click();
-      await expect(page.getByTestId('task-details-card')).toBeVisible();
+    const newRow = table.locator('tbody tr', { hasText: serviceName });
+    await expect(newRow).toBeVisible();
+    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
 
-      // Task detail warning card should be visible with resource gap info
-      const warnings = page.getByTestId('task-detail-warnings');
-      await expect(warnings).toBeVisible();
-      await expect(page.getByTestId('task-detail-resource-gap-warning')).toBeVisible();
-      await expect(page.getByTestId('task-detail-resource-gap-warning')).toContainText('Resource gap');
-    }
+    // Navigate to the detail page
+    const taskLink = newRow.locator('a').first();
+    await taskLink.click();
+    await expect(page.getByTestId('task-details-card')).toBeVisible();
+
+    // Task detail warning card should be visible with resource gap info
+    const warnings = page.getByTestId('task-detail-warnings');
+    await expect(warnings).toBeVisible();
+    await expect(page.getByTestId('task-detail-resource-gap-warning')).toBeVisible();
+    await expect(page.getByTestId('task-detail-resource-gap-warning')).toContainText('Resource gap');
+    await expect(page.getByTestId('task-detail-resource-gap-warning')).toContainText('UX');
+
+    // Clean up — go back and delete
+    await page.getByTestId('task-details-back-bottom').click();
+    await expect(page.getByTestId('tasks-table')).toBeVisible();
+    await page.getByTestId(`tasks-delete-${taskId}`).click();
+    await expectModalVisible(page, 'tasks-delete-modal');
+    await page.getByTestId('tasks-delete-modal-confirm').click();
+    await expect(page.getByTestId('tasks-delete-modal')).toBeHidden();
   });
 
   test('task detail shows unscheduled warning for task without planned dates', async ({ page }) => {
-    // Run scheduler so some tasks become scheduled and others remain unscheduled
-    await runSchedulerFromDashboard(page);
+    // Create a task with only an unresolvable role so it stays unscheduled after scheduling
     await gotoPage(page, '/tasks');
     const table = page.getByTestId('tasks-table');
     await waitForTableRows(table);
 
-    // Look for a task with an unscheduled warning icon
-    const unschedIcon = page.locator('[data-testid^="unscheduled-warning-"]').first();
-    const hasUnsched = await unschedIcon.isVisible().catch(() => false);
+    const serviceName = uniqueSuffix('DetailUnsched');
+    await page.getByTestId('tasks-add').click();
+    await expectModalVisible(page, 'tasks-modal');
+    await fillInputByTestId(page, 'tasks-service-name', serviceName);
+    await fillInputByTestId(page, 'effort-days-DEV', '0');
+    await fillInputByTestId(page, 'effort-days-QA', '0');
+    await page.getByTestId('effort-add-role-select').selectOption('UI');
+    await page.getByTestId('effort-add-btn').click();
+    await fillInputByTestId(page, 'effort-days-UI', '5');
+    await page.getByTestId('tasks-save').click();
+    await expect(page.getByTestId('tasks-modal')).toBeHidden();
 
-    if (hasUnsched) {
-      const row = unschedIcon.locator('xpath=ancestor::tr');
-      const taskLink = row.locator('a').first();
-      await taskLink.click();
-      await expect(page.getByTestId('task-details-card')).toBeVisible();
+    const newRow = table.locator('tbody tr', { hasText: serviceName });
+    await expect(newRow).toBeVisible();
+    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
 
-      // Unscheduled warning should be visible on the detail page
-      const warnings = page.getByTestId('task-detail-warnings');
-      await expect(warnings).toBeVisible();
-      await expect(page.getByTestId('task-detail-unscheduled-warning')).toBeVisible();
-      await expect(page.getByTestId('task-detail-unscheduled-warning')).toContainText('Unscheduled');
-      await expect(page.getByTestId('task-detail-unscheduled-warning')).toContainText('no planned dates');
-    }
+    // Run scheduler — task should remain unscheduled
+    await page.getByTestId('tasks-refresh').click();
+    await expect(page.getByTestId('tasks-refresh')).toBeEnabled({ timeout: 15_000 });
+    await page.waitForTimeout(1000);
+
+    // Navigate to the detail page
+    const taskLink = newRow.locator('a').first();
+    await taskLink.click();
+    await expect(page.getByTestId('task-details-card')).toBeVisible();
+
+    // Unscheduled warning should be visible on the detail page
+    const warnings = page.getByTestId('task-detail-warnings');
+    await expect(warnings).toBeVisible();
+    await expect(page.getByTestId('task-detail-unscheduled-warning')).toBeVisible();
+    await expect(page.getByTestId('task-detail-unscheduled-warning')).toContainText('Unscheduled');
+    await expect(page.getByTestId('task-detail-unscheduled-warning')).toContainText('no planned dates');
+
+    // Clean up
+    await page.getByTestId('task-details-back-bottom').click();
+    await expect(page.getByTestId('tasks-table')).toBeVisible();
+    await page.getByTestId(`tasks-delete-${taskId}`).click();
+    await expectModalVisible(page, 'tasks-delete-modal');
+    await page.getByTestId('tasks-delete-modal-confirm').click();
+    await expect(page.getByTestId('tasks-delete-modal')).toBeHidden();
+  });
+
+  test('task detail shows both unscheduled and resource gap warnings simultaneously', async ({ page }) => {
+    // Create a task with only an unresolvable role — after scheduling it will be
+    // both unscheduled AND have a resource gap (UI role has no matching resource)
+    await gotoPage(page, '/tasks');
+    const table = page.getByTestId('tasks-table');
+    await waitForTableRows(table);
+
+    const serviceName = uniqueSuffix('BothWarn');
+    await page.getByTestId('tasks-add').click();
+    await expectModalVisible(page, 'tasks-modal');
+    await fillInputByTestId(page, 'tasks-service-name', serviceName);
+    await fillInputByTestId(page, 'effort-days-DEV', '0');
+    await fillInputByTestId(page, 'effort-days-QA', '0');
+    await page.getByTestId('effort-add-role-select').selectOption('UI');
+    await page.getByTestId('effort-add-btn').click();
+    await fillInputByTestId(page, 'effort-days-UI', '5');
+    await page.getByTestId('tasks-save').click();
+    await expect(page.getByTestId('tasks-modal')).toBeHidden();
+
+    const newRow = table.locator('tbody tr', { hasText: serviceName });
+    await expect(newRow).toBeVisible();
+    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
+
+    // Run scheduler
+    await page.getByTestId('tasks-refresh').click();
+    await expect(page.getByTestId('tasks-refresh')).toBeEnabled({ timeout: 15_000 });
+    await page.waitForTimeout(1000);
+
+    // Navigate to detail page
+    const taskLink = newRow.locator('a').first();
+    await taskLink.click();
+    await expect(page.getByTestId('task-details-card')).toBeVisible();
+
+    // Both warning types should be visible simultaneously
+    const warnings = page.getByTestId('task-detail-warnings');
+    await expect(warnings).toBeVisible();
+    await expect(page.getByTestId('task-detail-unscheduled-warning')).toBeVisible();
+    await expect(page.getByTestId('task-detail-resource-gap-warning')).toBeVisible();
+
+    // Clean up
+    await page.getByTestId('task-details-back-bottom').click();
+    await expect(page.getByTestId('tasks-table')).toBeVisible();
+    await page.getByTestId(`tasks-delete-${taskId}`).click();
+    await expectModalVisible(page, 'tasks-delete-modal');
+    await page.getByTestId('tasks-delete-modal-confirm').click();
+    await expect(page.getByTestId('tasks-delete-modal')).toBeHidden();
   });
 
   test('no warnings shown for a healthy scheduled task', async ({ page }) => {
-    await runSchedulerFromDashboard(page);
+    // Create a task with only DEV+QA roles (both have matching resources in seed data)
     await gotoPage(page, '/tasks');
     const table = page.getByTestId('tasks-table');
     await waitForTableRows(table);
 
-    // Find a task without any warning icons (no resource gap, no unscheduled)
-    const rows = table.locator('tbody tr');
-    const count = await rows.count();
-    for (let i = 0; i < count; i++) {
-      const row = rows.nth(i);
-      const hasGap = await row.locator('[data-testid^="resource-gap-warning-"]').isVisible().catch(() => false);
-      const hasUnsched = await row.locator('[data-testid^="unscheduled-warning-"]').isVisible().catch(() => false);
-      if (!hasGap && !hasUnsched) {
-        // Navigate to this healthy task's detail page
-        const taskLink = row.locator('a').first();
-        await taskLink.click();
-        await expect(page.getByTestId('task-details-card')).toBeVisible();
+    const serviceName = uniqueSuffix('Healthy');
+    await page.getByTestId('tasks-add').click();
+    await expectModalVisible(page, 'tasks-modal');
+    await fillInputByTestId(page, 'tasks-service-name', serviceName);
+    await fillInputByTestId(page, 'effort-days-DEV', '3');
+    await fillInputByTestId(page, 'effort-days-QA', '1');
+    await page.getByTestId('tasks-save').click();
+    await expect(page.getByTestId('tasks-modal')).toBeHidden();
 
-        // No warning card should be present
-        await expect(page.getByTestId('task-detail-warnings')).toBeHidden();
-        break;
-      }
-    }
+    const newRow = table.locator('tbody tr', { hasText: serviceName });
+    await expect(newRow).toBeVisible();
+    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
+
+    // Run scheduler so the task gets scheduled
+    await page.getByTestId('tasks-refresh').click();
+    await expect(page.getByTestId('tasks-refresh')).toBeEnabled({ timeout: 15_000 });
+    await page.waitForTimeout(1000);
+
+    // Navigate to the detail page
+    const taskLink = newRow.locator('a').first();
+    await taskLink.click();
+    await expect(page.getByTestId('task-details-card')).toBeVisible();
+
+    // No warning card should be present
+    await expect(page.getByTestId('task-detail-warnings')).toBeHidden();
+
+    // Clean up
+    await page.getByTestId('task-details-back-bottom').click();
+    await expect(page.getByTestId('tasks-table')).toBeVisible();
+    await page.getByTestId(`tasks-delete-${taskId}`).click();
+    await expectModalVisible(page, 'tasks-delete-modal');
+    await page.getByTestId('tasks-delete-modal-confirm').click();
+    await expect(page.getByTestId('tasks-delete-modal')).toBeHidden();
   });
 
   test('edit button opens existing tasks edit modal for same task', async ({ page }) => {

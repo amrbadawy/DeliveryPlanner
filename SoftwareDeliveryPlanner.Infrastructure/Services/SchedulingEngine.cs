@@ -558,6 +558,21 @@ internal class SchedulingEngine : ISchedulingEngine
                 taskResourceIds[locked.TaskId].Add(locked.ResourceId);
         }
 
+        // Auto-complete phases where no active resources exist for the role.
+        // Without this, the overlap constraint (line ~648) permanently blocks
+        // downstream phases when a preceding phase can never be staffed.
+        foreach (var task in tasks)
+        {
+            foreach (var phase in task.EffortBreakdown)
+            {
+                if (phase.EstimationDays > 0 && !resourcesByRole.ContainsKey(phase.Role))
+                {
+                    var totalHours = phase.EstimationDays * DomainConstants.HoursPerDay;
+                    phaseCompletedHours[task.TaskId][phase.Role] = totalHours;
+                }
+            }
+        }
+
         // Overall utilization tracking for balanced_workload strategy
         var overallUtilization = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
         foreach (var resource in resources.Where(r => r.Active == DomainConstants.ActiveStatus.Yes))
@@ -968,8 +983,11 @@ internal class SchedulingEngine : ISchedulingEngine
         var finishDates = tasks.Where(t => t.PlannedFinish.HasValue).Select(t => t.PlannedFinish!.Value).ToList();
         var overallFinish = finishDates.Any() ? finishDates.Max() : (DateTime?)null;
 
+        var startDates = tasks.Where(t => t.PlannedStart.HasValue).Select(t => t.PlannedStart!.Value).ToList();
+        var earliestStart = startDates.Any() ? startDates.Min() : (DateTime?)null;
+
         var strictCount = tasks.Count(t => t.StrictDate.HasValue);
-        var scheduledTasks = tasks.Where(t => t.PlannedStart.HasValue).ToList();
+        var scheduledTasks = tasks.Where(t => t.PlannedStart.HasValue && t.PlannedFinish.HasValue).ToList();
         var onTrack = scheduledTasks.Count(t => t.DeliveryRisk == DomainConstants.DeliveryRisk.OnTrack);
         var atRisk = scheduledTasks.Count(t => t.DeliveryRisk == DomainConstants.DeliveryRisk.AtRisk);
         var late = scheduledTasks.Count(t => t.DeliveryRisk == DomainConstants.DeliveryRisk.Late);
@@ -996,6 +1014,7 @@ internal class SchedulingEngine : ISchedulingEngine
             ["total_estimation"] = totalEstimation,
             ["total_capacity"] = totalCapacity,
             ["active_resources"] = activeResources,
+            ["earliest_start"] = earliestStart ?? DateTime.MinValue,
             ["overall_finish"] = overallFinish ?? DateTime.MinValue,
             ["strict_count"] = strictCount,
             ["on_track"] = onTrack,

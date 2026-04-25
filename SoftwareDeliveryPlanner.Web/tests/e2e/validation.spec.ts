@@ -193,4 +193,20 @@ test.describe('Validation and exceptional flows', () => {
     const after = await table.locator('tbody tr').count();
     expect(after).toBeGreaterThan(before);
   });
+
+  test('scenarios validation blocks empty name', async ({ page }) => {
+    await gotoPage(page, '/scenarios');
+
+    await page.getByTestId('scenarios-save').click();
+    await expectModalVisible(page, 'scenarios-modal');
+
+    // Leave name empty and try to save
+    await fillInputByTestId(page, 'scenarios-name', '');
+    await page.getByTestId('scenarios-save-confirm').click();
+
+    // Validation error should appear and modal should remain open
+    await expect(page.getByTestId('scenarios-error')).toBeVisible();
+    await expect(page.getByTestId('scenarios-modal')).toBeVisible();
+    await page.getByTestId('scenarios-cancel').click();
+  });
 });

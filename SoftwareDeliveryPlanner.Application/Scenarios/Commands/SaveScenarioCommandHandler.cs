@@ -35,7 +35,7 @@ internal sealed class SaveScenarioCommandHandler : IRequestHandler<SaveScenarioC
             kpis.AtRisk,
             kpis.Late,
             kpis.Unscheduled,
-            null,
+            kpis.EarliestStart,
             kpis.OverallFinish,
             kpis.TotalEstimation,
             request.Notes,

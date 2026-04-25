@@ -601,7 +601,7 @@ else
         if (resResult.IsSuccess)
             allResources = resResult.Value;
 
-        isUnscheduled = !task.PlannedStart.HasValue;
+        isUnscheduled = !task.PlannedStart.HasValue || !task.PlannedFinish.HasValue;
 
         // Skip gap computation if resource load failed — avoid false positives
         if (!resResult.IsSuccess)

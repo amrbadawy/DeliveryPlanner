@@ -125,6 +125,43 @@ test.describe('Tasks search, filter, and sort', () => {
     const afterBoth = await table.locator('tbody tr').count();
     expect(afterBoth).toBeLessThanOrEqual(afterFilter);
   });
+
+  test('direct navigation to ?scheduled=no shows unscheduled filter badge', async ({ page }) => {
+    await gotoPage(page, '/tasks?scheduled=no');
+    const table = page.getByTestId('tasks-table');
+    await waitForTableRows(table);
+
+    // The unscheduled filter badge should be visible
+    const badge = page.getByTestId('tasks-unscheduled-filter-badge');
+    await expect(badge).toBeVisible();
+    await expect(badge).toContainText('Unscheduled only');
+  });
+
+  test('clearing filters removes unscheduled filter badge', async ({ page }) => {
+    await gotoPage(page, '/tasks?scheduled=no');
+    const table = page.getByTestId('tasks-table');
+    await waitForTableRows(table);
+
+    const badge = page.getByTestId('tasks-unscheduled-filter-badge');
+    await expect(badge).toBeVisible();
+
+    // Click clear filters
+    await page.getByTestId('tasks-clear-filters').click();
+    await expect(badge).not.toBeVisible();
+  });
+
+  test('unscheduled filter combines with search', async ({ page }) => {
+    await gotoPage(page, '/tasks?scheduled=no');
+    const table = page.getByTestId('tasks-table');
+    await waitForTableRows(table);
+
+    const rowsBefore = await table.locator('tbody tr').count();
+
+    // Add search to narrow further
+    await page.getByTestId('tasks-search').fill('SVC-001');
+    const rowsAfter = await table.locator('tbody tr').count();
+    expect(rowsAfter).toBeLessThanOrEqual(rowsBefore);
+  });
 });
 
 test.describe('Resources search, filter, and sort', () => {

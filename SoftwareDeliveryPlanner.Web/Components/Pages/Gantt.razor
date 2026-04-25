@@ -299,10 +299,6 @@ else
         // Load role-based segments
         var segResult = await Mediator.Send(new GetGanttSegmentsQuery());
         var allSegments = segResult.Value;
-        var totalSegments = allSegments.Sum(s => s.Segments.Count);
-        var estimatedCount = allSegments.Sum(s => s.Segments.Count(sg => sg.IsEstimated));
-        var roles = string.Join(", ", allSegments.SelectMany(s => s.Segments).Select(sg => sg.Role).Distinct().OrderBy(r => r));
-        System.Diagnostics.Debug.WriteLine($"[GANTT DEBUG] Tasks: {allSegments.Count}, Segments: {totalSegments}, Estimated: {estimatedCount}. Roles: {roles}");
         segmentsByTask = allSegments.ToDictionary(s => s.TaskId, s => s.Segments, StringComparer.OrdinalIgnoreCase);
 
         if (scheduledTasks.Any())

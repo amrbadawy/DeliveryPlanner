@@ -5,6 +5,7 @@ public sealed record DashboardKpisDto(
     double TotalEstimation,
     int ActiveResources,
     double TotalCapacity,
+    DateTime? EarliestStart,
     DateTime? OverallFinish,
     int OnTrack,
     int AtRisk,

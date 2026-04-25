@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { gotoPage, runSchedulerFromDashboard } from './helpers';
+import { gotoPage, runSchedulerFromDashboard, waitForTableRows } from './helpers';
 
 test.describe('Dashboard Features', () => {
   test('stale plan warning shown before scheduler run', async ({ page }) => {
@@ -84,14 +84,54 @@ test.describe('Dashboard Features', () => {
 
     const kpiCard = page.getByTestId('kpi-unscheduled');
     await expect(kpiCard).toBeVisible();
-    await kpiCard.click();
 
-    // Should navigate to the tasks page with the scheduled=no filter
-    await expect(page).toHaveURL(/\/tasks\?scheduled=no/);
+    // Get the unscheduled count from the KPI card text
+    const kpiText = await kpiCard.innerText();
+    const kpiCountMatch = kpiText.match(/\d+/);
+    const kpiCount = kpiCountMatch ? parseInt(kpiCountMatch[0], 10) : -1;
 
-    // The unscheduled filter badge should be visible
-    const badge = page.getByTestId('tasks-unscheduled-filter-badge');
-    await expect(badge).toBeVisible();
-    await expect(badge).toContainText('Unscheduled only');
+    // Only navigate if count > 0 (B3: card is non-clickable when 0)
+    if (kpiCount > 0) {
+      await kpiCard.click();
+
+      // Should navigate to the tasks page with the scheduled=no filter
+      await expect(page).toHaveURL(/\/tasks\?scheduled=no/);
+
+      // The unscheduled filter badge should be visible
+      const badge = page.getByTestId('tasks-unscheduled-filter-badge');
+      await expect(badge).toBeVisible();
+      await expect(badge).toContainText('Unscheduled only');
+
+      // The number of rows shown should match the KPI count
+      const table = page.getByTestId('tasks-table');
+      await waitForTableRows(table);
+      const rowCount = await table.locator('tbody tr').count();
+      expect(rowCount).toBe(kpiCount);
+    } else {
+      // When count is 0, the card should not be clickable (no cursor-pointer/kpi-clickable)
+      const classes = await kpiCard.getAttribute('class');
+      expect(classes).not.toContain('kpi-clickable');
+    }
+  });
+
+  test('unscheduled KPI count matches task table unscheduled icon count', async ({ page }) => {
+    await runSchedulerFromDashboard(page);
+
+    // Count unscheduled icons on the tasks page
+    await gotoPage(page, '/tasks');
+    const table = page.getByTestId('tasks-table');
+    await waitForTableRows(table);
+    const unschedIconCount = await page.locator('[data-testid^="unscheduled-warning-"]').count();
+
+    // Navigate to dashboard and compare with KPI
+    await gotoPage(page, '/');
+    await expect(page.getByTestId('dashboard-skeleton-kpi')).toBeHidden({ timeout: 15_000 });
+
+    const kpiCard = page.getByTestId('kpi-unscheduled');
+    const kpiText = await kpiCard.innerText();
+    const kpiCountMatch = kpiText.match(/\d+/);
+    const kpiCount = kpiCountMatch ? parseInt(kpiCountMatch[0], 10) : -1;
+
+    expect(kpiCount).toBe(unschedIconCount);
   });
 });

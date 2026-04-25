@@ -113,5 +113,16 @@ test.describe('Gantt chart', () => {
       const emptyVisible = await empty.isVisible().catch(() => false);
       return chartVisible || emptyVisible;
     }, { timeout: 10_000 }).toBeTruthy();
+
+    // If empty state is shown, verify the contextual message
+    const emptyVisible = await empty.isVisible().catch(() => false);
+    if (emptyVisible) {
+      const text = await empty.innerText();
+      // Should contain guidance about running the scheduler
+      expect(text).toContain('Refresh');
+      // If tasks exist but none scheduled, should mention task count
+      const mentionsTasks = text.includes('task(s) exist') || text.includes('scheduler');
+      expect(mentionsTasks).toBe(true);
+    }
   });
 });

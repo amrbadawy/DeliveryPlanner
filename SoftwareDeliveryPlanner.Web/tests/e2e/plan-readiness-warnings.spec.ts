@@ -31,7 +31,7 @@ test.describe('Plan readiness warnings', () => {
     // Banner should contain at least one of the expected messages
     const text = await banner.innerText();
     const hasExpectedMessage =
-      text.includes('Run the scheduler') ||
+      text.includes('No tasks are currently scheduled') ||
       text.includes('unscheduled') ||
       text.includes('no matching active resources');
     expect(hasExpectedMessage).toBe(true);
@@ -290,17 +290,45 @@ test.describe('Plan readiness warnings', () => {
     const table = page.getByTestId('tasks-table');
     await waitForTableRows(table);
 
-    const gapWarnings = page.locator('[data-testid^="resource-gap-warning-"]');
-    const count = await gapWarnings.count();
+    const serviceName = uniqueSuffix('TooltipTest');
 
-    if (count > 0) {
-      const firstWarning = gapWarnings.first();
-      const title = await firstWarning.getAttribute('title');
-      expect(title).toMatch(/No active resource for role\(s\):/);
-      // Title should list at least one role name after the colon
-      const rolePart = title!.split(':')[1].trim();
-      expect(rolePart.length).toBeGreaterThan(0);
-    }
+    // Create a task with both UX and BA roles — neither has a matching resource in seed data
+    await page.getByTestId('tasks-add').click();
+    await expectModalVisible(page, 'tasks-modal');
+    await fillInputByTestId(page, 'tasks-service-name', serviceName);
+    await fillInputByTestId(page, 'effort-days-DEV', '2');
+    await fillInputByTestId(page, 'effort-days-QA', '1');
+
+    await page.getByTestId('effort-add-role-select').selectOption('UX');
+    await page.getByTestId('effort-add-btn').click();
+    await fillInputByTestId(page, 'effort-days-UX', '3');
+
+    await page.getByTestId('effort-add-role-select').selectOption('BA');
+    await page.getByTestId('effort-add-btn').click();
+    await fillInputByTestId(page, 'effort-days-BA', '2');
+
+    await page.getByTestId('tasks-save').click();
+    await expect(page.getByTestId('tasks-modal')).toBeHidden();
+
+    const newRow = table.locator('tbody tr', { hasText: serviceName });
+    await expect(newRow).toBeVisible();
+    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
+
+    // Resource gap warning should be visible with multiple uncovered roles
+    const gapWarning = page.getByTestId(`resource-gap-warning-${taskId}`);
+    await expect(gapWarning).toBeVisible({ timeout: 5_000 });
+
+    const title = await gapWarning.getAttribute('title');
+    expect(title).toMatch(/No active resource for role\(s\):/);
+    // Tooltip should list both uncovered role names
+    expect(title).toContain('UX');
+    expect(title).toContain('BA');
+
+    // Clean up
+    await page.getByTestId(`tasks-delete-${taskId}`).click();
+    await expectModalVisible(page, 'tasks-delete-modal');
+    await page.getByTestId('tasks-delete-modal-confirm').click();
+    await expect(page.getByTestId('tasks-delete-modal')).toBeHidden();
   });
 
   test('finish and duration columns show dash for unscheduled tasks', async ({ page }) => {
@@ -308,31 +336,150 @@ test.describe('Plan readiness warnings', () => {
     const table = page.getByTestId('tasks-table');
     await waitForTableRows(table);
 
-    // Run scheduler so we can distinguish scheduled vs unscheduled
+    const serviceName = uniqueSuffix('DashTest');
+
+    // Create a task with only an unresolvable role so it stays unscheduled
+    await page.getByTestId('tasks-add').click();
+    await expectModalVisible(page, 'tasks-modal');
+    await fillInputByTestId(page, 'tasks-service-name', serviceName);
+    // Clear default DEV/QA and only use an unresolvable role
+    await fillInputByTestId(page, 'effort-days-DEV', '0');
+    await fillInputByTestId(page, 'effort-days-QA', '0');
+    await page.getByTestId('effort-add-role-select').selectOption('UI');
+    await page.getByTestId('effort-add-btn').click();
+    await fillInputByTestId(page, 'effort-days-UI', '5');
+
+    await page.getByTestId('tasks-save').click();
+    await expect(page.getByTestId('tasks-modal')).toBeHidden();
+
+    const newRow = table.locator('tbody tr', { hasText: serviceName });
+    await expect(newRow).toBeVisible();
+    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
+
+    // Run the scheduler
     await page.getByTestId('tasks-refresh').click();
     await expect(page.getByTestId('tasks-refresh')).toBeEnabled({ timeout: 15_000 });
     await page.waitForTimeout(1000);
 
-    // Find any unscheduled task
-    const unscheduledWarnings = page.locator('[data-testid^="unscheduled-warning-"]');
-    const count = await unscheduledWarnings.count();
+    // Verify unscheduled warning is visible
+    const unschedWarning = page.getByTestId(`unscheduled-warning-${taskId}`);
+    await expect(unschedWarning).toBeVisible({ timeout: 5_000 });
 
-    if (count > 0) {
-      // Get the row containing the first unscheduled warning
-      const warningEl = unscheduledWarnings.first();
-      const row = warningEl.locator('xpath=ancestor::tr');
+    // Get the row containing the unscheduled warning
+    const row = unschedWarning.locator('xpath=ancestor::tr');
 
-      // The Start column (index 5) should have the warning icon
-      await expect(warningEl).toBeVisible();
+    // The Finish column (index 6) should show a dash
+    const finishCell = row.locator('td').nth(6);
+    await expect(finishCell).toContainText('—');
 
-      // The Finish column (index 6) should show a dash
-      const finishCell = row.locator('td').nth(6);
-      await expect(finishCell).toContainText('—');
+    // The Days column (index 7) should show a dash
+    const daysCell = row.locator('td').nth(7);
+    await expect(daysCell).toContainText('—');
 
-      // The Days column (index 7) should show a dash
-      const daysCell = row.locator('td').nth(7);
-      await expect(daysCell).toContainText('—');
+    // Clean up
+    await page.getByTestId(`tasks-delete-${taskId}`).click();
+    await expectModalVisible(page, 'tasks-delete-modal');
+    await page.getByTestId('tasks-delete-modal-confirm').click();
+    await expect(page.getByTestId('tasks-delete-modal')).toBeHidden();
+  });
+
+  test('banner warning count matches actual icon counts', async ({ page }) => {
+    await gotoPage(page, '/tasks');
+    const table = page.getByTestId('tasks-table');
+    await waitForTableRows(table);
+
+    // Run scheduler to populate scheduling state
+    await page.getByTestId('tasks-refresh').click();
+    await expect(page.getByTestId('tasks-refresh')).toBeEnabled({ timeout: 15_000 });
+    await page.waitForTimeout(1000);
+
+    const banner = page.getByTestId('task-warnings-banner');
+    const isBannerVisible = await banner.isVisible().catch(() => false);
+    if (!isBannerVisible) return; // All healthy — no counts to verify
+
+    const bannerText = await banner.innerText();
+
+    // Count actual unscheduled icons in the table
+    const unschedCount = await page.locator('[data-testid^="unscheduled-warning-"]').count();
+    if (unschedCount > 0) {
+      expect(bannerText).toContain(`${unschedCount} task(s) are unscheduled`);
     }
+
+    // Count actual resource gap icons in the table
+    const gapCount = await page.locator('[data-testid^="resource-gap-warning-"]').count();
+    if (gapCount > 0) {
+      expect(bannerText).toContain(`${gapCount} task(s) have no matching active resources`);
+    }
+  });
+
+  test('inactive resource causes resource gap', async ({ page }) => {
+    // Step 1: Create a UX resource (active)
+    await gotoPage(page, '/resources');
+    const resTable = page.getByTestId('resources-table');
+    await waitForTableRows(resTable);
+
+    await page.getByTestId('resources-add').click();
+    await expectModalVisible(page, 'resources-modal');
+    const resourceId = (await page.getByTestId('resources-id').inputValue()).trim();
+    const resName = uniqueSuffix('InactiveRes');
+    await fillInputByTestId(page, 'resources-name', resName);
+    await fillInputByTestId(page, 'resources-role', 'UX Designer');
+    await fillInputByTestId(page, 'resources-team', 'E2E Team');
+    await page.getByTestId('resources-save').click();
+    await expect(page.getByTestId('resources-modal')).toBeHidden();
+
+    // Step 2: Create a task with UX role — should have NO gap since UX resource exists
+    await gotoPage(page, '/tasks');
+    const table = page.getByTestId('tasks-table');
+    await waitForTableRows(table);
+
+    const serviceName = uniqueSuffix('InactiveGap');
+    await page.getByTestId('tasks-add').click();
+    await expectModalVisible(page, 'tasks-modal');
+    await fillInputByTestId(page, 'tasks-service-name', serviceName);
+    await fillInputByTestId(page, 'effort-days-DEV', '3');
+    await fillInputByTestId(page, 'effort-days-QA', '1');
+    await page.getByTestId('effort-add-role-select').selectOption('UX');
+    await page.getByTestId('effort-add-btn').click();
+    await fillInputByTestId(page, 'effort-days-UX', '2');
+    await page.getByTestId('tasks-save').click();
+    await expect(page.getByTestId('tasks-modal')).toBeHidden();
+
+    const newRow = table.locator('tbody tr', { hasText: serviceName });
+    await expect(newRow).toBeVisible();
+    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
+
+    // No resource gap — UX resource is active
+    const gapWarning = page.getByTestId(`resource-gap-warning-${taskId}`);
+    await expect(gapWarning).not.toBeVisible();
+
+    // Step 3: Deactivate the UX resource
+    await gotoPage(page, '/resources');
+    await waitForTableRows(page.getByTestId('resources-table'));
+    await page.getByTestId(`resources-edit-${resourceId}`).click();
+    await expectModalVisible(page, 'resources-modal');
+    await fillInputByTestId(page, 'resources-active', 'No');
+    await page.getByTestId('resources-save').click();
+    await expect(page.getByTestId('resources-modal')).toBeHidden();
+
+    // Step 4: Go back to tasks — resource gap should now appear
+    await gotoPage(page, '/tasks');
+    await waitForTableRows(page.getByTestId('tasks-table'));
+    const gapWarningAfter = page.getByTestId(`resource-gap-warning-${taskId}`);
+    await expect(gapWarningAfter).toBeVisible({ timeout: 5_000 });
+
+    // Clean up — delete task then resource
+    await page.getByTestId(`tasks-delete-${taskId}`).click();
+    await expectModalVisible(page, 'tasks-delete-modal');
+    await page.getByTestId('tasks-delete-modal-confirm').click();
+    await expect(page.getByTestId('tasks-delete-modal')).toBeHidden();
+
+    await gotoPage(page, '/resources');
+    await waitForTableRows(page.getByTestId('resources-table'));
+    await page.getByTestId(`resources-delete-${resourceId}`).click();
+    await expectModalVisible(page, 'resources-delete-modal');
+    await page.getByTestId('resources-delete-modal-confirm').click();
+    await expect(page.getByTestId('resources-delete-modal')).toBeHidden();
   });
 
   test('banner shows filter context when filters are active', async ({ page }) => {
