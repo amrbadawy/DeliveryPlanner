@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { fillInputByTestId, gotoPage, runSchedulerFromDashboard, uniqueSuffix, waitForTableRows } from './helpers';
 
 test.describe('Task Details + Notes', () => {
@@ -178,5 +178,366 @@ test.describe('Task Details + Notes', () => {
 
     await page.reload({ waitUntil: 'networkidle' });
     await expect(page.getByTestId('td-effort-row-DEV').locator('td').nth(1)).toContainText('12.5');
+  });
+});
+
+// ── Helper shared by inline-edit tests ───────────────────────────────────────
+async function navigateToFirstTaskDetail(page: Page) {
+  await gotoPage(page, '/tasks');
+  const table = page.getByTestId('tasks-table');
+  await waitForTableRows(table);
+  await table.locator('tbody tr').first().locator('a').first().click();
+  await expect(page.getByTestId('task-details-card')).toBeVisible();
+  await expect(page.getByTestId('td-effort-breakdown')).toBeVisible();
+}
+
+// ── Inline per-row effort breakdown editing ───────────────────────────────────
+test.describe('Effort Breakdown — inline editing', () => {
+  test('inline edit button appears on each effort row', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+    await expect(page.getByTestId('effort-inline-edit-DEV')).toBeVisible();
+    await expect(page.getByTestId('effort-inline-edit-QA')).toBeVisible();
+  });
+
+  test('clicking edit on a row reveals inline inputs and hides the pencil button', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+    await page.getByTestId('effort-inline-edit-DEV').click();
+
+    await expect(page.getByTestId('effort-inline-days-DEV')).toBeVisible();
+    await expect(page.getByTestId('effort-inline-maxfte-DEV')).toBeVisible();
+    await expect(page.getByTestId('effort-inline-seniority-DEV')).toBeVisible();
+    await expect(page.getByTestId('effort-inline-save-DEV')).toBeVisible();
+    await expect(page.getByTestId('effort-inline-cancel-DEV')).toBeVisible();
+    // Pencil button is gone while row is in edit mode
+    await expect(page.getByTestId('effort-inline-edit-DEV')).toBeHidden();
+  });
+
+  test('primary role (lowest sort order) does not show overlap input; non-primary does', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+
+    // Discover which role has the lowest SortOrder from the rendered table
+    const effortTable = page.getByTestId('td-effort-breakdown');
+    const firstRowTestId = await effortTable.locator('tbody tr').first().getAttribute('data-testid');
+    const firstRole = (firstRowTestId ?? 'td-effort-row-DEV').replace('td-effort-row-', '');
+    const lastRowTestId = await effortTable.locator('tbody tr').last().getAttribute('data-testid');
+    const lastRole = (lastRowTestId ?? 'td-effort-row-QA').replace('td-effort-row-', '');
+
+    // First (primary) role — overlap must NOT be rendered
+    await page.getByTestId(`effort-inline-edit-${firstRole}`).click();
+    await expect(page.getByTestId(`effort-inline-overlap-${firstRole}`)).toBeHidden();
+    await page.getByTestId(`effort-inline-cancel-${firstRole}`).click();
+
+    // Last role (non-primary when more than one entry exists) — overlap MUST be rendered
+    if (firstRole !== lastRole) {
+      await page.getByTestId(`effort-inline-edit-${lastRole}`).click();
+      await expect(page.getByTestId(`effort-inline-overlap-${lastRole}`)).toBeVisible();
+      await page.getByTestId(`effort-inline-cancel-${lastRole}`).click();
+    }
+  });
+
+  test('happy path: inline edit DEV days saves and persists after reload', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+
+    await page.getByTestId('effort-inline-edit-DEV').click();
+    await fillInputByTestId(page, 'effort-inline-days-DEV', '8.5');
+    await page.getByTestId('effort-inline-save-DEV').click();
+
+    // Inputs should be gone, row back to read-only
+    await expect(page.getByTestId('effort-inline-save-DEV')).toBeHidden();
+    await expect(page.getByTestId('td-effort-row-DEV').locator('td').nth(1)).toContainText('8.5');
+
+    // Persist after reload
+    await page.reload({ waitUntil: 'networkidle' });
+    await expect(page.getByTestId('td-effort-row-DEV').locator('td').nth(1)).toContainText('8.5');
+  });
+
+  test('happy path: inline edit QA days saves and persists after reload', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+
+    await page.getByTestId('effort-inline-edit-QA').click();
+    await fillInputByTestId(page, 'effort-inline-days-QA', '4.5');
+    await page.getByTestId('effort-inline-save-QA').click();
+
+    await expect(page.getByTestId('effort-inline-save-QA')).toBeHidden();
+    await expect(page.getByTestId('td-effort-row-QA').locator('td').nth(1)).toContainText('4.5');
+
+    await page.reload({ waitUntil: 'networkidle' });
+    await expect(page.getByTestId('td-effort-row-QA').locator('td').nth(1)).toContainText('4.5');
+  });
+
+  test('happy path: inline edit changes seniority', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+
+    await page.getByTestId('effort-inline-edit-DEV').click();
+    await fillInputByTestId(page, 'effort-inline-seniority-DEV', 'Senior');
+    await page.getByTestId('effort-inline-save-DEV').click();
+
+    await expect(page.getByTestId('effort-inline-save-DEV')).toBeHidden();
+    // Seniority is the 5th column (index 4) in the read-only row
+    await expect(page.getByTestId('td-effort-row-DEV').locator('td').nth(4)).toContainText('Senior');
+
+    await page.reload({ waitUntil: 'networkidle' });
+    await expect(page.getByTestId('td-effort-row-DEV').locator('td').nth(4)).toContainText('Senior');
+  });
+
+  test('happy path: inline edit changes MaxFte', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+
+    await page.getByTestId('effort-inline-edit-DEV').click();
+    await fillInputByTestId(page, 'effort-inline-maxfte-DEV', '2');
+    await page.getByTestId('effort-inline-save-DEV').click();
+
+    await expect(page.getByTestId('effort-inline-save-DEV')).toBeHidden();
+    // MaxFte is the 3rd column (index 2) in the read-only row
+    await expect(page.getByTestId('td-effort-row-DEV').locator('td').nth(2)).toContainText('2');
+  });
+
+  test('happy path: inline edit overlap on non-primary role (QA)', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+
+    await page.getByTestId('effort-inline-edit-QA').click();
+    // QA is not the primary role so overlap is editable
+    await expect(page.getByTestId('effort-inline-overlap-QA')).toBeVisible();
+    await fillInputByTestId(page, 'effort-inline-overlap-QA', '20');
+    await page.getByTestId('effort-inline-save-QA').click();
+
+    await expect(page.getByTestId('effort-inline-save-QA')).toBeHidden();
+    // Overlap is the 4th column (index 3) in the read-only row
+    await expect(page.getByTestId('td-effort-row-QA').locator('td').nth(3)).toContainText('20');
+  });
+
+  test('toast notification appears on successful inline save', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+    await page.getByTestId('effort-inline-edit-QA').click();
+    await fillInputByTestId(page, 'effort-inline-days-QA', '3');
+    await page.getByTestId('effort-inline-save-QA').click();
+    await expect(page.getByTestId('task-details-toast')).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('cancel restores original value without saving', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+
+    // Capture current displayed days before editing
+    const originalDays = (await page.getByTestId('td-effort-row-DEV').locator('td').nth(1).innerText()).trim();
+
+    await page.getByTestId('effort-inline-edit-DEV').click();
+    await fillInputByTestId(page, 'effort-inline-days-DEV', '999');
+    await page.getByTestId('effort-inline-cancel-DEV').click();
+
+    // Edit inputs gone
+    await expect(page.getByTestId('effort-inline-save-DEV')).toBeHidden();
+    // Original value still shown
+    await expect(page.getByTestId('td-effort-row-DEV').locator('td').nth(1)).toContainText(originalDays);
+  });
+
+  test('only one row can be in edit mode at a time', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+
+    // Open DEV row
+    await page.getByTestId('effort-inline-edit-DEV').click();
+    await expect(page.getByTestId('effort-inline-days-DEV')).toBeVisible();
+
+    // Open QA row — DEV row should revert to read-only
+    await page.getByTestId('effort-inline-edit-QA').click();
+    await expect(page.getByTestId('effort-inline-days-DEV')).toBeHidden();
+    await expect(page.getByTestId('effort-inline-days-QA')).toBeVisible();
+
+    await page.getByTestId('effort-inline-cancel-QA').click();
+  });
+
+  test('opening the bulk-edit modal cancels active inline edit', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+
+    // Start inline editing DEV
+    await page.getByTestId('effort-inline-edit-DEV').click();
+    await expect(page.getByTestId('effort-inline-days-DEV')).toBeVisible();
+
+    // Open the "Edit Effort Breakdown" modal
+    await page.getByTestId('task-effort-edit').click();
+    await expect(page.getByTestId('task-effort-modal')).toBeVisible();
+
+    // Inline edit should be cancelled automatically
+    await expect(page.getByTestId('effort-inline-days-DEV')).toBeHidden();
+
+    await page.getByTestId('task-effort-cancel').click();
+  });
+
+  test('validation error: days = 0 shows inline error and keeps row open', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+    await page.getByTestId('effort-inline-edit-DEV').click();
+    await fillInputByTestId(page, 'effort-inline-days-DEV', '0');
+    await page.getByTestId('effort-inline-save-DEV').click();
+
+    await expect(page.getByTestId('effort-inline-error-DEV')).toBeVisible();
+    await expect(page.getByTestId('effort-inline-error-DEV')).toContainText('greater than zero');
+    // Row stays open
+    await expect(page.getByTestId('effort-inline-save-DEV')).toBeVisible();
+
+    await page.getByTestId('effort-inline-cancel-DEV').click();
+  });
+
+  test('validation error: MaxFte = 0 shows inline error', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+    await page.getByTestId('effort-inline-edit-DEV').click();
+    await fillInputByTestId(page, 'effort-inline-maxfte-DEV', '0');
+    await page.getByTestId('effort-inline-save-DEV').click();
+
+    await expect(page.getByTestId('effort-inline-error-DEV')).toBeVisible();
+    await expect(page.getByTestId('effort-inline-save-DEV')).toBeVisible();
+
+    await page.getByTestId('effort-inline-cancel-DEV').click();
+  });
+
+  test('validation error: overlap > 100 on non-primary role shows inline error', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+    await page.getByTestId('effort-inline-edit-QA').click();
+    // Force an out-of-range overlap value via JS (bypasses the browser max=100 constraint)
+    await page.getByTestId('effort-inline-overlap-QA').evaluate((el: HTMLInputElement) => {
+      el.value = '150';
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await page.waitForTimeout(150);
+    await page.getByTestId('effort-inline-save-QA').click();
+
+    await expect(page.getByTestId('effort-inline-error-QA')).toBeVisible();
+    await expect(page.getByTestId('effort-inline-error-QA')).toContainText('0 and 100');
+
+    await page.getByTestId('effort-inline-cancel-QA').click();
+  });
+
+  test('cancelling inline edit clears validation error', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+
+    // Trigger a validation error
+    await page.getByTestId('effort-inline-edit-DEV').click();
+    await fillInputByTestId(page, 'effort-inline-days-DEV', '0');
+    await page.getByTestId('effort-inline-save-DEV').click();
+    await expect(page.getByTestId('effort-inline-error-DEV')).toBeVisible();
+
+    // Cancel — error row and inputs should disappear
+    await page.getByTestId('effort-inline-cancel-DEV').click();
+    await expect(page.getByTestId('effort-inline-error-DEV')).toBeHidden();
+    await expect(page.getByTestId('effort-inline-save-DEV')).toBeHidden();
+  });
+
+  test('opening a second row clears validation error from first row', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+
+    // Trigger error on DEV row
+    await page.getByTestId('effort-inline-edit-DEV').click();
+    await fillInputByTestId(page, 'effort-inline-days-DEV', '0');
+    await page.getByTestId('effort-inline-save-DEV').click();
+    await expect(page.getByTestId('effort-inline-error-DEV')).toBeVisible();
+
+    // Open QA row — DEV error should be gone
+    await page.getByTestId('effort-inline-edit-QA').click();
+    await expect(page.getByTestId('effort-inline-error-DEV')).toBeHidden();
+    await expect(page.getByTestId('effort-inline-days-QA')).toBeVisible();
+
+    await page.getByTestId('effort-inline-cancel-QA').click();
+  });
+
+  test('seniority can be reset from a set value back to Any', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+
+    // First set seniority to Senior
+    await page.getByTestId('effort-inline-edit-DEV').click();
+    await fillInputByTestId(page, 'effort-inline-seniority-DEV', 'Senior');
+    await page.getByTestId('effort-inline-save-DEV').click();
+    await expect(page.getByTestId('effort-inline-save-DEV')).toBeHidden();
+    await expect(page.getByTestId('td-effort-row-DEV').locator('td').nth(4)).toContainText('Senior');
+
+    // Now reset to Any (empty value)
+    await page.getByTestId('effort-inline-edit-DEV').click();
+    await fillInputByTestId(page, 'effort-inline-seniority-DEV', '');
+    await page.getByTestId('effort-inline-save-DEV').click();
+    await expect(page.getByTestId('effort-inline-save-DEV')).toBeHidden();
+    await expect(page.getByTestId('td-effort-row-DEV').locator('td').nth(4)).toContainText('Any');
+
+    await page.reload({ waitUntil: 'networkidle' });
+    await expect(page.getByTestId('td-effort-row-DEV').locator('td').nth(4)).toContainText('Any');
+  });
+
+  test('TotalEstimationDays in header card updates after inline save', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+
+    // Read current total
+    const totalBefore = parseFloat((await page.getByTestId('td-dev-estimation').innerText()).trim());
+
+    // Read current DEV days
+    const devDaysBefore = parseFloat((await page.getByTestId('td-effort-row-DEV').locator('td').nth(1).innerText()).trim());
+
+    // Set DEV days to a known different value
+    const newDays = devDaysBefore === 7 ? 9 : 7;
+    const expectedTotal = totalBefore - devDaysBefore + newDays;
+
+    await page.getByTestId('effort-inline-edit-DEV').click();
+    await fillInputByTestId(page, 'effort-inline-days-DEV', String(newDays));
+    await page.getByTestId('effort-inline-save-DEV').click();
+    await expect(page.getByTestId('effort-inline-save-DEV')).toBeHidden();
+
+    // Total estimation should reflect the change
+    await expect(page.getByTestId('td-dev-estimation')).toContainText(String(expectedTotal));
+  });
+
+  test('validation error: negative overlap on non-primary role shows inline error', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+    await page.getByTestId('effort-inline-edit-QA').click();
+    // Force a negative overlap via JS (bypasses browser min=0 constraint)
+    await page.getByTestId('effort-inline-overlap-QA').evaluate((el: HTMLInputElement) => {
+      el.value = '-10';
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await page.waitForTimeout(150);
+    await page.getByTestId('effort-inline-save-QA').click();
+
+    await expect(page.getByTestId('effort-inline-error-QA')).toBeVisible();
+    await expect(page.getByTestId('effort-inline-error-QA')).toContainText('0 and 100');
+
+    await page.getByTestId('effort-inline-cancel-QA').click();
+  });
+
+  test('bulk modal save still works correctly after a prior inline edit', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+
+    // Inline edit: change QA days
+    await page.getByTestId('effort-inline-edit-QA').click();
+    await fillInputByTestId(page, 'effort-inline-days-QA', '5');
+    await page.getByTestId('effort-inline-save-QA').click();
+    await expect(page.getByTestId('effort-inline-save-QA')).toBeHidden();
+    await expect(page.getByTestId('td-effort-row-QA').locator('td').nth(1)).toContainText('5');
+
+    // Now open bulk modal and change DEV days
+    await page.getByTestId('task-effort-edit').click();
+    await expect(page.getByTestId('task-effort-modal')).toBeVisible();
+    await fillInputByTestId(page, 'effort-edit-days-DEV', '11');
+    await page.getByTestId('task-effort-save').click();
+    await expect(page.getByTestId('task-effort-modal')).toBeHidden();
+
+    // Both changes should be reflected
+    await expect(page.getByTestId('td-effort-row-DEV').locator('td').nth(1)).toContainText('11');
+    await expect(page.getByTestId('td-effort-row-QA').locator('td').nth(1)).toContainText('5');
+  });
+
+  test('overlap boundary: 0 saves correctly on non-primary role', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+
+    await page.getByTestId('effort-inline-edit-QA').click();
+    await fillInputByTestId(page, 'effort-inline-overlap-QA', '0');
+    await page.getByTestId('effort-inline-save-QA').click();
+
+    await expect(page.getByTestId('effort-inline-save-QA')).toBeHidden();
+    await expect(page.getByTestId('td-effort-row-QA').locator('td').nth(3)).toContainText('0');
+  });
+
+  test('overlap boundary: 100 saves correctly on non-primary role', async ({ page }) => {
+    await navigateToFirstTaskDetail(page);
+
+    await page.getByTestId('effort-inline-edit-QA').click();
+    await fillInputByTestId(page, 'effort-inline-overlap-QA', '100');
+    await page.getByTestId('effort-inline-save-QA').click();
+
+    await expect(page.getByTestId('effort-inline-save-QA')).toBeHidden();
+    await expect(page.getByTestId('td-effort-row-QA').locator('td').nth(3)).toContainText('100');
   });
 });

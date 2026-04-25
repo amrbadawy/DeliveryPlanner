@@ -107,18 +107,121 @@ else
                             <th>Max FTE</th>
                             <th>Overlap %</th>
                             <th>Min Seniority</th>
+                            <th style="width:80px"></th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var eb in task.EffortBreakdown.OrderBy(e => e.SortOrder))
+                        @{
+                            var sortedEntries = task.EffortBreakdown.OrderBy(e => e.SortOrder).ToList();
+                            var minSortOrder = sortedEntries.Count > 0 ? sortedEntries[0].SortOrder : 0;
+                        }
+                        @foreach (var eb in sortedEntries)
                         {
-                            <tr data-testid="td-effort-row-@eb.Role">
-                                <td>@DomainConstants.ResourceRole.GetDisplayName(eb.Role)</td>
-                                <td>@eb.EstimationDays</td>
-                                <td>@eb.MaxFte</td>
-                                <td>@eb.OverlapPct%</td>
-                                <td>@(eb.MinSeniority ?? "Any")</td>
-                            </tr>
+                            var isInlineFirst = eb.SortOrder == minSortOrder;
+                            var isRequired = DomainConstants.ResourceRole.RequiredRoles.Contains(eb.Role);
+
+                            if (inlineEditingRole == eb.Role && inlineEditEntry != null)
+                            {
+                                <!-- Edit row -->
+                                <tr data-testid="td-effort-row-@eb.Role" class="table-warning">
+                                    <td>
+                                        <span class="badge role-badge role-badge-@eb.Role.ToLowerInvariant() me-1">@eb.Role</span>
+                                        <small class="text-muted">@DomainConstants.ResourceRole.GetDisplayName(eb.Role)</small>
+                                        @if (isRequired)
+                                        {
+                                            <span class="text-danger ms-1" title="Required role">*</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm" min="0.5" step="0.5"
+                                               @bind="inlineEditEntry.EstimationDays"
+                                               disabled="@isSavingInline"
+                                               data-testid="effort-inline-days-@eb.Role" />
+                                    </td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm" min="0.1" step="0.5"
+                                               @bind="inlineEditEntry.MaxFte"
+                                               disabled="@isSavingInline"
+                                               data-testid="effort-inline-maxfte-@eb.Role" />
+                                    </td>
+                                    <td>
+                                        @if (isInlineFirst)
+                                        {
+                                            <span class="text-muted">&mdash;</span>
+                                        }
+                                        else
+                                        {
+                                            <input type="number" class="form-control form-control-sm" min="0" max="100" step="5"
+                                                   @bind="inlineEditEntry.OverlapPct"
+                                                   disabled="@isSavingInline"
+                                                   data-testid="effort-inline-overlap-@eb.Role" />
+                                        }
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm"
+                                                @bind="inlineEditEntry.MinSeniority"
+                                                disabled="@isSavingInline"
+                                                data-testid="effort-inline-seniority-@eb.Role">
+                                            <option value="">Any</option>
+                                            <option value="@DomainConstants.Seniority.Junior">Junior</option>
+                                            <option value="@DomainConstants.Seniority.Mid">Mid</option>
+                                            <option value="@DomainConstants.Seniority.Senior">Senior</option>
+                                            <option value="@DomainConstants.Seniority.Principal">Principal</option>
+                                        </select>
+                                    </td>
+                                    <td class="text-nowrap">
+                                        <button class="btn btn-sm btn-primary me-1"
+                                                @onclick="SaveInlineEdit"
+                                                disabled="@isSavingInline"
+                                                title="Save"
+                                                data-testid="effort-inline-save-@eb.Role">
+                                            @if (isSavingInline)
+                                            {
+                                                <span class="spinner-border spinner-border-sm"></span>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-check-lg"></i>
+                                            }
+                                        </button>
+                                        <button class="btn btn-sm btn-secondary"
+                                                @onclick="CancelInlineEdit"
+                                                disabled="@isSavingInline"
+                                                title="Cancel"
+                                                data-testid="effort-inline-cancel-@eb.Role">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                @if (!string.IsNullOrWhiteSpace(inlineEditError))
+                                {
+                                    <tr>
+                                        <td colspan="6" class="p-1 border-0">
+                                            <div class="alert alert-danger py-1 px-2 mb-0 small"
+                                                 data-testid="effort-inline-error-@eb.Role">@inlineEditError</div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <!-- Read-only row -->
+                                <tr data-testid="td-effort-row-@eb.Role">
+                                    <td>@DomainConstants.ResourceRole.GetDisplayName(eb.Role)</td>
+                                    <td>@eb.EstimationDays</td>
+                                    <td>@eb.MaxFte</td>
+                                    <td>@eb.OverlapPct%</td>
+                                    <td>@(eb.MinSeniority ?? "Any")</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-secondary"
+                                                @onclick="() => OpenInlineEdit(eb.Role)"
+                                                title="Edit this row"
+                                                data-testid="effort-inline-edit-@eb.Role">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
                         }
                     </tbody>
                 </table>
@@ -421,6 +524,12 @@ else
     private string selectedRoleToAdd = string.Empty;
     private List<EffortEntryModel> effortEntries = new();
 
+    // ── Inline per-row editing ────────────────────────────────────────────────
+    private string? inlineEditingRole = null;
+    private EffortEntryModel? inlineEditEntry = null;
+    private string inlineEditError = string.Empty;
+    private bool isSavingInline = false;
+
     private sealed class EffortEntryModel
     {
         public string Role { get; set; } = string.Empty;
@@ -488,6 +597,9 @@ else
         if (task == null)
             return;
 
+        // Cancel any active inline row edit before opening the modal
+        CancelInlineEdit();
+
         effortModalError = string.Empty;
         selectedRoleToAdd = string.Empty;
         effortEntries = task.EffortBreakdown
@@ -510,6 +622,114 @@ else
         showEffortModal = false;
         effortModalError = string.Empty;
         selectedRoleToAdd = string.Empty;
+    }
+
+    // ── Inline per-row edit ───────────────────────────────────────────────────
+
+    private void OpenInlineEdit(string role)
+    {
+        if (task == null) return;
+
+        // Discard any existing inline edit without saving
+        CancelInlineEdit();
+
+        // Close the modal if it happens to be open
+        if (showEffortModal) CloseEffortModal();
+
+        var entry = task.EffortBreakdown
+            .FirstOrDefault(e => string.Equals(e.Role, role, StringComparison.OrdinalIgnoreCase));
+        if (entry == null) return;
+
+        inlineEditEntry = new EffortEntryModel
+        {
+            Role = entry.Role,
+            EstimationDays = entry.EstimationDays,
+            MaxFte = entry.MaxFte,
+            OverlapPct = entry.OverlapPct,
+            MinSeniority = entry.MinSeniority
+        };
+        inlineEditingRole = role;
+    }
+
+    private void CancelInlineEdit()
+    {
+        inlineEditingRole = null;
+        inlineEditEntry = null;
+        inlineEditError = string.Empty;
+    }
+
+    private async Task SaveInlineEdit()
+    {
+        if (task == null || inlineEditEntry == null || inlineEditingRole == null) return;
+
+        // ── Client-side validation ────────────────────────────────────────────
+        if (inlineEditEntry.EstimationDays <= 0)
+        {
+            inlineEditError = "Estimation days must be greater than zero.";
+            return;
+        }
+        if (inlineEditEntry.MaxFte <= 0)
+        {
+            inlineEditError = "Max FTE must be greater than zero.";
+            return;
+        }
+        var isFirst = task.EffortBreakdown
+            .OrderBy(e => e.SortOrder)
+            .First().Role
+            .Equals(inlineEditingRole, StringComparison.OrdinalIgnoreCase);
+        if (!isFirst && (inlineEditEntry.OverlapPct < 0 || inlineEditEntry.OverlapPct > 100))
+        {
+            inlineEditError = "Overlap percentage must be between 0 and 100.";
+            return;
+        }
+
+        isSavingInline = true;
+        inlineEditError = string.Empty;
+
+        try
+        {
+            // Build the full breakdown list, replacing only the edited entry
+            var breakdown = task.EffortBreakdown
+                .OrderBy(e => e.SortOrder)
+                .Select(e => string.Equals(e.Role, inlineEditingRole, StringComparison.OrdinalIgnoreCase)
+                    ? new EffortBreakdownInput(
+                        inlineEditEntry.Role,
+                        inlineEditEntry.EstimationDays,
+                        inlineEditEntry.OverlapPct,
+                        inlineEditEntry.MaxFte,
+                        string.IsNullOrWhiteSpace(inlineEditEntry.MinSeniority) ? null : inlineEditEntry.MinSeniority)
+                    : new EffortBreakdownInput(
+                        e.Role,
+                        e.EstimationDays,
+                        e.OverlapPct,
+                        e.MaxFte,
+                        e.MinSeniority))
+                .ToList();
+
+            var command = new UpdateTaskEffortBreakdownCommand(TaskId, breakdown, autoSchedule.IsEnabled);
+            await Mediator.Send(command);
+
+            await LoadTaskData();
+            isTimelineLoading = true;
+            await LoadTimelineData();
+            isAllocationsLoading = true;
+            await LoadAllocationsData();
+
+            CancelInlineEdit();
+            toast.Show("Effort breakdown updated.");
+        }
+        catch (ValidationException ex)
+        {
+            inlineEditError = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+        catch (Exception ex)
+        {
+            inlineEditError = ex.Message;
+        }
+        finally
+        {
+            isSavingInline = false;
+        }
     }
 
     private void AddEffortEntry()
