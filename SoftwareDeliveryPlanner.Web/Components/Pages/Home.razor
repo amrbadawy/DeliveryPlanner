@@ -329,7 +329,7 @@ else
         totalEstimation = kpis.TotalEstimation;
         activeResources = kpis.ActiveResources;
         totalCapacity = kpis.TotalCapacity;
-        overallFinish = kpis.OverallFinish?.ToString() ?? "N/A";
+        overallFinish = kpis.OverallFinish?.ToString("d") ?? "N/A";
         onTrack = kpis.OnTrack;
         atRisk = kpis.AtRisk;
         late = kpis.Late;
