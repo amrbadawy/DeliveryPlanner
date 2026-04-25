@@ -104,7 +104,7 @@
                 @foreach (var role in roles)
                 {
                     <tr data-testid="roles-row-@role.Code">
-                        <td>@role.Code</td>
+                        <td><span class="badge role-badge role-badge-@role.Code.ToLowerInvariant()">@role.Code</span></td>
                         <td><a href="/roles/@role.Code" class="text-decoration-none" data-testid="roles-link-@role.Code">@role.DisplayName</a></td>
                         <td>@role.SortOrder</td>
                         <td>

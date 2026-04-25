@@ -207,7 +207,7 @@ else
                             {
                                 <!-- Read-only row -->
                                 <tr data-testid="td-effort-row-@eb.Role">
-                                    <td>@DomainConstants.ResourceRole.GetDisplayName(eb.Role)</td>
+                                    <td><span class="badge role-badge role-badge-@eb.Role.ToLowerInvariant() me-1">@eb.Role</span><small class="text-muted">@DomainConstants.ResourceRole.GetDisplayName(eb.Role)</small></td>
                                     <td>@eb.EstimationDays</td>
                                     <td>@eb.MaxFte</td>
                                     <td>@eb.OverlapPct%</td>
@@ -265,7 +265,7 @@ else
                                 <i class="bi bi-person-circle fs-4 text-primary"></i>
                                 <div>
                                     <a href="/resources/@alloc.ResourceId" class="fw-bold text-decoration-none" data-testid="alloc-link-@alloc.ResourceId">@alloc.ResourceName</a>
-                                    <div class="small text-muted">@alloc.Role · @alloc.Team</div>
+                                    <div class="small text-muted"><span class="badge role-badge role-badge-@alloc.Role.ToLowerInvariant() me-1">@alloc.Role</span>@alloc.Team</div>
                                 </div>
                             </div>
                             <div class="small">

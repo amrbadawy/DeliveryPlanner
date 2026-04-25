@@ -29,6 +29,7 @@ internal sealed class ScenarioOrchestrator : ServiceBase, IScenarioOrchestrator
         return await db.PlanScenarios
             .Include(s => s.TaskSnapshots)
                 .ThenInclude(ts => ts.EffortSnapshots)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(s => s.Id == id);
     }
 

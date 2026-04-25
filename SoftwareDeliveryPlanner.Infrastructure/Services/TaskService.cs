@@ -21,6 +21,7 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
         return await db.Tasks
             .Include(t => t.EffortBreakdown)
             .Include(t => t.Dependencies)
+            .AsSplitQuery()
             .OrderBy(t => t.SchedulingRank ?? 999)
             .ToListAsync(cancellationToken);
     }
@@ -31,6 +32,7 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
         return await db.Tasks
             .Include(t => t.EffortBreakdown)
             .Include(t => t.Dependencies)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(t => t.TaskId == taskId, cancellationToken);
     }
 
@@ -75,6 +77,7 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
             task = (await db.Tasks
                 .Include(t => t.EffortBreakdown)
                 .Include(t => t.Dependencies)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(t => t.Id == id, cancellationToken))!;
             task.Update(serviceName, priority, specs,
                 strictDate, phase, preferredResourceIds);

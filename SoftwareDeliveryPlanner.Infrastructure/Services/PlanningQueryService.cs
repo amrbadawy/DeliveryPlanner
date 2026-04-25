@@ -488,6 +488,7 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
 
         var tasks = await db.Tasks
             .Include(t => t.EffortBreakdown)
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
 
         var targetTasks = tasks
@@ -623,11 +624,8 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
         // Load tasks with effort breakdown for MaxFte
         var tasks = await db.Tasks
             .Include(t => t.EffortBreakdown)
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
-
-        // DEBUG: Log effort breakdown per task
-        var effortByTaskDebug = tasks.ToDictionary(t => t.TaskId, t => t.EffortBreakdown.Select(e => $"{e.Role}({e.EstimationDays}d)").ToList());
-        System.Diagnostics.Debug.WriteLine($"[QUERY] Tasks with effort: {tasks.Count}. Sample: {string.Join("; ", effortByTaskDebug.Select(kv => $"{kv.Key}:[{string.Join(",", kv.Value)}]").Take(5))}");
 
         var effortByTask = tasks.ToDictionary(
             t => t.TaskId,
@@ -738,10 +736,6 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
                 grouped.Add(new TaskGanttSegmentsDto(task.TaskId, estimatedSegments));
             }
         }
-
-        System.Diagnostics.Debug.WriteLine($"[QueryService] GetGanttSegmentsAsync: {grouped.Count} tasks, {grouped.Sum(g => g.Segments.Count)} segments total. " +
-            $"Roles: {string.Join(",", grouped.SelectMany(g => g.Segments).Select(s => s.Role).Distinct().OrderBy(r => r))}. " +
-            $"Estimated: {grouped.Sum(g => g.Segments.Count(s => s.IsEstimated))}");
 
         return grouped;
     }

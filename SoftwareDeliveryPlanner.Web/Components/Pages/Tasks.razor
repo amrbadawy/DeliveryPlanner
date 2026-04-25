@@ -4,6 +4,7 @@
 @using SoftwareDeliveryPlanner.Application.Tasks.Queries
 @using SoftwareDeliveryPlanner.Application.Tasks.Commands
 @using SoftwareDeliveryPlanner.Application.Planning.Commands
+@using SoftwareDeliveryPlanner.Application.Resources.Queries
 @using SoftwareDeliveryPlanner.Domain.Models
 @using SoftwareDeliveryPlanner.Domain
 @inject IMediator Mediator
@@ -76,6 +77,28 @@
     </div>
 </div>
 
+@if (isLoaded && tasks.Any() && (unscheduledTaskCount > 0 || resourceGapTaskCount > 0 || !schedulerHasRun))
+{
+    <div class="alert @(schedulerHasRun ? "alert-warning" : "alert-info") d-flex align-items-center mb-3" data-testid="task-warnings-banner">
+        <i class="bi @(schedulerHasRun ? "bi-exclamation-triangle-fill" : "bi-info-circle-fill") me-2"></i>
+        <div>
+            @if (!schedulerHasRun)
+            {
+                <span>Run the scheduler to generate a delivery plan and identify scheduling issues.</span>
+            }
+            else
+            {
+                var parts = new List<string>();
+                if (unscheduledTaskCount > 0)
+                    parts.Add($"{unscheduledTaskCount} task(s) are unscheduled and will not appear in the plan");
+                if (resourceGapTaskCount > 0)
+                    parts.Add($"{resourceGapTaskCount} task(s) have no matching active resources for required roles");
+                <span>@string.Join(". ", parts).</span>
+            }
+        </div>
+    </div>
+}
+
 @if (showModal)
 {
     <div class="modal d-block modal-backdrop-custom" role="dialog" aria-modal="true" aria-labelledby="tasks-modal-title" data-testid="tasks-modal">
@@ -137,7 +160,7 @@
                                     var isFirst = effortEntries.IndexOf(entry) == 0;
                                     <tr data-testid="effort-row-@entry.Role">
                                         <td>
-                                            <span class="badge bg-primary me-1">@entry.Role</span>
+                                            <span class="badge role-badge role-badge-@entry.Role.ToLowerInvariant() me-1">@entry.Role</span>
                                             <small class="text-muted">@DomainConstants.ResourceRole.GetDisplayName(entry.Role)</small>
                                             @if (isRequired) { <span class="text-danger ms-1">*</span> }
                                         </td>
@@ -380,10 +403,29 @@ else
                                 <a href="/tasks/@task.TaskId" @onclick:stopPropagation data-testid="tasks-details-link-@task.TaskId">@task.TaskId</a>
                             </td>
                             <td>@task.ServiceName</td>
-                            <td>@task.TotalEstimationDays</td>
+                            <td>
+                                @task.TotalEstimationDays
+                                @if (GetUncoveredRoles(task) is { Count: > 0 } uncovered)
+                                {
+                                    <span class="text-warning ms-1" title="No active resource for role(s): @string.Join(", ", uncovered)" data-testid="resource-gap-warning-@task.TaskId">
+                                        <i class="bi bi-exclamation-triangle-fill"></i>
+                                    </span>
+                                }
+                            </td>
                             <td>@(task.Phase ?? "")</td>
                             <td>@task.Priority</td>
-                            <td>@task.PlannedStart?.ToString("yyyy-MM-dd")</td>
+                            <td>
+                                @if (task.PlannedStart.HasValue)
+                                {
+                                    @task.PlannedStart.Value.ToString("yyyy-MM-dd")
+                                }
+                                else if (schedulerHasRun)
+                                {
+                                    <span class="text-warning" title="This task was not scheduled. Check dependencies and resource availability." data-testid="unscheduled-warning-@task.TaskId">
+                                        <i class="bi bi-exclamation-triangle-fill me-1"></i>&mdash;
+                                    </span>
+                                }
+                            </td>
                             <td>@task.PlannedFinish?.ToString("yyyy-MM-dd")</td>
                             <td>@task.Duration</td>
                             <td>
@@ -425,6 +467,7 @@ else
 
 @code {
     private List<TaskItem> tasks = new();
+    private List<TeamMember> resources = new();
     private bool showModal = false;
     private bool showDeleteConfirm = false;
     private TaskItem? editingTask;

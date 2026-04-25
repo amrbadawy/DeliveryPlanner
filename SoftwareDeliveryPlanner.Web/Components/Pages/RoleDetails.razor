@@ -104,7 +104,7 @@ else
         <div class="card-body">
             <dl class="row mb-0">
                 <dt class="col-sm-3">Code</dt>
-                <dd class="col-sm-9" data-testid="role-detail-val-code">@role.Code</dd>
+                <dd class="col-sm-9" data-testid="role-detail-val-code"><span class="badge role-badge role-badge-@role.Code.ToLowerInvariant()">@role.Code</span></dd>
 
                 <dt class="col-sm-3">Display Name</dt>
                 <dd class="col-sm-9" data-testid="role-detail-val-name">@role.DisplayName</dd>

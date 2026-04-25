@@ -69,6 +69,16 @@
     --font-size-lg: 1rem;
     --font-size-xl: 1.125rem;
     --font-size-2xl: 1.5rem;
+
+    /* ── Semantic: Role colours (single source of truth) ──── */
+    --color-role-dev: #3b82f6;   /* Blue    */
+    --color-role-qa:  #22c55e;   /* Green   */
+    --color-role-ba:  #a855f7;   /* Purple  */
+    --color-role-sa:  #06b6d4;   /* Cyan    */
+    --color-role-ux:  #f43f5e;   /* Rose    */
+    --color-role-ui:  #f97316;   /* Orange  */
+    --color-role-ops: #eab308;   /* Yellow  */
+    --color-role-pm:  #64748b;   /* Slate   */
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -131,6 +141,16 @@
 
     /* ── Focus Ring ───────────────────────────────────────── */
     --color-focus-ring: rgba(137, 180, 250, 0.25);
+
+    /* ── Role colours (brighter variants for dark surfaces) ── */
+    --color-role-dev: #60a5fa;   /* Blue-400    */
+    --color-role-qa:  #4ade80;   /* Green-400   */
+    --color-role-ba:  #c084fc;   /* Purple-400  */
+    --color-role-sa:  #22d3ee;   /* Cyan-400    */
+    --color-role-ux:  #fb7185;   /* Rose-400    */
+    --color-role-ui:  #fb923c;   /* Orange-400  */
+    --color-role-ops: #facc15;   /* Yellow-400  */
+    --color-role-pm:  #94a3b8;   /* Slate-400   */
 
     color-scheme: dark;
 }
@@ -555,28 +575,28 @@ th[role="button"] {
 }
 
 .role-badge-dev,
-.gantt-role-dev { background: #3b82f6; }   /* Blue */
+.gantt-role-dev { background: var(--color-role-dev); }
 
 .role-badge-qa,
-.gantt-role-qa { background: #22c55e; }    /* Green */
+.gantt-role-qa  { background: var(--color-role-qa); }
 
 .role-badge-ba,
-.gantt-role-ba { background: #a855f7; }    /* Purple */
+.gantt-role-ba  { background: var(--color-role-ba); }
 
 .role-badge-sa,
-.gantt-role-sa { background: #06b6d4; }    /* Cyan */
+.gantt-role-sa  { background: var(--color-role-sa); }
 
 .role-badge-ux,
-.gantt-role-ux { background: #f43f5e; }    /* Rose */
+.gantt-role-ux  { background: var(--color-role-ux); }
 
 .role-badge-ui,
-.gantt-role-ui { background: #f97316; }    /* Orange */
+.gantt-role-ui  { background: var(--color-role-ui); }
 
 .role-badge-ops,
-.gantt-role-ops { background: #eab308; }   /* Yellow */
+.gantt-role-ops { background: var(--color-role-ops); }
 
 .role-badge-pm,
-.gantt-role-pm { background: #64748b; }    /* Slate */
+.gantt-role-pm  { background: var(--color-role-pm); }
 
 /* ══════════════════════════════════════════════════════════
    Modal Backdrop (shared)

@@ -438,6 +438,7 @@ internal class SchedulingEngine : ISchedulingEngine
         var tasks = _db.Tasks
             .Include(t => t.EffortBreakdown)
             .Include(t => t.Dependencies)
+            .AsSplitQuery()
             .ToList();
         var resources = _db.Resources.ToList();
         var adjustments = _db.Adjustments.ToList();
@@ -861,7 +862,7 @@ internal class SchedulingEngine : ISchedulingEngine
         using var activity = ActivitySource.StartActivity("PreviewSchedule", ActivityKind.Internal);
 
         // 1. Snapshot current task state before any changes (AsNoTracking so EF stays clean)
-        var tasks = _db.Tasks.Include(t => t.EffortBreakdown).Include(t => t.Dependencies).AsNoTracking().ToList();
+        var tasks = _db.Tasks.Include(t => t.EffortBreakdown).Include(t => t.Dependencies).AsSplitQuery().AsNoTracking().ToList();
         var snapshots = tasks.Select(t => new
         {
             t.TaskId,
@@ -883,7 +884,7 @@ internal class SchedulingEngine : ISchedulingEngine
             foreach (var entry in _db.ChangeTracker.Entries().ToList())
                 entry.State = EntityState.Detached;
 
-            var updatedTasks = _db.Tasks.Include(t => t.EffortBreakdown).Include(t => t.Dependencies).AsNoTracking().ToList();
+            var updatedTasks = _db.Tasks.Include(t => t.EffortBreakdown).Include(t => t.Dependencies).AsSplitQuery().AsNoTracking().ToList();
             var newAllocCount = _db.Allocations.AsNoTracking().Count(a => !a.IsLocked);
 
             // 4. Compute diffs
@@ -956,7 +957,7 @@ internal class SchedulingEngine : ISchedulingEngine
 
     public Dictionary<string, object> GetDashboardKPIs()
     {
-        var tasks = _db.Tasks.Include(t => t.EffortBreakdown).ToList();
+        var tasks = _db.Tasks.Include(t => t.EffortBreakdown).AsSplitQuery().ToList();
         var resources = _db.Resources.Where(r => r.Active == DomainConstants.ActiveStatus.Yes).ToList();
 
         var totalServices = tasks.Count;
@@ -1006,7 +1007,7 @@ internal class SchedulingEngine : ISchedulingEngine
 
     public List<OutputPlanRowDto> GetOutputPlan()
     {
-        var tasks = _db.Tasks.Include(t => t.EffortBreakdown).OrderBy(t => t.SchedulingRank).ToList();
+        var tasks = _db.Tasks.Include(t => t.EffortBreakdown).AsSplitQuery().OrderBy(t => t.SchedulingRank).ToList();
         var output = new List<OutputPlanRowDto>();
 
         for (int i = 0; i < tasks.Count; i++)

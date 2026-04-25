@@ -58,14 +58,6 @@ else
         Plan range: <strong>@planStart.ToString("dd MMMM yyyy")</strong> to <strong>@planEnd.ToString("dd MMMM yyyy")</strong>
         (@totalDays days)
     </div>
-    <div class="alert alert-secondary small mb-2" style="font-size: 11px; max-height: 120px; overflow-y: auto;">
-        <strong>Debug:</strong> Tasks with segments: @segmentsByTask.Count |
-        @foreach (var kv in segmentsByTask.Take(3))
-        {
-            <span>@kv.Key: @string.Join(",", kv.Value.Select(s => $"{s.Role}{(s.IsEstimated?"*":"")}"))</span>
-        }
-        @if (segmentsByTask.Count > 3) { <span>... +@(segmentsByTask.Count - 3) more</span> }
-    </div>
 
     <!-- Legend -->
     <div class="gantt-legend mb-3" data-testid="gantt-legend">
