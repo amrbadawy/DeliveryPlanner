@@ -130,12 +130,12 @@ else
                             <td>@item.TotalEstimationDays</td>
                             <td>@item.StrictDate</td>
                             <td>
-                                <span class="badge bg-@GetStatusColor(item.Status)">
+                                <span class="badge @BadgeHelpers.StatusBg(item.Status)">
                                     @item.Status
                                 </span>
                             </td>
                             <td>
-                                <span class="badge bg-@GetRiskColor(item.DeliveryRisk)">
+                                <span class="badge @BadgeHelpers.RiskBadgeClass(item.DeliveryRisk)">
                                     @item.DeliveryRisk
                                 </span>
                             </td>
@@ -258,27 +258,6 @@ else
     {
         var result = await Mediator.Send(new GetOutputPlanQuery());
         output = result.Value;
-    }
-
-    private string GetStatusColor(string? status)
-    {
-        return status switch
-        {
-            DomainConstants.TaskStatus.Completed => "success",
-            DomainConstants.TaskStatus.InProgress => "info",
-            _ => "secondary"
-        };
-    }
-
-    private string GetRiskColor(string? risk)
-    {
-        return risk switch
-        {
-            DomainConstants.DeliveryRisk.OnTrack => "success",
-            DomainConstants.DeliveryRisk.AtRisk => "warning",
-            DomainConstants.DeliveryRisk.Late => "danger",
-            _ => "secondary"
-        };
     }
 
     private async Task ExportToCsv()

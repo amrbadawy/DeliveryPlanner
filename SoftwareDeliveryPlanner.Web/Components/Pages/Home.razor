@@ -75,7 +75,7 @@ else
                 {
                     <div class="d-flex align-items-center gap-2 py-1 border-bottom">
                         <i class="bi bi-arrow-right-circle text-danger"></i>
-                        <span><strong>@n.ServiceName</strong> (@n.TaskId) moved from <span class="badge bg-secondary">@n.PreviousRisk</span> to <span class="badge bg-danger">@n.CurrentRisk</span></span>
+                        <span><strong>@n.ServiceName</strong> (@n.TaskId) moved from <span class="badge @BadgeHelpers.RiskBadgeClass(n.PreviousRisk)">@n.PreviousRisk</span> to <span class="badge @BadgeHelpers.RiskBadgeClass(n.CurrentRisk)">@n.CurrentRisk</span></span>
                         <small class="text-muted ms-auto">@n.CreatedAt.ToString("MMM dd HH:mm")</small>
                     </div>
                 }

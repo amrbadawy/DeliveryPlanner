@@ -155,7 +155,7 @@ else
                                 <td><a href="/tasks/@task.TaskId" class="text-decoration-none" data-testid="task-link-@task.TaskId">@task.TaskId</a></td>
                                 <td>@task.ServiceName</td>
                                 <td>
-                                    <span class="badge bg-@(task.Status == DomainConstants.TaskStatus.Completed ? "success" : task.Status == DomainConstants.TaskStatus.InProgress ? "info" : "secondary")">
+                                    <span class="badge @BadgeHelpers.StatusBg(task.Status)">
                                         @task.Status
                                     </span>
                                 </td>

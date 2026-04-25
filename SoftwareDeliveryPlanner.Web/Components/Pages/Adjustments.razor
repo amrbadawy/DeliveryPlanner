@@ -212,7 +212,7 @@ else
                         <tr data-testid="adjustments-row-@a.Id">
                             <td>@a.ResourceId</td>
                             <td>
-                                <span class="badge bg-@(a.AdjType == DomainConstants.AdjustmentType.Vacation ? "info" : a.AdjType == DomainConstants.AdjustmentType.Training ? "primary" : a.AdjType == DomainConstants.AdjustmentType.SickLeave ? "warning text-dark" : "secondary")">
+                                <span class="badge @BadgeHelpers.AdjustmentTypeBadgeClass(a.AdjType)">
                                     @a.AdjType
                                 </span>
                             </td>

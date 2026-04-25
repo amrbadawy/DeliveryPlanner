@@ -51,7 +51,16 @@ else
                 <dd class="col-sm-9" data-testid="td-dev-estimation">@task.TotalEstimationDays</dd>
 
                 <dt class="col-sm-3">Priority</dt>
-                <dd class="col-sm-9" data-testid="td-priority">@task.Priority</dd>
+                <dd class="col-sm-9" data-testid="td-priority">
+                    @if (BadgeHelpers.ShowPriorityBadge(task.Priority))
+                    {
+                        <span class="badge @BadgeHelpers.PriorityBadgeClass(task.Priority)">P@task.Priority</span>
+                    }
+                    else
+                    {
+                        @task.Priority
+                    }
+                </dd>
 
                 <dt class="col-sm-3">Strict Date</dt>
                 <dd class="col-sm-9" data-testid="td-strict-date">@(task.StrictDate?.ToString("yyyy-MM-dd") ?? "None")</dd>
@@ -61,14 +70,14 @@ else
 
                 <dt class="col-sm-3">Status</dt>
                 <dd class="col-sm-9" data-testid="td-status">
-                    <span class="badge bg-@(task.Status == DomainConstants.TaskStatus.Completed ? "success" : task.Status == DomainConstants.TaskStatus.InProgress ? "info" : "secondary")">
+                    <span class="badge @BadgeHelpers.StatusBg(task.Status)">
                         @task.Status
                     </span>
                 </dd>
 
                 <dt class="col-sm-3">Risk</dt>
                 <dd class="col-sm-9" data-testid="td-risk">
-                    <span class="badge bg-@(task.DeliveryRisk == DomainConstants.DeliveryRisk.OnTrack ? "success" : task.DeliveryRisk == DomainConstants.DeliveryRisk.AtRisk ? "warning" : "danger")">
+                    <span class="badge @BadgeHelpers.RiskBadgeClass(task.DeliveryRisk)">
                         @task.DeliveryRisk
                     </span>
                 </dd>
@@ -265,7 +274,7 @@ else
                                 <i class="bi bi-person-circle fs-4 text-primary"></i>
                                 <div>
                                     <a href="/resources/@alloc.ResourceId" class="fw-bold text-decoration-none" data-testid="alloc-link-@alloc.ResourceId">@alloc.ResourceName</a>
-                                    <div class="small text-muted"><span class="badge role-badge role-badge-@alloc.Role.ToLowerInvariant() me-1">@alloc.Role</span>@alloc.Team</div>
+                                    <div class="small text-muted"><span class="badge role-badge role-badge-@alloc.Role.ToLowerInvariant() me-1">@alloc.Role</span><span class="badge bg-secondary bg-opacity-25 text-secondary">@alloc.Team</span></div>
                                 </div>
                             </div>
                             <div class="small">

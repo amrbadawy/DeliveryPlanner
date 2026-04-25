@@ -5,6 +5,7 @@
 @using SoftwareDeliveryPlanner.Application.Roles.Commands
 @using SoftwareDeliveryPlanner.Application.Resources.Queries
 @using SoftwareDeliveryPlanner.Domain.Models
+@using SoftwareDeliveryPlanner.Domain
 @inject IMediator Mediator
 @inject NavigationManager NavigationManager
 
@@ -169,7 +170,7 @@ else
                                 <td>@res.AvailabilityPct.ToString("F0")%</td>
                                 <td>@res.SeniorityLevel</td>
                                 <td>
-                                    <span class="badge bg-@(res.Active == "Yes" ? "success" : "secondary")">@res.Active</span>
+                                    <span class="badge bg-@(res.Active == DomainConstants.ActiveStatus.Yes ? "success" : "secondary")">@res.Active</span>
                                 </td>
                             </tr>
                         }

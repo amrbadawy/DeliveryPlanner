@@ -167,7 +167,7 @@ else
                                 </span>
                             </td>
                             <td>
-                                <span class="badge bg-@(h.HolidayType == DomainConstants.HolidayType.National ? "primary" : h.HolidayType == DomainConstants.HolidayType.Religious ? "warning text-dark" : "info")">
+                                <span class="badge @BadgeHelpers.HolidayTypeBadgeClass(h.HolidayType)">
                                     @h.HolidayType
                                 </span>
                             </td>

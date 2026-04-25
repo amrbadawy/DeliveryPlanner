@@ -166,9 +166,9 @@
                             <div class="card-header"><strong>@CompareA.ScenarioName</strong></div>
                             <div class="card-body">
                                 <div class="row text-center">
-                                    <div class="col"><small class="text-muted">On Track</small><div class="fw-bold text-success">@CompareA.OnTrackCount</div></div>
-                                    <div class="col"><small class="text-muted">At Risk</small><div class="fw-bold text-warning">@CompareA.AtRiskCount</div></div>
-                                    <div class="col"><small class="text-muted">Late</small><div class="fw-bold text-danger">@CompareA.LateCount</div></div>
+                                    <div class="col"><small class="text-muted">On Track</small><div><span class="badge bg-success">@CompareA.OnTrackCount</span></div></div>
+                                    <div class="col"><small class="text-muted">At Risk</small><div><span class="badge bg-warning text-dark">@CompareA.AtRiskCount</span></div></div>
+                                    <div class="col"><small class="text-muted">Late</small><div><span class="badge bg-danger">@CompareA.LateCount</span></div></div>
                                     <div class="col"><small class="text-muted">Finish</small><div class="fw-bold">@(CompareA.LatestFinish?.ToString("MMM dd") ?? "—")</div></div>
                                 </div>
                             </div>
@@ -179,9 +179,9 @@
                             <div class="card-header"><strong>@CompareB.ScenarioName</strong></div>
                             <div class="card-body">
                                 <div class="row text-center">
-                                    <div class="col"><small class="text-muted">On Track</small><div class="fw-bold text-success">@CompareB.OnTrackCount</div></div>
-                                    <div class="col"><small class="text-muted">At Risk</small><div class="fw-bold text-warning">@CompareB.AtRiskCount</div></div>
-                                    <div class="col"><small class="text-muted">Late</small><div class="fw-bold text-danger">@CompareB.LateCount</div></div>
+                                    <div class="col"><small class="text-muted">On Track</small><div><span class="badge bg-success">@CompareB.OnTrackCount</span></div></div>
+                                    <div class="col"><small class="text-muted">At Risk</small><div><span class="badge bg-warning text-dark">@CompareB.AtRiskCount</span></div></div>
+                                    <div class="col"><small class="text-muted">Late</small><div><span class="badge bg-danger">@CompareB.LateCount</span></div></div>
                                     <div class="col"><small class="text-muted">Finish</small><div class="fw-bold">@(CompareB.LatestFinish?.ToString("MMM dd") ?? "—")</div></div>
                                 </div>
                             </div>

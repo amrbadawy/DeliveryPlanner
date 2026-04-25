@@ -231,6 +231,7 @@ else
                         <th role="button" @onclick='() => ApplySort("DailyCapacity")' aria-sort="@AriaSort("DailyCapacity")" data-testid="resources-sort-cap">Capacity @SortIndicator("DailyCapacity")</th>
                         <th role="button" @onclick='() => ApplySort("StartDate")' aria-sort="@AriaSort("StartDate")" data-testid="resources-sort-start">Start Date @SortIndicator("StartDate")</th>
                         <th role="button" @onclick='() => ApplySort("Active")' aria-sort="@AriaSort("Active")" data-testid="resources-sort-active">Active @SortIndicator("Active")</th>
+                        <th role="button" @onclick='() => ApplySort("SeniorityLevel")' aria-sort="@AriaSort("SeniorityLevel")" data-testid="resources-sort-seniority">Seniority @SortIndicator("SeniorityLevel")</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -250,6 +251,7 @@ else
                                     @(r.Active == DomainConstants.ActiveStatus.Yes ? DomainConstants.ActiveStatus.Yes : DomainConstants.ActiveStatus.No)
                                 </span>
                             </td>
+                            <td>@(r.SeniorityLevel ?? "—")</td>
                             <td>
                                 <button class="btn btn-sm btn-outline-warning" @onclick="() => EditResource(r)" aria-label="Edit @r.ResourceId" data-testid="resources-edit-@r.ResourceId"><i class="bi bi-pencil"></i></button>
                                 <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteResource(r)" aria-label="Delete @r.ResourceId" data-testid="resources-delete-@r.ResourceId"><i class="bi bi-trash"></i></button>
@@ -345,6 +347,7 @@ else
                     "DailyCapacity" => sortAscending ? result.OrderBy(r => r.DailyCapacity) : result.OrderByDescending(r => r.DailyCapacity),
                     "StartDate" => sortAscending ? result.OrderBy(r => r.StartDate) : result.OrderByDescending(r => r.StartDate),
                     "Active" => sortAscending ? result.OrderBy(r => r.Active) : result.OrderByDescending(r => r.Active),
+                    "SeniorityLevel" => sortAscending ? result.OrderBy(r => r.SeniorityLevel) : result.OrderByDescending(r => r.SeniorityLevel),
                     _ => result
                 };
             }
