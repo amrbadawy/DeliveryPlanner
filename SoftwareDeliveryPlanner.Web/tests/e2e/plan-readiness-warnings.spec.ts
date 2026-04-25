@@ -375,4 +375,60 @@ test.describe('Plan readiness warnings', () => {
       }
     }
   });
+
+  test('banner shows filter context when status filter is active', async ({ page }) => {
+    await gotoPage(page, '/tasks');
+    const table = page.getByTestId('tasks-table');
+    await waitForTableRows(table);
+
+    await page.getByTestId('tasks-refresh').click();
+    await expect(page.getByTestId('tasks-refresh')).toBeEnabled({ timeout: 15_000 });
+    await page.waitForTimeout(1000);
+
+    const banner = page.getByTestId('task-warnings-banner');
+    const isBannerVisible = await banner.isVisible().catch(() => false);
+
+    if (isBannerVisible) {
+      // Apply a status filter
+      await fillInputByTestId(page, 'tasks-filter-status', 'NotStarted');
+      await page.waitForTimeout(500);
+
+      const stillVisible = await banner.isVisible().catch(() => false);
+      if (stillVisible) {
+        await expect(banner).toContainText('across all tasks');
+      }
+
+      // Clear filters
+      await page.getByTestId('tasks-clear-filters').click();
+      await page.waitForTimeout(500);
+    }
+  });
+
+  test('banner shows filter context when search is active', async ({ page }) => {
+    await gotoPage(page, '/tasks');
+    const table = page.getByTestId('tasks-table');
+    await waitForTableRows(table);
+
+    await page.getByTestId('tasks-refresh').click();
+    await expect(page.getByTestId('tasks-refresh')).toBeEnabled({ timeout: 15_000 });
+    await page.waitForTimeout(1000);
+
+    const banner = page.getByTestId('task-warnings-banner');
+    const isBannerVisible = await banner.isVisible().catch(() => false);
+
+    if (isBannerVisible) {
+      // Type into the search box
+      await page.getByTestId('tasks-search').fill('SVC');
+      await page.waitForTimeout(1500); // wait for debounce
+
+      const stillVisible = await banner.isVisible().catch(() => false);
+      if (stillVisible) {
+        await expect(banner).toContainText('across all tasks');
+      }
+
+      // Clear search
+      await page.getByTestId('tasks-search').fill('');
+      await page.waitForTimeout(1500);
+    }
+  });
 });

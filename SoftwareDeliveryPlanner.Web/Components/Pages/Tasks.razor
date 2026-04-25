@@ -72,6 +72,10 @@
             </div>
             <div class="col-md-2 text-muted small text-end">
                 @FilteredTasks.Count() of @tasks.Count
+                @if (scheduledFilter == "no")
+                {
+                    <span class="badge bg-warning text-dark ms-1" data-testid="tasks-unscheduled-filter-badge" title="Showing only unscheduled tasks (click Clear to reset)">Unscheduled only</span>
+                }
             </div>
         </div>
     </div>
@@ -80,7 +84,7 @@
 @if (isLoaded && tasks.Any() && (unscheduledTaskCount > 0 || resourceGapTaskCount > 0 || !schedulerHasRun))
 {
     var hasIssues = unscheduledTaskCount > 0 || resourceGapTaskCount > 0;
-    var filtersActive = !string.IsNullOrEmpty(statusFilter) || !string.IsNullOrEmpty(riskFilter) || !string.IsNullOrWhiteSpace(searchTerm);
+    var filtersActive = !string.IsNullOrWhiteSpace(statusFilter) || !string.IsNullOrWhiteSpace(riskFilter) || !string.IsNullOrWhiteSpace(scheduledFilter) || !string.IsNullOrWhiteSpace(searchTerm);
     var scope = filtersActive ? " (across all tasks)" : "";
     <div class="alert @(hasIssues ? "alert-warning" : "alert-info") d-flex align-items-center mb-3" data-testid="task-warnings-banner">
         <i class="bi @(hasIssues ? "bi-exclamation-triangle-fill" : "bi-info-circle-fill") me-2"></i>
@@ -497,6 +501,7 @@ else
     private System.Threading.Timer? _debounceTimer;
     private string statusFilter = string.Empty;
     private string riskFilter = string.Empty;
+    private string scheduledFilter = string.Empty; // "no" = unscheduled only
     private string sortColumn = string.Empty;
     private bool sortAscending = true;
 
@@ -637,6 +642,10 @@ else
             if (!string.IsNullOrEmpty(riskFilter))
                 result = result.Where(t => t.DeliveryRisk == riskFilter);
 
+            // Filter by scheduling state
+            if (scheduledFilter == "no")
+                result = result.Where(t => !t.PlannedStart.HasValue);
+
             // Sort
             if (!string.IsNullOrEmpty(sortColumn))
             {
@@ -684,6 +693,7 @@ else
         searchInput = string.Empty;
         statusFilter = string.Empty;
         riskFilter = string.Empty;
+        scheduledFilter = string.Empty;
         sortColumn = string.Empty;
         sortAscending = true;
     }
@@ -708,6 +718,8 @@ else
             riskFilter = query["risk"]!;
         if (!string.IsNullOrEmpty(query["status"]))
             statusFilter = query["status"]!;
+        if (!string.IsNullOrEmpty(query["scheduled"]))
+            scheduledFilter = query["scheduled"]!;
 
         await LoadTasks();
         isLoaded = true;

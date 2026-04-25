@@ -29,6 +29,19 @@ public class PlanScenario
         if (string.IsNullOrWhiteSpace(scenarioName))
             throw new DomainException("Scenario name is required.");
 
+        if (totalTasks < 0)
+            throw new DomainException("Total tasks must not be negative.");
+        if (onTrack < 0)
+            throw new DomainException("On track count must not be negative.");
+        if (atRisk < 0)
+            throw new DomainException("At risk count must not be negative.");
+        if (late < 0)
+            throw new DomainException("Late count must not be negative.");
+        if (unscheduled < 0)
+            throw new DomainException("Unscheduled count must not be negative.");
+        if (onTrack + atRisk + late + unscheduled != totalTasks)
+            throw new DomainException("Status counts (on track + at risk + late + unscheduled) must equal total tasks.");
+
         return new PlanScenario
         {
             ScenarioName = scenarioName.Trim(),

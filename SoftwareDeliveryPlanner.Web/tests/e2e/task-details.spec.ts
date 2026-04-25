@@ -144,6 +144,58 @@ test.describe('Task Details + Notes', () => {
     }
   });
 
+  test('task detail shows unscheduled warning for task without planned dates', async ({ page }) => {
+    // Run scheduler so some tasks become scheduled and others remain unscheduled
+    await runSchedulerFromDashboard(page);
+    await gotoPage(page, '/tasks');
+    const table = page.getByTestId('tasks-table');
+    await waitForTableRows(table);
+
+    // Look for a task with an unscheduled warning icon
+    const unschedIcon = page.locator('[data-testid^="unscheduled-warning-"]').first();
+    const hasUnsched = await unschedIcon.isVisible().catch(() => false);
+
+    if (hasUnsched) {
+      const row = unschedIcon.locator('xpath=ancestor::tr');
+      const taskLink = row.locator('a').first();
+      await taskLink.click();
+      await expect(page.getByTestId('task-details-card')).toBeVisible();
+
+      // Unscheduled warning should be visible on the detail page
+      const warnings = page.getByTestId('task-detail-warnings');
+      await expect(warnings).toBeVisible();
+      await expect(page.getByTestId('task-detail-unscheduled-warning')).toBeVisible();
+      await expect(page.getByTestId('task-detail-unscheduled-warning')).toContainText('Unscheduled');
+      await expect(page.getByTestId('task-detail-unscheduled-warning')).toContainText('no planned dates');
+    }
+  });
+
+  test('no warnings shown for a healthy scheduled task', async ({ page }) => {
+    await runSchedulerFromDashboard(page);
+    await gotoPage(page, '/tasks');
+    const table = page.getByTestId('tasks-table');
+    await waitForTableRows(table);
+
+    // Find a task without any warning icons (no resource gap, no unscheduled)
+    const rows = table.locator('tbody tr');
+    const count = await rows.count();
+    for (let i = 0; i < count; i++) {
+      const row = rows.nth(i);
+      const hasGap = await row.locator('[data-testid^="resource-gap-warning-"]').isVisible().catch(() => false);
+      const hasUnsched = await row.locator('[data-testid^="unscheduled-warning-"]').isVisible().catch(() => false);
+      if (!hasGap && !hasUnsched) {
+        // Navigate to this healthy task's detail page
+        const taskLink = row.locator('a').first();
+        await taskLink.click();
+        await expect(page.getByTestId('task-details-card')).toBeVisible();
+
+        // No warning card should be present
+        await expect(page.getByTestId('task-detail-warnings')).toBeHidden();
+        break;
+      }
+    }
+  });
+
   test('edit button opens existing tasks edit modal for same task', async ({ page }) => {
     await gotoPage(page, '/tasks');
     const table = page.getByTestId('tasks-table');

@@ -603,6 +603,13 @@ else
 
         isUnscheduled = !task.PlannedStart.HasValue;
 
+        // Skip gap computation if resource load failed — avoid false positives
+        if (!resResult.IsSuccess)
+        {
+            uncoveredRoles = new();
+            return;
+        }
+
         var activeByRole = allResources
             .Where(r => r.Active == DomainConstants.ActiveStatus.Yes)
             .GroupBy(r => r.Role, StringComparer.OrdinalIgnoreCase)
@@ -782,6 +789,7 @@ else
             await Mediator.Send(command);
 
             await LoadTaskData();
+            await LoadResourcesAndComputeWarnings();
             isTimelineLoading = true;
             await LoadTimelineData();
             isAllocationsLoading = true;
@@ -843,6 +851,7 @@ else
             await Mediator.Send(command);
 
             await LoadTaskData();
+            await LoadResourcesAndComputeWarnings();
             isTimelineLoading = true;
             await LoadTimelineData();
             isAllocationsLoading = true;

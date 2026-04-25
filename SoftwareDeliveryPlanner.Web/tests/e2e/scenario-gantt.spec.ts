@@ -50,6 +50,7 @@ test.describe('Scenario Gantt Chart', () => {
     await expect(kpis).toContainText('On Track');
     await expect(kpis).toContainText('At Risk');
     await expect(kpis).toContainText('Late');
+    await expect(kpis).toContainText('Unscheduled');
     await expect(kpis).toContainText('Latest Finish');
     await expect(kpis).toContainText('Total Est.');
   });

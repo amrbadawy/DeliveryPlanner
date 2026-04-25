@@ -158,7 +158,7 @@ else
             </div>
         </div>
         <div class="col-md-3">
-            <div class="kpi-card p-3 kpi-clickable @(unscheduled > 0 ? "kpi-warning" : "")" @onclick='() => NavigateToTasks("", "")' @onkeydown='(e) => OnKpiKeyDown(e, "", "")' role="button" tabindex="0" title="View tasks — unscheduled tasks shown with warnings" data-testid="kpi-unscheduled">
+            <div class="kpi-card p-3 kpi-clickable @(unscheduled > 0 ? "kpi-warning" : "")" @onclick='() => NavigateToTasks("scheduled", "no")' @onkeydown='(e) => OnKpiKeyDown(e, "scheduled", "no")' role="button" tabindex="0" title="View unscheduled tasks" data-testid="kpi-unscheduled">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <div class="kpi-label">Unscheduled</div>

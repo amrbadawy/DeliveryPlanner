@@ -46,7 +46,14 @@ else if (!scheduledTasks.Any())
     <div class="empty-state" data-testid="gantt-empty">
         <div class="empty-icon"><i class="bi bi-bar-chart-steps"></i></div>
         <h5>No scheduled tasks</h5>
-        <p>Click Refresh to run the scheduler and generate the Gantt chart.</p>
+        @if (totalTaskCount > 0)
+        {
+            <p>@totalTaskCount task(s) exist but none have planned dates yet. Click Refresh to run the scheduler and generate the Gantt chart.</p>
+        }
+        else
+        {
+            <p>Click Refresh to run the scheduler and generate the Gantt chart.</p>
+        }
         <button class="btn btn-outline-secondary" @onclick="RefreshData">
             <i class="bi bi-arrow-clockwise"></i> Refresh
         </button>

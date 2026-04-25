@@ -75,4 +75,23 @@ test.describe('Dashboard Features', () => {
     await expect(kpiCard).toBeVisible();
     await expect(kpiCard).toContainText('Unscheduled');
   });
+
+  test('clicking unscheduled KPI navigates to tasks with filter', async ({ page }) => {
+    await runSchedulerFromDashboard(page);
+    await gotoPage(page, '/');
+
+    await expect(page.getByTestId('dashboard-skeleton-kpi')).toBeHidden({ timeout: 15_000 });
+
+    const kpiCard = page.getByTestId('kpi-unscheduled');
+    await expect(kpiCard).toBeVisible();
+    await kpiCard.click();
+
+    // Should navigate to the tasks page with the scheduled=no filter
+    await expect(page).toHaveURL(/\/tasks\?scheduled=no/);
+
+    // The unscheduled filter badge should be visible
+    const badge = page.getByTestId('tasks-unscheduled-filter-badge');
+    await expect(badge).toBeVisible();
+    await expect(badge).toContainText('Unscheduled only');
+  });
 });

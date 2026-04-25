@@ -55,6 +55,67 @@ public class PlanScenarioDomainTests
     }
 
     [Fact]
+    public void Create_NonZeroUnscheduledCount_IsStored()
+    {
+        var scenario = PlanScenario.Create("With Unscheduled", 10, 3, 2, 1, 4, null, null, 50.0, null, TestTimestamp);
+
+        Assert.Equal(4, scenario.UnscheduledCount);
+        Assert.Equal(10, scenario.TotalTasks);
+        Assert.Equal(3, scenario.OnTrackCount);
+        Assert.Equal(2, scenario.AtRiskCount);
+        Assert.Equal(1, scenario.LateCount);
+    }
+
+    [Fact]
+    public void Create_AllUnscheduled_IsValid()
+    {
+        var scenario = PlanScenario.Create("All Unscheduled", 5, 0, 0, 0, 5, null, null, 25.0, null, TestTimestamp);
+
+        Assert.Equal(5, scenario.UnscheduledCount);
+        Assert.Equal(0, scenario.OnTrackCount);
+    }
+
+    [Theory]
+    [InlineData(-1, 0, 0, 0, 0)]
+    [InlineData(5, -1, 0, 0, 0)]
+    [InlineData(5, 0, -1, 0, 0)]
+    [InlineData(5, 0, 0, -1, 0)]
+    [InlineData(5, 0, 0, 0, -1)]
+    public void Create_NegativeCount_ThrowsDomainException(int total, int onTrack, int atRisk, int late, int unscheduled)
+    {
+        var ex = Assert.Throws<DomainException>(() =>
+            PlanScenario.Create("Test", total, onTrack, atRisk, late, unscheduled, null, null, 0, null, TestTimestamp));
+
+        Assert.Contains("negative", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(5, 3, 2, 1, 1)]   // sum = 7 > 5
+    [InlineData(10, 5, 3, 2, 1)]  // sum = 11 > 10
+    [InlineData(5, 3, 2, 1, 0)]   // sum = 6 > 5
+    [InlineData(5, 0, 0, 0, 0)]   // sum = 0 < 5
+    public void Create_SumMismatch_ThrowsDomainException(int total, int onTrack, int atRisk, int late, int unscheduled)
+    {
+        var ex = Assert.Throws<DomainException>(() =>
+            PlanScenario.Create("Test", total, onTrack, atRisk, late, unscheduled, null, null, 0, null, TestTimestamp));
+
+        Assert.Contains("must equal total tasks", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(10, 5, 3, 2, 0)]
+    [InlineData(10, 3, 2, 1, 4)]
+    [InlineData(0, 0, 0, 0, 0)]
+    [InlineData(1, 0, 0, 0, 1)]
+    public void Create_ValidSums_Succeeds(int total, int onTrack, int atRisk, int late, int unscheduled)
+    {
+        var scenario = PlanScenario.Create("Valid", total, onTrack, atRisk, late, unscheduled, null, null, 0, null, TestTimestamp);
+
+        Assert.Equal(total, scenario.TotalTasks);
+        Assert.Equal(onTrack + atRisk + late + unscheduled, scenario.TotalTasks);
+    }
+
+    [Fact]
     public void AddTaskSnapshot_AddsToCollection()
     {
         var scenario = PlanScenario.Create("Test", 1, 1, 0, 0, 0, null, null, 5.0, null, TestTimestamp);
