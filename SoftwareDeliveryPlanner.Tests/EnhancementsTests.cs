@@ -747,7 +747,7 @@ public class Enhancement4_DependencyPersistenceTests : OrchestratorFixture
             IsNew: true), CancellationToken.None);
 
         await using var db = await Factory.CreateDbContextAsync();
-        var task = await db.Tasks.Include(t => t.Dependencies).FirstAsync(t => t.TaskId == "FSD-001");
+        var task = await db.Tasks.Include(t => t.Dependencies).AsSplitQuery().FirstAsync(t => t.TaskId == "FSD-001");
         Assert.Single(task.Dependencies);
         Assert.Equal("FS", task.Dependencies.First().Type);
         Assert.Equal("SVC-001", task.Dependencies.First().PredecessorTaskId);
@@ -764,7 +764,7 @@ public class Enhancement4_DependencyPersistenceTests : OrchestratorFixture
             IsNew: true), CancellationToken.None);
 
         await using var db = await Factory.CreateDbContextAsync();
-        var task = await db.Tasks.Include(t => t.Dependencies).FirstAsync(t => t.TaskId == "SSD-001");
+        var task = await db.Tasks.Include(t => t.Dependencies).AsSplitQuery().FirstAsync(t => t.TaskId == "SSD-001");
         Assert.Single(task.Dependencies);
         Assert.Equal("SS", task.Dependencies.First().Type);
         Assert.Equal(2, task.Dependencies.First().LagDays);
@@ -793,7 +793,7 @@ public class Enhancement4_DependencyPersistenceTests : OrchestratorFixture
             IsNew: false), CancellationToken.None);
 
         await using var db2 = await Factory.CreateDbContextAsync();
-        var updated = await db2.Tasks.Include(t => t.Dependencies).FirstAsync(t => t.TaskId == "UPD-001");
+        var updated = await db2.Tasks.Include(t => t.Dependencies).AsSplitQuery().FirstAsync(t => t.TaskId == "UPD-001");
         // Should have exactly 1 dependency (SVC-002), not 2
         Assert.Single(updated.Dependencies);
         Assert.Equal("SVC-002", updated.Dependencies.First().PredecessorTaskId);
@@ -822,7 +822,7 @@ public class Enhancement4_DependencyPersistenceTests : OrchestratorFixture
             IsNew: false), CancellationToken.None);
 
         await using var db2 = await Factory.CreateDbContextAsync();
-        var updated = await db2.Tasks.Include(t => t.Dependencies).FirstAsync(t => t.TaskId == "CLR-001");
+        var updated = await db2.Tasks.Include(t => t.Dependencies).AsSplitQuery().FirstAsync(t => t.TaskId == "CLR-001");
         Assert.Empty(updated.Dependencies);
         Assert.Null(updated.DependsOnTaskIds);
     }

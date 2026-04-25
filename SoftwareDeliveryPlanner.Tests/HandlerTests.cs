@@ -176,7 +176,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
     public async Task Handle_UpdateTask_ModifiesExistingTask()
     {
         await using var db = await Factory.CreateDbContextAsync();
-        var existing = await db.Tasks.Include(t => t.EffortBreakdown).FirstAsync();
+        var existing = await db.Tasks.Include(t => t.EffortBreakdown).AsSplitQuery().FirstAsync();
         var originalName = existing.ServiceName;
 
         var handler = new UpsertTaskCommandHandler(TaskOrchestrator);
@@ -232,7 +232,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             IsNew: true), CancellationToken.None);
 
         await using var db = await Factory.CreateDbContextAsync();
-        var task = await db.Tasks.Include(t => t.Dependencies).FirstAsync(t => t.TaskId == "DEP-01");
+        var task = await db.Tasks.Include(t => t.Dependencies).AsSplitQuery().FirstAsync(t => t.TaskId == "DEP-01");
         Assert.Equal("SVC-001,SVC-002", task.DependsOnTaskIds);
     }
 
@@ -251,7 +251,7 @@ public class UpsertTaskCommandHandlerTests : OrchestratorFixture
             IsNew: true), CancellationToken.None);
 
         await using var db = await Factory.CreateDbContextAsync();
-        var task = await db.Tasks.Include(t => t.Dependencies).FirstAsync(t => t.TaskId == "NDP-01");
+        var task = await db.Tasks.Include(t => t.Dependencies).AsSplitQuery().FirstAsync(t => t.TaskId == "NDP-01");
         Assert.Null(task.DependsOnTaskIds);
     }
 }
@@ -296,6 +296,7 @@ public class UpdateTaskEffortBreakdownCommandHandlerTests : OrchestratorFixture
         var existing = await db.Tasks
             .Include(t => t.EffortBreakdown)
             .Include(t => t.Dependencies)
+            .AsSplitQuery()
             .FirstAsync();
 
         var originalServiceName = existing.ServiceName;
@@ -323,6 +324,7 @@ public class UpdateTaskEffortBreakdownCommandHandlerTests : OrchestratorFixture
         var updated = await verifyDb.Tasks
             .Include(t => t.EffortBreakdown)
             .Include(t => t.Dependencies)
+            .AsSplitQuery()
             .FirstAsync(t => t.Id == existing.Id);
 
         Assert.Equal(originalServiceName, updated.ServiceName);

@@ -31,6 +31,7 @@ internal sealed class AdjustmentService : ServiceBase, IAdjustmentOrchestrator
 
         var teamMember = await db.Resources
             .Include(r => r.Adjustments)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(r => r.ResourceId == resourceId, cancellationToken)
             ?? throw new DomainException($"Resource '{resourceId}' not found.");
 
@@ -47,6 +48,7 @@ internal sealed class AdjustmentService : ServiceBase, IAdjustmentOrchestrator
         {
             var teamMember = await db.Resources
                 .Include(r => r.Adjustments)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(r => r.ResourceId == adjustment.ResourceId, cancellationToken);
 
             teamMember?.RemoveAdjustment(id);

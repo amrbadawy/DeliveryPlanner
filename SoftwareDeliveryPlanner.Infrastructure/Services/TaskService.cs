@@ -111,6 +111,7 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
 
         var task = await db.Tasks
             .Include(t => t.EffortBreakdown)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(t => t.TaskId == taskId, cancellationToken)
             ?? throw new InvalidOperationException($"Task '{taskId}' was not found.");
 

@@ -27,6 +27,7 @@ internal sealed class ResourceService : ServiceBase, IResourceOrchestrator
         await using var db = await ReadOnlyDbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Resources
             .Include(r => r.Adjustments)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(r => r.ResourceId == resourceId, cancellationToken);
     }
 
