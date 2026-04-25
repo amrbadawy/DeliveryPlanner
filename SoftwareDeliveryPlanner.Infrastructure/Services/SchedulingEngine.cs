@@ -702,8 +702,12 @@ internal class SchedulingEngine : ISchedulingEngine
                         var used = usedHours.GetValueOrDefault(resource.ResourceId)?.GetValueOrDefault(calDate) ?? 0;
                         var available = perResourceHours[resource.ResourceId] - used;
                         var give = Math.Min(available, remainingHours);
-                        give = DomainConstants.MinAllocationHours * Math.Floor(give / DomainConstants.MinAllocationHours);
-                        if (give < DomainConstants.MinAllocationHours) continue;
+                        if (give >= DomainConstants.MinAllocationHours)
+                            give = DomainConstants.MinAllocationHours * Math.Floor(give / DomainConstants.MinAllocationHours);
+                        else if (remainingHours < DomainConstants.MinAllocationHours && give >= remainingHours)
+                            give = remainingHours; // allow final fractional allocation to complete phase
+                        else
+                            continue;
 
                         var newCumulative = phaseCompletedHours[taskId].GetValueOrDefault(phase.Role) + give;
                         var isPhaseComplete = newCumulative >= totalPhaseHours;
@@ -776,6 +780,15 @@ internal class SchedulingEngine : ISchedulingEngine
                 ?? new List<DateTime>();
             var finishes = phaseFinishDate.GetValueOrDefault(taskId)?.Values.Where(d => d.HasValue).Select(d => d!.Value).ToList()
                 ?? new List<DateTime>();
+
+            // Safety net: include last allocation date for phases that have allocations
+            // but didn't formally complete (e.g., due to rounding or resource shortage)
+            var lastAllocByRole = allAllocations
+                .Where(a => a.TaskId.Equals(taskId, StringComparison.OrdinalIgnoreCase))
+                .GroupBy(a => a.Role, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.Max(a => a.CalendarDate))
+                .ToList();
+            finishes.AddRange(lastAllocByRole);
 
             DateTime? plannedStart = starts.Any() ? starts.Min() : null;
             DateTime? plannedFinish = finishes.Any() ? finishes.Max() : null;

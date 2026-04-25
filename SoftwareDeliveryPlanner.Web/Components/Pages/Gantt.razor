@@ -365,6 +365,11 @@ else
 
         var taskStart = task.PlannedStart.Value;
         var taskEnd = task.PlannedFinish.Value;
+
+        // Extend effective end to cover segments that extend beyond PlannedFinish
+        if (segment.SegmentEnd > taskEnd)
+            taskEnd = segment.SegmentEnd;
+
         var taskSpan = (taskEnd - taskStart).TotalDays;
         if (taskSpan < 1) taskSpan = 1;
 
@@ -375,6 +380,8 @@ else
         var widthPct = Math.Max(1, Math.Round(segWidthDays / taskSpan * 100, 2));
         // Clamp to not overflow
         if (leftPct + widthPct > 100) widthPct = 100 - leftPct;
+        // Guarantee minimum visible width
+        if (widthPct < 1) widthPct = 1;
 
         return $"left: {leftPct}%; width: {widthPct}%";
     }
