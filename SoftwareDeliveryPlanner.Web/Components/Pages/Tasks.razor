@@ -433,8 +433,8 @@ else
                                     </span>
                                 }
                             </td>
-                            <td>@task.PlannedFinish?.ToString("yyyy-MM-dd")</td>
-                            <td>@task.Duration</td>
+                            <td>@task.PlannedFinish?.ToString("yyyy-MM-dd")@if (!task.PlannedFinish.HasValue && schedulerHasRun) { <span>&mdash;</span> }</td>
+                            <td>@if (task.Duration > 0 || !schedulerHasRun) { @task.Duration } else { <span>&mdash;</span> }</td>
                             <td>
                                 <span class="badge @BadgeHelpers.StatusBg(task.Status)">
                                     @task.Status
