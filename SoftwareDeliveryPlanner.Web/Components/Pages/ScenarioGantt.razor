@@ -79,6 +79,12 @@ else
         </div>
         <div class="col">
             <div class="card border-0 shadow-sm text-center p-2">
+                <small class="text-muted">Unscheduled</small>
+                <div>@if (scenario.UnscheduledCount > 0) { <span class="badge bg-warning text-dark">@scenario.UnscheduledCount</span> } else { <span class="text-muted">0</span> }</div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card border-0 shadow-sm text-center p-2">
                 <small class="text-muted">Latest Finish</small>
                 <div class="fw-bold">@(scenario.LatestFinish?.ToString("MMM dd, yyyy") ?? "\u2014")</div>
             </div>

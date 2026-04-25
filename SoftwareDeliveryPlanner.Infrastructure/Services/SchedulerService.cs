@@ -120,6 +120,7 @@ internal sealed class SchedulerService : ServiceBase, ISchedulerService
             OnTrack: (int)kpis["on_track"],
             AtRisk: (int)kpis["at_risk"],
             Late: (int)kpis["late"],
+            Unscheduled: (int)kpis["unscheduled"],
             AvgAssigned: (double)kpis["avg_assigned"],
             OverallocationCount: (int)kpis["overallocation_count"]);
     }

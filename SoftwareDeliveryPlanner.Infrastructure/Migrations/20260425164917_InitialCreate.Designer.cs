@@ -12,8 +12,8 @@ using SoftwareDeliveryPlanner.Infrastructure.Data;
 namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 {
     [DbContext(typeof(PlannerDbContext))]
-    [Migration("20260423212057_UpdateRoleSortOrder")]
-    partial class UpdateRoleSortOrder
+    [Migration("20260425164917_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -548,6 +548,11 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     b.Property<int>("TotalTasks")
                         .HasColumnType("int");
+
+                    b.Property<int>("UnscheduledCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
 
                     b.HasKey("Id");
 

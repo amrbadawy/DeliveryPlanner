@@ -31,6 +31,10 @@ public sealed class PlanScenarioConfiguration : IEntityTypeConfiguration<PlanSce
         builder.Property(s => s.LateCount)
             .IsRequired();
 
+        builder.Property(s => s.UnscheduledCount)
+            .IsRequired()
+            .HasDefaultValue(0);
+
         builder.Property(s => s.TotalEstimation)
             .IsRequired();
 

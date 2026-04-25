@@ -123,6 +123,7 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     OnTrackCount = table.Column<int>(type: "int", nullable: false),
                     AtRiskCount = table.Column<int>(type: "int", nullable: false),
                     LateCount = table.Column<int>(type: "int", nullable: false),
+                    UnscheduledCount = table.Column<int>(type: "int", nullable: false, defaultValue: 0),
                     EarliestStart = table.Column<DateTime>(type: "datetime2", nullable: true),
                     LatestFinish = table.Column<DateTime>(type: "datetime2", nullable: true),
                     TotalEstimation = table.Column<double>(type: "float", nullable: false),
@@ -492,12 +493,12 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                 columns: new[] { "Id", "Code", "DisplayName", "IsActive", "SortOrder" },
                 values: new object[,]
                 {
-                    { 1, "DEV", "Developer", true, 1 },
-                    { 2, "QA", "Quality Assurance", true, 2 },
-                    { 3, "SA", "System Analyst", true, 3 },
-                    { 4, "BA", "Business Analyst", true, 4 },
-                    { 5, "UX", "UX Designer", true, 5 },
-                    { 6, "UI", "UI Designer", true, 6 }
+                    { 1, "DEV", "Developer", true, 5 },
+                    { 2, "QA", "Quality Assurance", true, 6 },
+                    { 3, "SA", "System Analyst", true, 2 },
+                    { 4, "BA", "Business Analyst", true, 1 },
+                    { 5, "UX", "UX Designer", true, 3 },
+                    { 6, "UI", "UI Designer", true, 4 }
                 });
 
             migrationBuilder.CreateIndex(

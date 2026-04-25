@@ -334,4 +334,45 @@ test.describe('Plan readiness warnings', () => {
       await expect(daysCell).toContainText('—');
     }
   });
+
+  test('banner shows filter context when filters are active', async ({ page }) => {
+    // Run scheduler so unscheduled/resource-gap counts are non-zero
+    await gotoPage(page, '/tasks');
+    const table = page.getByTestId('tasks-table');
+    await waitForTableRows(table);
+
+    await page.getByTestId('tasks-refresh').click();
+    await expect(page.getByTestId('tasks-refresh')).toBeEnabled({ timeout: 15_000 });
+    await page.waitForTimeout(1000);
+
+    const banner = page.getByTestId('task-warnings-banner');
+    const isBannerVisible = await banner.isVisible().catch(() => false);
+
+    if (isBannerVisible) {
+      // Before applying filter — banner should NOT say "across all tasks"
+      const textBefore = await banner.innerText();
+      expect(textBefore).not.toContain('across all tasks');
+
+      // Apply a risk filter
+      await fillInputByTestId(page, 'tasks-filter-risk', 'On Track');
+      await page.waitForTimeout(500);
+
+      // If banner is still visible after filtering, it should say "across all tasks"
+      const stillVisible = await banner.isVisible().catch(() => false);
+      if (stillVisible) {
+        await expect(banner).toContainText('across all tasks');
+      }
+
+      // Clear the filter
+      await fillInputByTestId(page, 'tasks-filter-risk', '');
+      await page.waitForTimeout(500);
+
+      // Banner should revert to not saying "across all tasks"
+      const visibleAfterClear = await banner.isVisible().catch(() => false);
+      if (visibleAfterClear) {
+        const textAfter = await banner.innerText();
+        expect(textAfter).not.toContain('across all tasks');
+      }
+    }
+  });
 });

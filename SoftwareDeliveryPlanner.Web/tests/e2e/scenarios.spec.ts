@@ -89,6 +89,34 @@ test.describe('What-If Scenarios', () => {
       // Comparison section should become visible
       const comparison = page.getByTestId('scenarios-comparison');
       await expect(comparison).toBeVisible();
+
+      // Comparison should include Unscheduled label
+      await expect(comparison).toContainText('Unscheduled');
     }
+  });
+
+  test('scenario table shows Unscheduled column', async ({ page }) => {
+    await runSchedulerFromDashboard(page);
+    await gotoPage(page, '/scenarios');
+
+    const scenarioName = uniqueSuffix('E2E Unsched Col');
+
+    // Save a scenario
+    await page.getByTestId('scenarios-save').click();
+    await expect(page.getByTestId('scenarios-save-modal')).toBeVisible();
+    await page.getByTestId('scenarios-name-input').fill(scenarioName);
+    await page.getByTestId('scenarios-save-confirm').click();
+    await expect(page.getByTestId('scenarios-save-modal')).toBeHidden();
+
+    // Table should have Unscheduled header
+    const table = page.getByTestId('scenarios-table');
+    await expect(table).toBeVisible();
+    await expect(table.locator('thead')).toContainText('Unscheduled');
+
+    // Clean up
+    const row = table.locator('tbody tr', { hasText: scenarioName });
+    const deleteBtn = row.locator('button[data-testid^="scenarios-delete-"]');
+    await deleteBtn.click();
+    await expect(table.locator('tbody tr', { hasText: scenarioName })).toHaveCount(0);
   });
 });

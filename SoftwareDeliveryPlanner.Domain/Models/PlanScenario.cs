@@ -11,6 +11,7 @@ public class PlanScenario
     public int OnTrackCount { get; private set; }
     public int AtRiskCount { get; private set; }
     public int LateCount { get; private set; }
+    public int UnscheduledCount { get; private set; }
     public DateTime? EarliestStart { get; private set; }
     public DateTime? LatestFinish { get; private set; }
     public double TotalEstimation { get; private set; }
@@ -22,7 +23,7 @@ public class PlanScenario
 
     private PlanScenario() { }
 
-    public static PlanScenario Create(string scenarioName, int totalTasks, int onTrack, int atRisk, int late,
+    public static PlanScenario Create(string scenarioName, int totalTasks, int onTrack, int atRisk, int late, int unscheduled,
         DateTime? earliestStart, DateTime? latestFinish, double totalEstimation, string? notes, DateTime createdAt)
     {
         if (string.IsNullOrWhiteSpace(scenarioName))
@@ -36,6 +37,7 @@ public class PlanScenario
             OnTrackCount = onTrack,
             AtRiskCount = atRisk,
             LateCount = late,
+            UnscheduledCount = unscheduled,
             EarliestStart = earliestStart,
             LatestFinish = latestFinish,
             TotalEstimation = totalEstimation,

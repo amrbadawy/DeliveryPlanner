@@ -92,6 +92,7 @@
                             <th class="text-center">On Track</th>
                             <th class="text-center">At Risk</th>
                             <th class="text-center">Late</th>
+                            <th class="text-center">Unscheduled</th>
                             <th class="text-center">Latest Finish</th>
                             <th class="text-center">Total Est.</th>
                             <th></th>
@@ -107,6 +108,7 @@
                                 <td class="text-center"><span class="badge bg-success">@s.OnTrackCount</span></td>
                                 <td class="text-center"><span class="badge bg-warning text-dark">@s.AtRiskCount</span></td>
                                 <td class="text-center"><span class="badge bg-danger">@s.LateCount</span></td>
+                                <td class="text-center">@if (s.UnscheduledCount > 0) { <span class="badge bg-warning text-dark">@s.UnscheduledCount</span> } else { <span class="text-muted">0</span> }</td>
                                 <td class="text-center">@(s.LatestFinish?.ToString("MMM dd, yyyy") ?? "—")</td>
                                 <td class="text-center">@s.TotalEstimation.ToString("F1")</td>
                                 <td>
@@ -169,6 +171,7 @@
                                     <div class="col"><small class="text-muted">On Track</small><div><span class="badge bg-success">@CompareA.OnTrackCount</span></div></div>
                                     <div class="col"><small class="text-muted">At Risk</small><div><span class="badge bg-warning text-dark">@CompareA.AtRiskCount</span></div></div>
                                     <div class="col"><small class="text-muted">Late</small><div><span class="badge bg-danger">@CompareA.LateCount</span></div></div>
+                                    <div class="col"><small class="text-muted">Unscheduled</small><div>@if (CompareA.UnscheduledCount > 0) { <span class="badge bg-warning text-dark">@CompareA.UnscheduledCount</span> } else { <span class="text-muted">0</span> }</div></div>
                                     <div class="col"><small class="text-muted">Finish</small><div class="fw-bold">@(CompareA.LatestFinish?.ToString("MMM dd") ?? "—")</div></div>
                                 </div>
                             </div>
@@ -182,6 +185,7 @@
                                     <div class="col"><small class="text-muted">On Track</small><div><span class="badge bg-success">@CompareB.OnTrackCount</span></div></div>
                                     <div class="col"><small class="text-muted">At Risk</small><div><span class="badge bg-warning text-dark">@CompareB.AtRiskCount</span></div></div>
                                     <div class="col"><small class="text-muted">Late</small><div><span class="badge bg-danger">@CompareB.LateCount</span></div></div>
+                                    <div class="col"><small class="text-muted">Unscheduled</small><div>@if (CompareB.UnscheduledCount > 0) { <span class="badge bg-warning text-dark">@CompareB.UnscheduledCount</span> } else { <span class="text-muted">0</span> }</div></div>
                                     <div class="col"><small class="text-muted">Finish</small><div class="fw-bold">@(CompareB.LatestFinish?.ToString("MMM dd") ?? "—")</div></div>
                                 </div>
                             </div>
@@ -205,6 +209,10 @@
                             <div class="col">
                                 <small class="text-muted">Late</small>
                                 <div class="fw-bold @(DeltaClass(LateDelta, false))">@FormatDelta(LateDelta)</div>
+                            </div>
+                            <div class="col">
+                                <small class="text-muted">Unscheduled</small>
+                                <div class="fw-bold @(DeltaClass(UnscheduledDelta, false))">@FormatDelta(UnscheduledDelta)</div>
                             </div>
                             <div class="col">
                                 <small class="text-muted">Total Est.</small>
@@ -235,6 +243,7 @@
     private int OnTrackDelta => (CompareB?.OnTrackCount ?? 0) - (CompareA?.OnTrackCount ?? 0);
     private int AtRiskDelta => (CompareB?.AtRiskCount ?? 0) - (CompareA?.AtRiskCount ?? 0);
     private int LateDelta => (CompareB?.LateCount ?? 0) - (CompareA?.LateCount ?? 0);
+    private int UnscheduledDelta => (CompareB?.UnscheduledCount ?? 0) - (CompareA?.UnscheduledCount ?? 0);
     private double EstDelta => (CompareB?.TotalEstimation ?? 0) - (CompareA?.TotalEstimation ?? 0);
 
     protected override async Task OnInitializedAsync()

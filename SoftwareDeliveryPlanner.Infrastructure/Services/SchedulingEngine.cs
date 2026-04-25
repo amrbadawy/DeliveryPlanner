@@ -969,9 +969,11 @@ internal class SchedulingEngine : ISchedulingEngine
         var overallFinish = finishDates.Any() ? finishDates.Max() : (DateTime?)null;
 
         var strictCount = tasks.Count(t => t.StrictDate.HasValue);
-        var onTrack = tasks.Count(t => t.DeliveryRisk == DomainConstants.DeliveryRisk.OnTrack);
-        var atRisk = tasks.Count(t => t.DeliveryRisk == DomainConstants.DeliveryRisk.AtRisk);
-        var late = tasks.Count(t => t.DeliveryRisk == DomainConstants.DeliveryRisk.Late);
+        var scheduledTasks = tasks.Where(t => t.PlannedStart.HasValue).ToList();
+        var onTrack = scheduledTasks.Count(t => t.DeliveryRisk == DomainConstants.DeliveryRisk.OnTrack);
+        var atRisk = scheduledTasks.Count(t => t.DeliveryRisk == DomainConstants.DeliveryRisk.AtRisk);
+        var late = scheduledTasks.Count(t => t.DeliveryRisk == DomainConstants.DeliveryRisk.Late);
+        var unscheduled = tasks.Count - scheduledTasks.Count;
 
         var assignedResources = tasks.Where(t => t.PeakConcurrency.HasValue && t.PeakConcurrency > 0).Select(t => t.PeakConcurrency!.Value).ToList();
         var avgAssigned = assignedResources.Any() ? assignedResources.Average() : 0;
@@ -999,6 +1001,7 @@ internal class SchedulingEngine : ISchedulingEngine
             ["on_track"] = onTrack,
             ["at_risk"] = atRisk,
             ["late"] = late,
+            ["unscheduled"] = unscheduled,
             ["avg_assigned"] = Math.Round(avgAssigned, 1),
             ["upcoming_strict"] = upcomingStrict,
             ["overallocation_count"] = overallocationCount

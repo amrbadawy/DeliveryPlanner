@@ -124,7 +124,7 @@ else
 
     <!-- Status Row -->
     <div class="row g-3 mb-4">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="kpi-card kpi-success p-3 kpi-clickable" @onclick='() => NavigateToTasks("risk", "On Track")' @onkeydown='(e) => OnKpiKeyDown(e, "risk", "On Track")' role="button" tabindex="0" title="View On Track tasks">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
@@ -135,7 +135,7 @@ else
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="kpi-card kpi-warning p-3 kpi-clickable" @onclick='() => NavigateToTasks("risk", "At Risk")' @onkeydown='(e) => OnKpiKeyDown(e, "risk", "At Risk")' role="button" tabindex="0" title="View At Risk tasks">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
@@ -146,7 +146,7 @@ else
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="kpi-card kpi-danger p-3 kpi-clickable" @onclick='() => NavigateToTasks("risk", "Late")' @onkeydown='(e) => OnKpiKeyDown(e, "risk", "Late")' role="button" tabindex="0" title="View Late tasks">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
@@ -154,6 +154,17 @@ else
                         <div class="kpi-value kpi-text-danger">@late</div>
                     </div>
                     <i class="bi bi-x-circle kpi-icon kpi-icon-danger"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-card p-3 kpi-clickable @(unscheduled > 0 ? "kpi-warning" : "")" @onclick='() => NavigateToTasks("", "")' @onkeydown='(e) => OnKpiKeyDown(e, "", "")' role="button" tabindex="0" title="View tasks — unscheduled tasks shown with warnings" data-testid="kpi-unscheduled">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="kpi-label">Unscheduled</div>
+                        <div class="kpi-value @(unscheduled > 0 ? "kpi-text-warning" : "kpi-text-success")">@unscheduled</div>
+                    </div>
+                    <i class="bi bi-calendar-x kpi-icon @(unscheduled > 0 ? "kpi-icon-warning" : "kpi-icon-success")"></i>
                 </div>
             </div>
         </div>
@@ -294,6 +305,7 @@ else
     private int onTrack = 0;
     private int atRisk = 0;
     private int late = 0;
+    private int unscheduled = 0;
     private double avgAssigned = 0;
     private int overallocationCount = 0;
     private string schedulerResult = "";
@@ -333,6 +345,7 @@ else
         onTrack = kpis.OnTrack;
         atRisk = kpis.AtRisk;
         late = kpis.Late;
+        unscheduled = kpis.Unscheduled;
         avgAssigned = kpis.AvgAssigned;
         overallocationCount = kpis.OverallocationCount;
     }

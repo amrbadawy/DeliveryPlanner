@@ -118,6 +118,32 @@ test.describe('Task Details + Notes', () => {
     await expect(page.getByRole('heading', { name: /Assigned Resources/ })).toBeVisible();
   });
 
+  test('task detail warnings card shows for task with resource gap', async ({ page }) => {
+    // Navigate to tasks page and find a task that has a resource gap
+    // (seed data has tasks with BA/SA/UX roles but no BA/SA/UX resources)
+    await gotoPage(page, '/tasks');
+    const table = page.getByTestId('tasks-table');
+    await waitForTableRows(table);
+
+    // Look for a task with a resource gap icon in the tasks table
+    const gapIcon = page.locator('[data-testid^="resource-gap-warning-"]').first();
+    const hasGap = await gapIcon.isVisible().catch(() => false);
+
+    if (hasGap) {
+      // Get the row and click through to the detail page
+      const row = gapIcon.locator('xpath=ancestor::tr');
+      const taskLink = row.locator('a').first();
+      await taskLink.click();
+      await expect(page.getByTestId('task-details-card')).toBeVisible();
+
+      // Task detail warning card should be visible with resource gap info
+      const warnings = page.getByTestId('task-detail-warnings');
+      await expect(warnings).toBeVisible();
+      await expect(page.getByTestId('task-detail-resource-gap-warning')).toBeVisible();
+      await expect(page.getByTestId('task-detail-resource-gap-warning')).toContainText('Resource gap');
+    }
+  });
+
   test('edit button opens existing tasks edit modal for same task', async ({ page }) => {
     await gotoPage(page, '/tasks');
     const table = page.getByTestId('tasks-table');

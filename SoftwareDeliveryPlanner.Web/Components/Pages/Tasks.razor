@@ -80,6 +80,8 @@
 @if (isLoaded && tasks.Any() && (unscheduledTaskCount > 0 || resourceGapTaskCount > 0 || !schedulerHasRun))
 {
     var hasIssues = unscheduledTaskCount > 0 || resourceGapTaskCount > 0;
+    var filtersActive = !string.IsNullOrEmpty(statusFilter) || !string.IsNullOrEmpty(riskFilter) || !string.IsNullOrWhiteSpace(searchTerm);
+    var scope = filtersActive ? " (across all tasks)" : "";
     <div class="alert @(hasIssues ? "alert-warning" : "alert-info") d-flex align-items-center mb-3" data-testid="task-warnings-banner">
         <i class="bi @(hasIssues ? "bi-exclamation-triangle-fill" : "bi-info-circle-fill") me-2"></i>
         <div>
@@ -88,9 +90,9 @@
                 if (!schedulerHasRun)
                     parts.Add("Run the scheduler to generate a delivery plan and identify scheduling issues");
                 if (unscheduledTaskCount > 0)
-                    parts.Add($"{unscheduledTaskCount} task(s) are unscheduled and will not appear in the plan");
+                    parts.Add($"{unscheduledTaskCount} task(s) are unscheduled and will not appear in the plan{scope}");
                 if (resourceGapTaskCount > 0)
-                    parts.Add($"{resourceGapTaskCount} task(s) have no matching active resources for required roles");
+                    parts.Add($"{resourceGapTaskCount} task(s) have no matching active resources for required roles{scope}");
             }
             <span>@string.Join(". ", parts).</span>
         </div>

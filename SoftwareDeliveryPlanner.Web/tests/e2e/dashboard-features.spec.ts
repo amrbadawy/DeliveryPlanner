@@ -62,4 +62,17 @@ test.describe('Dashboard Features', () => {
     // KPI values should be visible — check for the heading
     await expect(page.getByRole('heading', { name: /Dashboard/ })).toBeVisible();
   });
+
+  test('unscheduled KPI card is visible on dashboard', async ({ page }) => {
+    await runSchedulerFromDashboard(page);
+    await gotoPage(page, '/');
+
+    // Wait for loading to complete
+    await expect(page.getByTestId('dashboard-skeleton-kpi')).toBeHidden({ timeout: 15_000 });
+
+    // Unscheduled KPI card should be present
+    const kpiCard = page.getByTestId('kpi-unscheduled');
+    await expect(kpiCard).toBeVisible();
+    await expect(kpiCard).toContainText('Unscheduled');
+  });
 });

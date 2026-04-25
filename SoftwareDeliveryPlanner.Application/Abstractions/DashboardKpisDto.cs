@@ -9,5 +9,6 @@ public sealed record DashboardKpisDto(
     int OnTrack,
     int AtRisk,
     int Late,
+    int Unscheduled,
     double AvgAssigned,
     int OverallocationCount);

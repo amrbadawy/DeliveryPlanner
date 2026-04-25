@@ -546,6 +546,11 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.Property<int>("TotalTasks")
                         .HasColumnType("int");
 
+                    b.Property<int>("UnscheduledCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.HasKey("Id");
 
                     b.ToTable("PlanScenarios", "planning");

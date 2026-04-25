@@ -57,6 +57,12 @@ else
     <div class="mb-2 text-muted" data-testid="gantt-range">
         Plan range: <strong>@planStart.ToString("dd MMMM yyyy")</strong> to <strong>@planEnd.ToString("dd MMMM yyyy")</strong>
         (@totalDays days)
+        @if (excludedTaskCount > 0)
+        {
+            <span class="ms-2 badge bg-warning text-dark" data-testid="gantt-excluded-count" title="@excludedTaskCount task(s) are not scheduled and do not appear on the chart">
+                <i class="bi bi-exclamation-triangle me-1"></i>Showing @scheduledTasks.Count of @totalTaskCount tasks (@excludedTaskCount not scheduled)
+            </span>
+        }
     </div>
 
     <!-- Legend -->
@@ -243,6 +249,8 @@ else
     private const int LanePadding = 6;   // Top+bottom padding in shell
 
     private List<TaskItem> scheduledTasks = new();
+    private int totalTaskCount;
+    private int excludedTaskCount;
     private Dictionary<string, List<GanttRoleSegmentDto>> segmentsByTask = new(StringComparer.OrdinalIgnoreCase);
     private DateTime planStart;
     private DateTime planEnd;
@@ -270,6 +278,7 @@ else
     {
         var result = await Mediator.Send(new GetTasksQuery());
         var allTasks = result.Value;
+        totalTaskCount = allTasks.Count;
 
         // Only show tasks with a planned start and finish
         scheduledTasks = allTasks
@@ -277,6 +286,8 @@ else
             .OrderBy(t => t.PlannedStart)
             .ThenBy(t => t.SchedulingRank)
             .ToList();
+
+        excludedTaskCount = totalTaskCount - scheduledTasks.Count;
 
         // Load role-based segments
         var segResult = await Mediator.Send(new GetGanttSegmentsQuery());

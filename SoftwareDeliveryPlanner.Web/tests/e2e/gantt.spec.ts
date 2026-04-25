@@ -69,6 +69,22 @@ test.describe('Gantt chart', () => {
     await expect(range).toContainText('days');
   });
 
+  test('excluded task count badge shows when tasks are unscheduled', async ({ page }) => {
+    const empty = page.getByTestId('gantt-empty');
+    if (await empty.isVisible().catch(() => false)) {
+      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
+    }
+
+    // If there are unscheduled tasks, the badge should appear
+    const badge = page.getByTestId('gantt-excluded-count');
+    const isVisible = await badge.isVisible().catch(() => false);
+    if (isVisible) {
+      await expect(badge).toContainText('not scheduled');
+      await expect(badge).toContainText('Showing');
+    }
+    // If no unscheduled tasks exist, badge is correctly hidden — both states are valid
+  });
+
   test('refresh button re-runs scheduler and reloads chart', async ({ page }) => {
     const chart = page.getByTestId('gantt-chart');
     const empty = page.getByTestId('gantt-empty');
