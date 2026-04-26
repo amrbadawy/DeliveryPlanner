@@ -3,8 +3,10 @@
 @using FluentValidation
 @using SoftwareDeliveryPlanner.Application.Resources.Queries
 @using SoftwareDeliveryPlanner.Application.Resources.Commands
+@using SoftwareDeliveryPlanner.Application.Lookups.Queries
 @using SoftwareDeliveryPlanner.Application.Roles.Queries
 @using SoftwareDeliveryPlanner.Application.Planning.Commands
+@using SoftwareDeliveryPlanner.Application.Abstractions
 @using SoftwareDeliveryPlanner.Domain.Models
 @using SoftwareDeliveryPlanner.Domain
 @inject IMediator Mediator
@@ -57,8 +59,10 @@
             <div class="col-md-2">
                 <select class="form-select form-select-sm" @bind="activeFilter" aria-label="Filter by active status" data-testid="resources-filter-active">
                     <option value="">All</option>
-                    <option value="@DomainConstants.ActiveStatus.Yes">Active</option>
-                    <option value="@DomainConstants.ActiveStatus.No">Inactive</option>
+                    @foreach (var option in activeStatusOptions)
+                    {
+                        <option value="@option.Code">@option.DisplayName</option>
+                    }
                 </select>
             </div>
             <div class="col-md-2">
@@ -142,8 +146,10 @@
                         <div class="col-md-6 mb-2">
                             <label class="form-label">Active:</label>
                             <select class="form-select" @bind="resourceForm.Active" data-testid="resources-active">
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
+                                @foreach (var option in activeStatusOptions)
+                                {
+                                    <option value="@option.Code">@option.DisplayName</option>
+                                }
                             </select>
                         </div>
                     </div>
@@ -166,8 +172,10 @@
                             <label class="form-label">Working Week:</label>
                             <select class="form-select" @bind="resourceForm.WorkingWeek" data-testid="resources-working-week">
                                 <option value="">Global Default</option>
-                                <option value="@DomainConstants.WorkingWeek.MonFri">Mon–Fri</option>
-                                <option value="@DomainConstants.WorkingWeek.SunThu">Sun–Thu</option>
+                                @foreach (var option in workingWeekOptions)
+                                {
+                                    <option value="@option.Code">@option.DisplayName</option>
+                                }
                             </select>
                         </div>
                     </div>
@@ -248,7 +256,7 @@ else
                             <td>@r.StartDate.ToString("yyyy-MM-dd")</td>
                             <td>
                                 <span class="badge bg-@(r.Active == DomainConstants.ActiveStatus.Yes ? "success" : "secondary")">
-                                    @(r.Active == DomainConstants.ActiveStatus.Yes ? DomainConstants.ActiveStatus.Yes : DomainConstants.ActiveStatus.No)
+                                    @GetActiveStatusDisplayName(r.Active)
                                 </span>
                             </td>
                             <td>@(r.SeniorityLevel ?? "—")</td>
@@ -273,6 +281,8 @@ else
     private List<TeamMember> resources = new();
     private List<Role> allRoles = new();
     private List<Role> activeRoles = new();
+    private List<LookupOptionDto> activeStatusOptions = new();
+    private List<LookupOptionDto> workingWeekOptions = new();
     private bool showModal = false;
     private bool showDeleteConfirm = false;
     private TeamMember? editingResource;
@@ -405,6 +415,12 @@ else
 
     private async Task LoadResources()
     {
+        var activeStatusResult = await Mediator.Send(new GetLookupOptionsQuery(LookupCatalogs.ActiveStatuses));
+        activeStatusOptions = activeStatusResult.Value;
+
+        var workingWeekResult = await Mediator.Send(new GetLookupOptionsQuery(LookupCatalogs.WorkingWeeks));
+        workingWeekOptions = workingWeekResult.Value;
+
         var activeRolesResult = await Mediator.Send(new GetRolesQuery(false));
         activeRoles = activeRolesResult.Value
             .Where(r => r.IsActive)
@@ -432,7 +448,7 @@ else
             Role = activeRoles.FirstOrDefault()?.Code ?? DomainConstants.ResourceRole.Developer,
             Team = DomainConstants.DefaultTeam,
             StartDate = DateTime.Today,
-            Active = DomainConstants.ActiveStatus.Yes,
+            Active = activeStatusOptions.FirstOrDefault()?.Code ?? DomainConstants.ActiveStatus.Yes,
             AvailabilityPct = 100,
             DailyCapacity = 1
         };
@@ -583,4 +599,7 @@ else
             await LoadResources();
         }
     }
+
+    private string GetActiveStatusDisplayName(string code)
+        => activeStatusOptions.FirstOrDefault(x => x.Code == code)?.DisplayName ?? code;
 }

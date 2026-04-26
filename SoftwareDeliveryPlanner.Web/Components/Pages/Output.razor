@@ -1,6 +1,7 @@
 @page "/output"
 @using MediatR
 @using SoftwareDeliveryPlanner.Application.Abstractions
+@using SoftwareDeliveryPlanner.Application.Lookups.Queries
 @using SoftwareDeliveryPlanner.Application.Output.Queries
 @using SoftwareDeliveryPlanner.Application.Planning.Commands
 @using SoftwareDeliveryPlanner.Domain
@@ -57,17 +58,19 @@
                 <div class="col-md-2">
                     <select class="form-select form-select-sm" @bind="statusFilter" aria-label="Filter by status" data-testid="output-filter-status">
                         <option value="">All Statuses</option>
-                        <option value="@DomainConstants.TaskStatus.NotStarted">@DomainConstants.TaskStatus.NotStarted</option>
-                        <option value="@DomainConstants.TaskStatus.InProgress">@DomainConstants.TaskStatus.InProgress</option>
-                        <option value="@DomainConstants.TaskStatus.Completed">@DomainConstants.TaskStatus.Completed</option>
+                        @foreach (var option in statusOptions)
+                        {
+                            <option value="@option.Code">@option.DisplayName</option>
+                        }
                     </select>
                 </div>
                 <div class="col-md-2">
                     <select class="form-select form-select-sm" @bind="riskFilter" aria-label="Filter by risk" data-testid="output-filter-risk">
                         <option value="">All Risks</option>
-                        <option value="@DomainConstants.DeliveryRisk.OnTrack">@DomainConstants.DeliveryRisk.OnTrack</option>
-                        <option value="@DomainConstants.DeliveryRisk.AtRisk">@DomainConstants.DeliveryRisk.AtRisk</option>
-                        <option value="@DomainConstants.DeliveryRisk.Late">@DomainConstants.DeliveryRisk.Late</option>
+                        @foreach (var option in riskOptions)
+                        {
+                            <option value="@option.Code">@option.DisplayName</option>
+                        }
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -131,12 +134,12 @@ else
                             <td>@item.StrictDate</td>
                             <td>
                                 <span class="badge @BadgeHelpers.StatusBg(item.Status)">
-                                    @item.Status
+                                    @GetStatusDisplayName(item.Status)
                                 </span>
                             </td>
                             <td>
                                 <span class="badge @BadgeHelpers.RiskBadgeClass(item.DeliveryRisk)">
-                                    @item.DeliveryRisk
+                                    @GetRiskDisplayName(item.DeliveryRisk)
                                 </span>
                             </td>
                         </tr>
@@ -158,6 +161,8 @@ else
     private bool isLoaded = false;
     private bool isRefreshing = false;
     private bool isExporting = false;
+    private List<LookupOptionDto> statusOptions = new();
+    private List<LookupOptionDto> riskOptions = new();
 
     // Search/Sort/Filter state
     private string searchTerm = string.Empty;
@@ -256,6 +261,12 @@ else
 
     private async Task LoadOutput()
     {
+        var statusResult = await Mediator.Send(new GetLookupOptionsQuery(LookupCatalogs.TaskStatuses));
+        statusOptions = statusResult.Value;
+
+        var riskResult = await Mediator.Send(new GetLookupOptionsQuery(LookupCatalogs.DeliveryRisks));
+        riskOptions = riskResult.Value;
+
         var result = await Mediator.Send(new GetOutputPlanQuery());
         output = result.Value;
     }
@@ -278,7 +289,9 @@ else
             foreach (var item in output)
             {
                 var service = item.ServiceName.Replace(",", ";").Replace("\r", " ").Replace("\n", " ");
-                csv.AppendLine($"{item.Num},{item.TaskId},{service},{item.AssignedResourceIds ?? ""},{item.PlannedStart ?? ""},{item.PlannedFinish ?? ""},{item.Duration?.ToString() ?? ""},{item.TotalEstimationDays},{item.StrictDate ?? ""},{item.Status},{item.DeliveryRisk},{item.Phase ?? ""}");
+                var status = GetStatusDisplayName(item.Status);
+                var risk = GetRiskDisplayName(item.DeliveryRisk);
+                csv.AppendLine($"{item.Num},{item.TaskId},{service},{item.AssignedResourceIds ?? ""},{item.PlannedStart ?? ""},{item.PlannedFinish ?? ""},{item.Duration?.ToString() ?? ""},{item.TotalEstimationDays},{item.StrictDate ?? ""},{status},{risk},{item.Phase ?? ""}");
             }
 
             var fileName = $"delivery_plan_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
@@ -308,4 +321,10 @@ else
             isRefreshing = false;
         }
     }
+
+    private string GetStatusDisplayName(string code)
+        => statusOptions.FirstOrDefault(x => x.Code == code)?.DisplayName ?? code;
+
+    private string GetRiskDisplayName(string code)
+        => riskOptions.FirstOrDefault(x => x.Code == code)?.DisplayName ?? code;
 }

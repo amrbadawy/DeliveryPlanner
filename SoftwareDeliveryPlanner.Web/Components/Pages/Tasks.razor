@@ -5,6 +5,8 @@
 @using SoftwareDeliveryPlanner.Application.Tasks.Commands
 @using SoftwareDeliveryPlanner.Application.Planning.Commands
 @using SoftwareDeliveryPlanner.Application.Resources.Queries
+@using SoftwareDeliveryPlanner.Application.Lookups.Queries
+@using SoftwareDeliveryPlanner.Application.Abstractions
 @using SoftwareDeliveryPlanner.Domain.Models
 @using SoftwareDeliveryPlanner.Domain
 @inject IMediator Mediator
@@ -54,17 +56,19 @@
             <div class="col-md-2">
                 <select class="form-select form-select-sm" @bind="statusFilter" aria-label="Filter by status" data-testid="tasks-filter-status">
                     <option value="">All Statuses</option>
-                    <option value="@DomainConstants.TaskStatus.NotStarted">@DomainConstants.TaskStatus.NotStarted</option>
-                    <option value="@DomainConstants.TaskStatus.InProgress">@DomainConstants.TaskStatus.InProgress</option>
-                    <option value="@DomainConstants.TaskStatus.Completed">@DomainConstants.TaskStatus.Completed</option>
+                    @foreach (var option in statusOptions)
+                    {
+                        <option value="@option.Code">@option.DisplayName</option>
+                    }
                 </select>
             </div>
             <div class="col-md-2">
                 <select class="form-select form-select-sm" @bind="riskFilter" aria-label="Filter by risk" data-testid="tasks-filter-risk">
                     <option value="">All Risks</option>
-                    <option value="@DomainConstants.DeliveryRisk.OnTrack">@DomainConstants.DeliveryRisk.OnTrack</option>
-                    <option value="@DomainConstants.DeliveryRisk.AtRisk">@DomainConstants.DeliveryRisk.AtRisk</option>
-                    <option value="@DomainConstants.DeliveryRisk.Late">@DomainConstants.DeliveryRisk.Late</option>
+                    @foreach (var option in riskOptions)
+                    {
+                        <option value="@option.Code">@option.DisplayName</option>
+                    }
                 </select>
             </div>
             <div class="col-md-2">
@@ -443,12 +447,12 @@ else
                             <td>@if (task.Duration > 0 || !schedulerHasRun) { @task.Duration } else { <span>&mdash;</span> }</td>
                             <td>
                                 <span class="badge @BadgeHelpers.StatusBg(task.Status)">
-                                    @task.Status
+                                    @GetStatusDisplayName(task.Status)
                                 </span>
                             </td>
                             <td>
                                 <span class="badge @BadgeHelpers.RiskBadgeClass(task.DeliveryRisk)">
-                                    @task.DeliveryRisk
+                                    @GetRiskDisplayName(task.DeliveryRisk)
                                 </span>
                             </td>
                             <td>
@@ -481,6 +485,8 @@ else
 @code {
     private List<TaskItem> tasks = new();
     private List<TeamMember> resources = new();
+    private List<LookupOptionDto> statusOptions = new();
+    private List<LookupOptionDto> riskOptions = new();
     private bool showModal = false;
     private bool showDeleteConfirm = false;
     private TaskItem? editingTask;
@@ -735,6 +741,12 @@ else
 
     private async Task LoadTasks()
     {
+        var statusResult = await Mediator.Send(new GetLookupOptionsQuery(LookupCatalogs.TaskStatuses));
+        statusOptions = statusResult.Value;
+
+        var riskResult = await Mediator.Send(new GetLookupOptionsQuery(LookupCatalogs.DeliveryRisks));
+        riskOptions = riskResult.Value;
+
         var taskResult = await Mediator.Send(new GetTasksQuery());
         tasks = taskResult.Value;
 
@@ -1072,4 +1084,10 @@ else
             await LoadTasks();
         }
     }
+
+    private string GetStatusDisplayName(string code)
+        => statusOptions.FirstOrDefault(x => x.Code == code)?.DisplayName ?? code;
+
+    private string GetRiskDisplayName(string code)
+        => riskOptions.FirstOrDefault(x => x.Code == code)?.DisplayName ?? code;
 }

@@ -3,6 +3,8 @@
 @using FluentValidation
 @using SoftwareDeliveryPlanner.Application.Adjustments.Queries
 @using SoftwareDeliveryPlanner.Application.Adjustments.Commands
+@using SoftwareDeliveryPlanner.Application.Abstractions
+@using SoftwareDeliveryPlanner.Application.Lookups.Queries
 @using SoftwareDeliveryPlanner.Application.Resources.Queries
 @using SoftwareDeliveryPlanner.Application.Planning.Commands
 @using SoftwareDeliveryPlanner.Domain.Models
@@ -48,10 +50,10 @@
             <div class="col-md-2">
                 <select class="form-select form-select-sm" @bind="typeFilter" aria-label="Filter by type" data-testid="adjustments-filter-type">
                     <option value="">All Types</option>
-                    <option value="@DomainConstants.AdjustmentType.Vacation">@DomainConstants.AdjustmentType.Vacation</option>
-                    <option value="@DomainConstants.AdjustmentType.Training">@DomainConstants.AdjustmentType.Training</option>
-                    <option value="@DomainConstants.AdjustmentType.SickLeave">@DomainConstants.AdjustmentType.SickLeave</option>
-                    <option value="@DomainConstants.AdjustmentType.Other">@DomainConstants.AdjustmentType.Other</option>
+                    @foreach (var option in adjustmentTypeOptions)
+                    {
+                        <option value="@option.Code">@option.DisplayName</option>
+                    }
                 </select>
             </div>
             <div class="col-md-2">
@@ -104,10 +106,10 @@
                         <div class="col-md-6 mb-2">
                             <label class="form-label">Adjustment Type: <span class="required-indicator">*</span></label>
                             <select class="form-select @(fieldErrors.ContainsKey("AdjType") ? "is-invalid" : "")" @bind="adjustmentForm.AdjType" data-testid="adjustments-type">
-                                <option>Vacation</option>
-                                <option>Training</option>
-                                <option>Sick Leave</option>
-                                <option>Other</option>
+                                @foreach (var option in adjustmentTypeOptions)
+                                {
+                                    <option value="@option.Code">@option.DisplayName</option>
+                                }
                             </select>
                             @if (fieldErrors.ContainsKey("AdjType"))
                             {
@@ -213,7 +215,7 @@ else
                             <td>@a.ResourceId</td>
                             <td>
                                 <span class="badge @BadgeHelpers.AdjustmentTypeBadgeClass(a.AdjType)">
-                                    @a.AdjType
+                                    @GetAdjustmentTypeDisplayName(a.AdjType)
                                 </span>
                             </td>
                             <td>@a.AdjStart.ToString("yyyy-MM-dd")</td>
@@ -239,6 +241,7 @@ else
 @code {
     private List<Adjustment> adjustments = new();
     private List<TeamMember> resources = new();
+    private List<LookupOptionDto> adjustmentTypeOptions = new();
     private bool showModal = false;
     private bool showDeleteConfirm = false;
     private Adjustment? editingAdjustment;
@@ -360,6 +363,9 @@ else
 
     private async Task LoadData()
     {
+        var adjustmentTypesResult = await Mediator.Send(new GetLookupOptionsQuery(LookupCatalogs.AdjustmentTypes));
+        adjustmentTypeOptions = adjustmentTypesResult.Value;
+
         var adjResult = await Mediator.Send(new GetAdjustmentsQuery());
         adjustments = adjResult.Value;
         var resResult = await Mediator.Send(new GetResourcesQuery());
@@ -370,7 +376,7 @@ else
     {
         adjustmentForm = new AdjustmentFormModel
         {
-            AdjType = DomainConstants.AdjustmentType.Vacation,
+            AdjType = adjustmentTypeOptions.FirstOrDefault()?.Code ?? DomainConstants.AdjustmentType.Vacation,
             AvailabilityPct = 0,
             ResourceId = resources.FirstOrDefault()?.ResourceId ?? string.Empty
         };
@@ -482,4 +488,7 @@ else
             await LoadData();
         }
     }
+
+    private string GetAdjustmentTypeDisplayName(string code)
+        => adjustmentTypeOptions.FirstOrDefault(x => x.Code == code)?.DisplayName ?? code;
 }

@@ -16,6 +16,10 @@ public static class BadgeHelpers
     {
         DomainConstants.TaskStatus.Completed  => "bg-success",
         DomainConstants.TaskStatus.InProgress => "bg-info",
+        DomainConstants.TaskStatus.NotStarted => "bg-secondary",
+        "Completed" => "bg-success",
+        "In Progress" => "bg-info",
+        "Not Started" => "bg-secondary",
         _                                     => "bg-secondary"
     };
 
@@ -27,6 +31,9 @@ public static class BadgeHelpers
         DomainConstants.DeliveryRisk.OnTrack => "bg-success",
         DomainConstants.DeliveryRisk.AtRisk  => "bg-warning text-dark",
         DomainConstants.DeliveryRisk.Late    => "bg-danger",
+        "On Track" => "bg-success",
+        "At Risk" => "bg-warning text-dark",
+        "Late" => "bg-danger",
         _                                    => "bg-secondary"
     };
 
@@ -54,6 +61,9 @@ public static class BadgeHelpers
         DomainConstants.AdjustmentType.Vacation  => "bg-info",
         DomainConstants.AdjustmentType.Training  => "bg-success",
         DomainConstants.AdjustmentType.SickLeave => "bg-warning text-dark",
+        "Vacation"  => "bg-info",
+        "Training"  => "bg-success",
+        "Sick Leave" => "bg-warning text-dark",
         _                                        => "bg-secondary"
     };
 
@@ -65,6 +75,9 @@ public static class BadgeHelpers
         DomainConstants.HolidayType.National  => "bg-success",
         DomainConstants.HolidayType.Religious => "bg-warning text-dark",
         DomainConstants.HolidayType.Company   => "bg-info",
+        "National"  => "bg-success",
+        "Religious" => "bg-warning text-dark",
+        "Company"   => "bg-info",
         _                                     => "bg-secondary"
     };
 }

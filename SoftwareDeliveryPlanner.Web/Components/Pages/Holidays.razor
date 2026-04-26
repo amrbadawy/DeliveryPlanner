@@ -3,6 +3,7 @@
 @using FluentValidation
 @using SoftwareDeliveryPlanner.Application.Holidays.Queries
 @using SoftwareDeliveryPlanner.Application.Holidays.Commands
+@using SoftwareDeliveryPlanner.Application.Lookups.Queries
 @using SoftwareDeliveryPlanner.Application.Planning.Commands
 @using SoftwareDeliveryPlanner.Application.Settings.Queries
 @using SoftwareDeliveryPlanner.Application.Abstractions
@@ -105,9 +106,10 @@
                 <div class="col-md-3">
                     <select class="form-select form-select-sm" @bind="selectedType" aria-label="Filter by type" data-testid="holidays-type-filter">
                         <option value="">All Types</option>
-                        <option value="National">National</option>
-                        <option value="Religious">Religious</option>
-                        <option value="Company">Company</option>
+                        @foreach (var option in holidayTypeOptions)
+                        {
+                            <option value="@option.Code">@option.DisplayName</option>
+                        }
                     </select>
                 </div>
                 <div class="col-md-2 text-muted small text-end">
@@ -168,7 +170,7 @@ else
                             </td>
                             <td>
                                 <span class="badge @BadgeHelpers.HolidayTypeBadgeClass(h.HolidayType)">
-                                    @h.HolidayType
+                                    @GetHolidayTypeDisplayName(h.HolidayType)
                                 </span>
                             </td>
                             <td class="text-muted">@h.Notes</td>
@@ -239,9 +241,10 @@ else
                         <div class="col-md-4 mb-3">
                             <label class="form-label fw-semibold">Type</label>
                             <select class="form-select" @bind="formType" data-testid="holidays-type">
-                                <option>National</option>
-                                <option>Religious</option>
-                                <option>Company</option>
+                                @foreach (var option in holidayTypeOptions)
+                                {
+                                    <option value="@option.Code">@option.DisplayName</option>
+                                }
                             </select>
                         </div>
                     </div>
@@ -368,6 +371,7 @@ else
     private bool isDeleting = false;
     private bool isRefreshing = false;
     private bool isCopying = false;
+    private List<LookupOptionDto> holidayTypeOptions = new();
 
     // Form fields
     private string formName = string.Empty;
@@ -433,6 +437,9 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        var holidayTypesResult = await Mediator.Send(new GetLookupOptionsQuery(LookupCatalogs.HolidayTypes));
+        holidayTypeOptions = holidayTypesResult.Value;
+
         // Load settings for working week config
         var settingsResult = await Mediator.Send(new GetSettingsQuery());
         if (settingsResult.IsSuccess && !string.IsNullOrEmpty(settingsResult.Value.GlobalWorkingWeek))
@@ -480,7 +487,7 @@ else
         formName = string.Empty;
         formStartDate = DateTime.Today;
         formEndDate = DateTime.Today;
-        formType = DomainConstants.HolidayType.National;
+        formType = holidayTypeOptions.FirstOrDefault()?.Code ?? DomainConstants.HolidayType.National;
         formNotes = null;
         modalError = string.Empty;
         fieldErrors.Clear();
@@ -667,6 +674,9 @@ else
             await LoadHolidays();
         }
     }
+
+    private string GetHolidayTypeDisplayName(string code)
+        => holidayTypeOptions.FirstOrDefault(x => x.Code == code)?.DisplayName ?? code;
 
     public void Dispose() => _debounceTimer?.Dispose();
 }
