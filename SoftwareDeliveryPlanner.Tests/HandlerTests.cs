@@ -533,7 +533,7 @@ public class UpsertResourceCommandHandlerTests : OrchestratorFixture
             AvailabilityPct: 100,
             DailyCapacity: 1,
             StartDate: DateTime.Today,
-            Active: "Yes",
+            Active: "YES",
             Notes: null,
             IsNew: true), CancellationToken.None);
 
@@ -625,7 +625,7 @@ public class UpsertResourceCommandValidatorTests
         Id: 0, ResourceId: "DEV-001", ResourceName: "Alice",
         Role: "DEV", Team: "Delivery",
         AvailabilityPct: 100, DailyCapacity: 1,
-        StartDate: DateTime.Today, Active: "Yes",
+        StartDate: DateTime.Today, Active: "YES",
         Notes: null, IsNew: true);
 
     [Fact]
@@ -695,7 +695,7 @@ public class GetAdjustmentsQueryHandlerTests : OrchestratorFixture
     public async Task Handle_WithAdjustment_ReturnsList()
     {
         await using var db = await Factory.CreateDbContextAsync();
-        db.Adjustments.Add(Adjustment.Create("DEV-001", "Vacation", 0, DateTime.Today, DateTime.Today.AddDays(3)));
+        db.Adjustments.Add(Adjustment.Create("DEV-001", "VACATION", 0, DateTime.Today, DateTime.Today.AddDays(3)));
         await db.SaveChangesAsync();
 
         var handler = new GetAdjustmentsQueryHandler(AdjustmentOrchestrator);
@@ -719,7 +719,7 @@ public class AddAdjustmentCommandHandlerTests : OrchestratorFixture
         var handler = new AddAdjustmentCommandHandler(AdjustmentOrchestrator);
         await handler.Handle(new AddAdjustmentCommand(
             ResourceId: "DEV-001",
-            AdjType: "Vacation",
+            AdjType: "VACATION",
             AvailabilityPct: 0,
             AdjStart: DateTime.Today,
             AdjEnd: DateTime.Today.AddDays(5),
@@ -738,7 +738,7 @@ public class AddAdjustmentCommandHandlerTests : OrchestratorFixture
 
         await handler.Handle(new AddAdjustmentCommand(
             ResourceId: "DEV-002",
-            AdjType: "Training",
+            AdjType: "TRAINING",
             AvailabilityPct: 50,
             AdjStart: start,
             AdjEnd: end,
@@ -746,7 +746,7 @@ public class AddAdjustmentCommandHandlerTests : OrchestratorFixture
 
         await using var db = await Factory.CreateDbContextAsync();
         var adj = await db.Adjustments.FirstAsync(a => a.ResourceId == "DEV-002");
-        Assert.Equal("Training", adj.AdjType);
+        Assert.Equal("TRAINING", adj.AdjType);
         Assert.Equal(50, adj.AvailabilityPct);
         Assert.Equal(start, adj.AdjStart);
         Assert.Equal(end, adj.AdjEnd);
@@ -763,7 +763,7 @@ public class DeleteAdjustmentCommandHandlerTests : OrchestratorFixture
     public async Task Handle_ExistingAdjustment_RemovesFromDatabase()
     {
         await using var db = await Factory.CreateDbContextAsync();
-        db.Adjustments.Add(Adjustment.Create("DEV-001", "Vacation", 0, DateTime.Today, DateTime.Today.AddDays(3)));
+        db.Adjustments.Add(Adjustment.Create("DEV-001", "VACATION", 0, DateTime.Today, DateTime.Today.AddDays(3)));
         await db.SaveChangesAsync();
 
         await using var db2 = await Factory.CreateDbContextAsync();
@@ -794,7 +794,7 @@ public class AddAdjustmentCommandValidatorTests
 
     private static AddAdjustmentCommand Valid() => new(
         ResourceId: "DEV-001",
-        AdjType: "Vacation",
+        AdjType: "VACATION",
         AvailabilityPct: 0,
         AdjStart: DateTime.Today,
         AdjEnd: DateTime.Today.AddDays(7),
@@ -895,7 +895,7 @@ public class UpsertHolidayCommandHandlerTests : OrchestratorFixture
             HolidayName: "Christmas",
             StartDate: date,
             EndDate: date,
-            HolidayType: "Company",
+            HolidayType: "COMPANY",
             Notes: null,
             IsNew: true), CancellationToken.None);
 
@@ -915,14 +915,14 @@ public class UpsertHolidayCommandHandlerTests : OrchestratorFixture
             HolidayName: "Updated Holiday",
             StartDate: existing.StartDate,
             EndDate: existing.EndDate,
-            HolidayType: "Company",
+            HolidayType: "COMPANY",
             Notes: "updated",
             IsNew: false), CancellationToken.None);
 
         await using var verifyDb = await Factory.CreateDbContextAsync();
         var updated = await verifyDb.Holidays.FirstAsync(h => h.Id == existing.Id);
         Assert.Equal("Updated Holiday", updated.HolidayName);
-        Assert.Equal("Company", updated.HolidayType);
+        Assert.Equal("COMPANY", updated.HolidayType);
     }
 }
 
@@ -967,7 +967,7 @@ public class UpsertHolidayCommandValidatorTests : OrchestratorFixture
         HolidayName: "Test Holiday",
         StartDate: new DateTime(2026, 11, 15),
         EndDate: new DateTime(2026, 11, 15),
-        HolidayType: "National",
+        HolidayType: "NATIONAL",
         Notes: null,
         IsNew: true);
 
@@ -1285,7 +1285,7 @@ public class UpsertHolidayCommandHandlerEdgeTests : OrchestratorFixture
             HolidayName: "Christmas Break",
             StartDate: start,
             EndDate: end,
-            HolidayType: "Company",
+            HolidayType: "COMPANY",
             Notes: null,
             IsNew: true), CancellationToken.None);
 
@@ -1306,7 +1306,7 @@ public class UpsertHolidayCommandHandlerEdgeTests : OrchestratorFixture
             HolidayName: "Noted Holiday",
             StartDate: date,
             EndDate: date,
-            HolidayType: "Company",
+            HolidayType: "COMPANY",
             Notes: "Test notes",
             IsNew: true), CancellationToken.None);
 
@@ -1351,7 +1351,7 @@ public class UpsertHolidayCommandHandlerEdgeTests : OrchestratorFixture
             HolidayName: " Trimmed Holiday  ",
             StartDate: date,
             EndDate: date,
-            HolidayType: "Company",
+            HolidayType: "COMPANY",
             Notes: null,
             IsNew: true), CancellationToken.None);
 
@@ -1401,7 +1401,7 @@ public class UpsertHolidayCommandValidatorEdgeTests : OrchestratorFixture
             HolidayName: "Free Day",
             StartDate: new DateTime(2026, 11, 15),
             EndDate: new DateTime(2026, 11, 15),
-            HolidayType: "Company",
+            HolidayType: "COMPANY",
             Notes: null,
             IsNew: true));
 
@@ -1423,7 +1423,7 @@ public class UpsertHolidayCommandValidatorEdgeTests : OrchestratorFixture
             HolidayName: "Big Holiday",
             StartDate: new DateTime(2026, 12, 8),
             EndDate: new DateTime(2026, 12, 14),
-            HolidayType: "Company",
+            HolidayType: "COMPANY",
             Notes: null,
             IsNew: true));
 
@@ -1441,7 +1441,7 @@ public class UpsertHolidayCommandValidatorEdgeTests : OrchestratorFixture
             HolidayName: "Single Day",
             StartDate: new DateTime(2026, 11, 20),
             EndDate: new DateTime(2026, 11, 20),
-            HolidayType: "Company",
+            HolidayType: "COMPANY",
             Notes: null,
             IsNew: true));
 
@@ -1457,7 +1457,7 @@ public class UpsertHolidayCommandValidatorEdgeTests : OrchestratorFixture
             HolidayName: "",
             StartDate: new DateTime(2026, 11, 15),
             EndDate: new DateTime(2026, 11, 15),
-            HolidayType: "Company",
+            HolidayType: "COMPANY",
             Notes: null,
             IsNew: true));
 
@@ -1510,7 +1510,7 @@ public class GetTimelineQueryHandlerEdgeTests : OrchestratorFixture
     {
         // Add an adjustment for DEV-001
         await using var db = await Factory.CreateDbContextAsync();
-        db.Adjustments.Add(Adjustment.Create("DEV-001", "Training", 50, new DateTime(2026, 8, 10), new DateTime(2026, 8, 12)));
+        db.Adjustments.Add(Adjustment.Create("DEV-001", "TRAINING", 50, new DateTime(2026, 8, 10), new DateTime(2026, 8, 12)));
         await db.SaveChangesAsync();
 
         var handler = new GetTimelineQueryHandler(PlanningQueryService);
@@ -1519,7 +1519,7 @@ public class GetTimelineQueryHandlerEdgeTests : OrchestratorFixture
             CancellationToken.None);
 
         Assert.Single(result.Value.Days);
-        Assert.Equal("Training", result.Value.Days[0].StatusText);
+        Assert.Equal("TRAINING", result.Value.Days[0].StatusText);
         Assert.Equal(TimelineDayStatus.Adjustment, result.Value.Days[0].Status);
     }
 }
@@ -1577,18 +1577,18 @@ public class AddAdjustmentCommandValidatorEdgeTests
 
     private static AddAdjustmentCommand Valid() => new(
         ResourceId: "DEV-001",
-        AdjType: "Vacation",
+        AdjType: "VACATION",
         AvailabilityPct: 0,
         AdjStart: DateTime.Today,
         AdjEnd: DateTime.Today.AddDays(7),
         Notes: null);
 
     [Fact]
-    public void EmptyAdjType_PassesValidation()
+    public void EmptyAdjType_FailsValidation()
     {
-        // AdjType has no NotEmpty rule — empty should pass
+        // AdjType is required
         var result = _validator.Validate(Valid() with { AdjType = "" });
-        Assert.True(result.IsValid);
+        Assert.False(result.IsValid);
     }
 
     [Fact]
@@ -1761,7 +1761,7 @@ public class UpsertResourceCommandValidatorAdditionalTests
         Id: 0, ResourceId: "DEV-001", ResourceName: "Alice",
         Role: "DEV", Team: "Delivery",
         AvailabilityPct: 100, DailyCapacity: 1,
-        StartDate: DateTime.Today, Active: "Yes",
+        StartDate: DateTime.Today, Active: "YES",
         Notes: null, IsNew: true);
 
     [Fact]
@@ -1838,7 +1838,7 @@ public class AddAdjustmentCommandValidatorAdditionalTests
 
     private static AddAdjustmentCommand Valid() => new(
         ResourceId: "DEV-001",
-        AdjType: "Vacation",
+        AdjType: "VACATION",
         AvailabilityPct: 0,
         AdjStart: DateTime.Today,
         AdjEnd: DateTime.Today.AddDays(7),
@@ -1913,7 +1913,7 @@ public class UpsertHolidayCommandValidatorAdditionalTests : OrchestratorFixture
         var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         var result = await validator.ValidateAsync(new UpsertHolidayCommand(
             Id: 0, HolidayName: null!, StartDate: new DateTime(2026, 11, 15),
-            EndDate: new DateTime(2026, 11, 15), HolidayType: "National",
+            EndDate: new DateTime(2026, 11, 15), HolidayType: "NATIONAL",
             Notes: null, IsNew: true));
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertHolidayCommand.HolidayName));
@@ -1925,7 +1925,7 @@ public class UpsertHolidayCommandValidatorAdditionalTests : OrchestratorFixture
         var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         var result = await validator.ValidateAsync(new UpsertHolidayCommand(
             Id: 0, HolidayName: "", StartDate: new DateTime(2026, 11, 20),
-            EndDate: new DateTime(2026, 11, 15), HolidayType: "National",
+            EndDate: new DateTime(2026, 11, 15), HolidayType: "NATIONAL",
             Notes: null, IsNew: true));
         Assert.False(result.IsValid);
         Assert.True(result.Errors.Count >= 2);
@@ -1945,19 +1945,20 @@ public class UpsertHolidayCommandValidatorAdditionalTests : OrchestratorFixture
             Id: 0, HolidayName: "Overlap Test",
             StartDate: new DateTime(2026, 12, 22),
             EndDate: new DateTime(2026, 12, 28),
-            HolidayType: "National", Notes: null, IsNew: true));
+            HolidayType: "NATIONAL", Notes: null, IsNew: true));
         Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("overlaps"));
     }
 
     [Fact]
-    public async Task UnconstrainedFields_HolidayType_AcceptsAnyValue()
+    public async Task EmptyHolidayType_FailsValidation()
     {
         var validator = new UpsertHolidayCommandValidator(HolidayOrchestrator);
         var result = await validator.ValidateAsync(new UpsertHolidayCommand(
             Id: 0, HolidayName: "Test", StartDate: new DateTime(2026, 11, 15),
             EndDate: new DateTime(2026, 11, 15), HolidayType: "",
             Notes: null, IsNew: true));
-        Assert.True(result.IsValid);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpsertHolidayCommand.HolidayType));
     }
 }
 
@@ -2092,7 +2093,7 @@ public class HandlerEdgeCaseTests : OrchestratorFixture
     {
         var handler = new AddAdjustmentCommandHandler(AdjustmentOrchestrator);
         await handler.Handle(new AddAdjustmentCommand(
-            ResourceId: "DEV-001", AdjType: "Vacation",
+            ResourceId: "DEV-001", AdjType: "VACATION",
             AvailabilityPct: 0, AdjStart: DateTime.Today,
             AdjEnd: DateTime.Today.AddDays(3), Notes: null), CancellationToken.None);
 

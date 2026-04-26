@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Domain.Models;
 using SoftwareDeliveryPlanner.Infrastructure.Services;
@@ -96,7 +97,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         var engine = new SchedulingEngine(_db, TimeProvider.System);
         var kpis = engine.GetDashboardKPIs();
 
-        // active_resources counts resources where Active == "Yes" (no date filter in GetDashboardKPIs)
+        // active_resources counts resources where Active == "YES" (no date filter in GetDashboardKPIs)
         // The scheduling engine itself filters by EndDate during RunScheduler, not GetDashboardKPIs.
         // This test simply confirms the KPI is still returned correctly.
         Assert.True(kpis.ContainsKey("active_resources"));
@@ -122,7 +123,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-102");
         // No capacity available → task should remain Not Started / unallocated
-        Assert.Equal("Not Started", task.Status);
+        Assert.Equal("NOT_STARTED", task.Status);
     }
 
     // ------------------------------------------------------------------
@@ -142,7 +143,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Resources.Add(TeamMember.Create("RES-11", "Adjustable", "DEV", "Default", 100, 1, new DateTime(2026, 1, 1)));
         _db.Resources.Add(TeamMember.Create("QA-11", "Adjustable QA", "QA", "Default", 100, 1, new DateTime(2026, 1, 1)));
         // Zero-capacity adjustment for the entire plan start month
-        _db.Adjustments.Add(Adjustment.Create("RES-11", "Leave", 0, new DateTime(2026, 5, 1), new DateTime(2026, 5, 31), "Full leave"));
+        _db.Adjustments.Add(Adjustment.Create("RES-11", DomainConstants.AdjustmentType.Other, 0, new DateTime(2026, 5, 1), new DateTime(2026, 5, 31), "Full leave"));
         _db.Tasks.Add(TaskItem.Create("SV-103", "Zero Adj Task", 5, B(3)));
         _db.SaveChanges();
 
@@ -175,7 +176,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
 
-        // Should not throw; zero-estimation tasks just get "Not Started" (no effort remaining)
+        // Should not throw; zero-estimation tasks just get "NOT_STARTED" (no effort remaining)
         var exception = Record.Exception(() => engine.RunScheduler());
         Assert.Null(exception);
     }
@@ -237,7 +238,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         engine.RunScheduler();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-106");
-        Assert.Equal("Late", task.DeliveryRisk);
+        Assert.Equal("LATE", task.DeliveryRisk);
     }
 
     // ------------------------------------------------------------------
@@ -326,8 +327,8 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         // Add a single inactive resource
-        _db.Resources.Add(TeamMember.Create("RES-12", "Inactive Dev", "DEV", "Default", 100, 1, new DateTime(2026, 1, 1), active: "No"));
-        _db.Resources.Add(TeamMember.Create("QA-12", "Inactive QA", "QA", "Default", 100, 1, new DateTime(2026, 1, 1), active: "No"));
+        _db.Resources.Add(TeamMember.Create("RES-12", "Inactive Dev", "DEV", "Default", 100, 1, new DateTime(2026, 1, 1), active: "NO"));
+        _db.Resources.Add(TeamMember.Create("QA-12", "Inactive QA", "QA", "Default", 100, 1, new DateTime(2026, 1, 1), active: "NO"));
         _db.Tasks.Add(TaskItem.Create("SV-112", "Inactive Resources Task", 5, B(5)));
         _db.SaveChanges();
 
@@ -335,7 +336,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         engine.RunScheduler();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-112");
-        Assert.Equal("Not Started", task.Status);
+        Assert.Equal("NOT_STARTED", task.Status);
     }
 
     // ------------------------------------------------------------------
@@ -355,7 +356,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _engine.RunScheduler();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-113");
-        Assert.Equal("On Track", task.DeliveryRisk);
+        Assert.Equal("ON_TRACK", task.DeliveryRisk);
     }
 
     // ------------------------------------------------------------------
@@ -491,7 +492,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
 
         var task = _db.Tasks.First(t => t.TaskId == "DEP-020");
         Assert.NotNull(task.PlannedStart);
-        Assert.Equal("Completed", task.Status);
+        Assert.Equal(DomainConstants.TaskStatus.Completed, task.Status);
     }
 
     [Fact]
@@ -543,7 +544,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
 
         var task = _db.Tasks.First(t => t.TaskId == "DEP-030");
         // Task should never start because its dependency can't be completed
-        Assert.Equal("Not Started", task.Status);
+        Assert.Equal("NOT_STARTED", task.Status);
         Assert.Null(task.PlannedStart);
     }
 
@@ -572,8 +573,8 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
 
         var taskA = _db.Tasks.First(t => t.TaskId == "CIR-001");
         var taskB = _db.Tasks.First(t => t.TaskId == "CIR-002");
-        Assert.Equal("Not Started", taskA.Status);
-        Assert.Equal("Not Started", taskB.Status);
+        Assert.Equal("NOT_STARTED", taskA.Status);
+        Assert.Equal("NOT_STARTED", taskB.Status);
         Assert.Null(taskA.PlannedStart);
         Assert.Null(taskB.PlannedStart);
     }
@@ -603,7 +604,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         Assert.Null(exception);
 
         var task = _db.Tasks.First(t => t.TaskId == "SELF-001");
-        Assert.Equal("Not Started", task.Status);
+        Assert.Equal("NOT_STARTED", task.Status);
         Assert.Null(task.PlannedStart);
     }
 
@@ -630,8 +631,8 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         engine.RunScheduler();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-116");
-        // The task should be "At Risk", "On Track", or "Late" depending on exact date/scheduling
-        Assert.Contains(task.DeliveryRisk, new[] { "At Risk", "On Track", "Late" });
+        // The task should be "AT_RISK", "ON_TRACK", or "LATE" depending on exact date/scheduling
+        Assert.Contains(task.DeliveryRisk, new[] { "AT_RISK", "ON_TRACK", "LATE" });
     }
 
     // ------------------------------------------------------------------
@@ -655,7 +656,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-117");
         // No planned finish + has strict date → At Risk
-        Assert.Equal("At Risk", task.DeliveryRisk);
+        Assert.Equal("AT_RISK", task.DeliveryRisk);
     }
 
     // ------------------------------------------------------------------
@@ -741,8 +742,8 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
 
         // Two 75% adjustments stacking: 1 * 100% * 8 hrs/day * 75% * 75% = 4.5 hrs
         // (must stay >= MinAllocationHours of 4 to get any allocations)
-        _db.Adjustments.Add(Adjustment.Create("RES-13", "Training", 75, new DateTime(2026, 5, 1), new DateTime(2026, 5, 31)));
-        _db.Adjustments.Add(Adjustment.Create("RES-13", "Other", 75, new DateTime(2026, 5, 1), new DateTime(2026, 5, 31)));
+        _db.Adjustments.Add(Adjustment.Create("RES-13", "TRAINING", 75, new DateTime(2026, 5, 1), new DateTime(2026, 5, 31)));
+        _db.Adjustments.Add(Adjustment.Create("RES-13", "OTHER", 75, new DateTime(2026, 5, 1), new DateTime(2026, 5, 31)));
 
         _db.Tasks.Add(TaskItem.Create("SV-118", "Multi Stack Task", 5, B(5)));
         _db.SaveChanges();

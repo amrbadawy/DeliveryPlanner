@@ -80,12 +80,12 @@ public class DependencyRulesTests
     }
 
     // ─────────────────────────────────────────────────────────
-    // Architecture Rule: No enums — use LookupValue entities
+    // Architecture Rule: No enums — use lookup/reference entities
     // ─────────────────────────────────────────────────────────
 
     // DTO-associated semantic enums that are explicitly permitted.
     // These represent presentation/contract concepts in DTOs, not
-    // domain-level lookup data that belongs in a LookupValue table.
+    // domain-level lookup data that belongs in reference tables.
     private static readonly HashSet<string> AllowedDtoEnums = new(StringComparer.Ordinal)
     {
         "SoftwareDeliveryPlanner.Application.Abstractions.TimelineDayStatus",
@@ -116,7 +116,7 @@ public class DependencyRulesTests
 
         Assert.True(
             enums.Count == 0,
-            $"Enums are forbidden (use LookupValue entities instead). " +
+            $"Enums are forbidden (use lookup/reference entities instead). " +
             $"Found in {layer}: {string.Join(", ", enums)}");
     }
 
@@ -1432,7 +1432,7 @@ public class DependencyRulesTests
         var aggregateRootType = typeof(SoftwareDeliveryPlanner.SharedKernel.AggregateRoot);
 
         // These entities are NOT aggregate roots — they are value/child/infrastructure entities
-        var nonAggregateNames = new HashSet<string> { "CalendarDay", "Allocation", "Setting", "LookupValue", "Adjustment", "Role" };
+        var nonAggregateNames = new HashSet<string> { "CalendarDay", "Allocation", "Setting", "Adjustment", "Role", "TaskStatusLookup", "DeliveryRiskLookup", "HolidayTypeLookup", "AdjustmentTypeLookup", "ActiveStatusLookup", "WorkingWeekLookup" };
 
         var violations = domainAssembly.GetTypes()
             .Where(t => t.IsClass && !t.IsAbstract && t.Namespace != null
@@ -1482,7 +1482,12 @@ public class DependencyRulesTests
     [InlineData("CalendarDay")]
     [InlineData("Allocation")]
     [InlineData("Setting")]
-    [InlineData("LookupValue")]
+    [InlineData("TaskStatusLookup")]
+    [InlineData("DeliveryRiskLookup")]
+    [InlineData("HolidayTypeLookup")]
+    [InlineData("AdjustmentTypeLookup")]
+    [InlineData("ActiveStatusLookup")]
+    [InlineData("WorkingWeekLookup")]
     [InlineData("Role")]
     public void Infrastructure_Entities_May_Have_Public_Setters(string entityName)
     {

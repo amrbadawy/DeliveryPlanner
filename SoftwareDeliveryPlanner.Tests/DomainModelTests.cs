@@ -212,7 +212,7 @@ public class TeamMemberDomainTests
     [Fact]
     public void Create_WithNotes_SetsNotes()
     {
-        var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 100, 1, DateTime.Today, active: "Yes", notes: "Note here");
+        var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 100, 1, DateTime.Today, active: "YES", notes: "Note here");
         Assert.Equal("Note here", member.Notes);
     }
 
@@ -256,10 +256,10 @@ public class AdjustmentDomainTests
     {
         var start = DateTime.Today;
         var end = DateTime.Today.AddDays(7);
-        var adj = Adjustment.Create("DEV-001", "Vacation", 0, start, end, "Summer");
+        var adj = Adjustment.Create("DEV-001", "VACATION", 0, start, end, "Summer");
 
         Assert.Equal("DEV-001", adj.ResourceId);
-        Assert.Equal("Vacation", adj.AdjType);
+        Assert.Equal("VACATION", adj.AdjType);
         Assert.Equal(0, adj.AvailabilityPct);
         Assert.Equal(start, adj.AdjStart);
         Assert.Equal(end, adj.AdjEnd);
@@ -272,7 +272,7 @@ public class AdjustmentDomainTests
     public void Create_EmptyResourceId_ThrowsDomainException(string id)
     {
         Assert.Throws<DomainException>(() =>
-            Adjustment.Create(id, "Vacation", 0, DateTime.Today, DateTime.Today.AddDays(3)));
+            Adjustment.Create(id, "VACATION", 0, DateTime.Today, DateTime.Today.AddDays(3)));
     }
 
     [Theory]
@@ -281,14 +281,14 @@ public class AdjustmentDomainTests
     public void Create_InvalidAvailabilityPct_ThrowsDomainException(double pct)
     {
         Assert.Throws<DomainException>(() =>
-            Adjustment.Create("DEV-001", "Vacation", pct, DateTime.Today, DateTime.Today.AddDays(3)));
+            Adjustment.Create("DEV-001", "VACATION", pct, DateTime.Today, DateTime.Today.AddDays(3)));
     }
 
     [Fact]
     public void Create_EndBeforeStart_ThrowsDomainException()
     {
         Assert.Throws<DomainException>(() =>
-            Adjustment.Create("DEV-001", "Vacation", 0,
+            Adjustment.Create("DEV-001", "VACATION", 0,
                 DateTime.Today.AddDays(5), DateTime.Today));
     }
 
@@ -296,7 +296,7 @@ public class AdjustmentDomainTests
     public void Create_StartEqualsEnd_DoesNotThrow()
     {
         var today = DateTime.Today;
-        var adj = Adjustment.Create("DEV-001", "Training", 50, today, today);
+        var adj = Adjustment.Create("DEV-001", "TRAINING", 50, today, today);
         Assert.Equal(today, adj.AdjStart);
         Assert.Equal(today, adj.AdjEnd);
     }
@@ -304,14 +304,14 @@ public class AdjustmentDomainTests
     [Fact]
     public void Create_TrimsResourceId()
     {
-        var adj = Adjustment.Create("  DEV-001  ", "Vacation", 0, DateTime.Today, DateTime.Today.AddDays(3));
+        var adj = Adjustment.Create("  DEV-001  ", "VACATION", 0, DateTime.Today, DateTime.Today.AddDays(3));
         Assert.Equal("DEV-001", adj.ResourceId);
     }
 
     [Fact]
     public void Create_WithNullNotes_SetsNull()
     {
-        var adj = Adjustment.Create("DEV-001", "Vacation", 0, DateTime.Today, DateTime.Today.AddDays(3));
+        var adj = Adjustment.Create("DEV-001", "VACATION", 0, DateTime.Today, DateTime.Today.AddDays(3));
         Assert.Null(adj.Notes);
     }
 
@@ -319,7 +319,7 @@ public class AdjustmentDomainTests
     public void Create_PreservesResourceIdCase_ButTrims()
     {
         // Adjustment.Create trims but does NOT normalize to uppercase (unlike TeamMember.Create)
-        var adj = Adjustment.Create("  dev-001  ", "Vacation", 0, DateTime.Today, DateTime.Today.AddDays(3));
+        var adj = Adjustment.Create("  dev-001  ", "VACATION", 0, DateTime.Today, DateTime.Today.AddDays(3));
         Assert.Equal("dev-001", adj.ResourceId);
     }
 }
@@ -335,12 +335,12 @@ public class HolidayDomainTests
     {
         var start = new DateTime(2026, 3, 30);
         var end = new DateTime(2026, 4, 2);
-        var holiday = Holiday.Create("Eid Al-Fitr", start, end, "Religious", "Festival");
+        var holiday = Holiday.Create("Eid Al-Fitr", start, end, "RELIGIOUS", "Festival");
 
         Assert.Equal("Eid Al-Fitr", holiday.HolidayName);
         Assert.Equal(start.Date, holiday.StartDate);
         Assert.Equal(end.Date, holiday.EndDate);
-        Assert.Equal("Religious", holiday.HolidayType);
+        Assert.Equal("RELIGIOUS", holiday.HolidayType);
         Assert.Equal("Festival", holiday.Notes);
         Assert.Equal(4, holiday.DurationDays);
     }
@@ -349,7 +349,7 @@ public class HolidayDomainTests
     public void Create_SingleDay_OverloadSetsStartAndEndEqual()
     {
         var date = new DateTime(2026, 9, 23);
-        var holiday = Holiday.Create("National Day", date, "National", "Key date");
+        var holiday = Holiday.Create("National Day", date, "NATIONAL", "Key date");
 
         Assert.Equal("National Day", holiday.HolidayName);
         Assert.Equal(date.Date, holiday.StartDate);
@@ -390,7 +390,7 @@ public class HolidayDomainTests
     public void Create_DefaultsToNationalType()
     {
         var holiday = Holiday.Create("Some Holiday", DateTime.Today, DateTime.Today);
-        Assert.Equal("National", holiday.HolidayType);
+        Assert.Equal("NATIONAL", holiday.HolidayType);
     }
 
     [Fact]
@@ -420,15 +420,15 @@ public class HolidayDomainTests
     [Fact]
     public void Create_WithNotes_PersistsNotes()
     {
-        var holiday = Holiday.Create("Test Holiday", DateTime.Today, DateTime.Today, "National", "Some notes");
+        var holiday = Holiday.Create("Test Holiday", DateTime.Today, DateTime.Today, "NATIONAL", "Some notes");
         Assert.Equal("Some notes", holiday.Notes);
     }
 
     [Fact]
     public void Create_WithCustomType_PersistsType()
     {
-        var holiday = Holiday.Create("Eid", DateTime.Today, DateTime.Today, "Religious");
-        Assert.Equal("Religious", holiday.HolidayType);
+        var holiday = Holiday.Create("Eid", DateTime.Today, DateTime.Today, "RELIGIOUS");
+        Assert.Equal("RELIGIOUS", holiday.HolidayType);
     }
 
     [Fact]
@@ -444,7 +444,7 @@ public class HolidayDomainTests
     public void Create_SingleDayOverload_DefaultsToNationalType()
     {
         var holiday = Holiday.Create("Independence Day", new DateTime(2026, 7, 4));
-        Assert.Equal("National", holiday.HolidayType);
+        Assert.Equal("NATIONAL", holiday.HolidayType);
     }
 
     [Fact]
@@ -459,7 +459,7 @@ public class HolidayDomainTests
     [Fact]
     public void Create_RangeOverload_NullNotes_SetsNull()
     {
-        var holiday = Holiday.Create("Test Holiday", DateTime.Today, DateTime.Today, "National", null);
+        var holiday = Holiday.Create("Test Holiday", DateTime.Today, DateTime.Today, "NATIONAL", null);
         Assert.Null(holiday.Notes);
     }
 }
@@ -562,17 +562,17 @@ public class DomainConstantsTests
     [Fact]
     public void Constants_TaskStatus_MatchExpectedValues()
     {
-        Assert.Equal("Not Started", DomainConstants.TaskStatus.NotStarted);
-        Assert.Equal("In Progress", DomainConstants.TaskStatus.InProgress);
-        Assert.Equal("Completed", DomainConstants.TaskStatus.Completed);
+        Assert.Equal("NOT_STARTED", DomainConstants.TaskStatus.NotStarted);
+        Assert.Equal("IN_PROGRESS", DomainConstants.TaskStatus.InProgress);
+        Assert.Equal("COMPLETED", DomainConstants.TaskStatus.Completed);
     }
 
     [Fact]
     public void Constants_DeliveryRisk_MatchExpectedValues()
     {
-        Assert.Equal("On Track", DomainConstants.DeliveryRisk.OnTrack);
-        Assert.Equal("At Risk", DomainConstants.DeliveryRisk.AtRisk);
-        Assert.Equal("Late", DomainConstants.DeliveryRisk.Late);
+        Assert.Equal("ON_TRACK", DomainConstants.DeliveryRisk.OnTrack);
+        Assert.Equal("AT_RISK", DomainConstants.DeliveryRisk.AtRisk);
+        Assert.Equal("LATE", DomainConstants.DeliveryRisk.Late);
     }
 
     [Fact]
@@ -592,8 +592,8 @@ public class DomainConstantsTests
     [Fact]
     public void Constants_WorkingWeekCodes_MatchExpectedValues()
     {
-        Assert.Equal("sun_thu", DomainConstants.WorkingWeek.SunThu);
-        Assert.Equal("mon_fri", DomainConstants.WorkingWeek.MonFri);
+        Assert.Equal("SUN_THU", DomainConstants.WorkingWeek.SunThu);
+        Assert.Equal("MON_FRI", DomainConstants.WorkingWeek.MonFri);
     }
 }
 
@@ -714,7 +714,7 @@ public class TeamMemberDomainAdditionalTests
     [Fact]
     public void Create_DefaultActive_IsYes()
     {
-        // active parameter defaults to "Yes" when not specified
+        // active parameter defaults to "YES" when not specified
         var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 100, 1, DateTime.Today);
         Assert.Equal(DomainConstants.ActiveStatus.Yes, member.Active);
     }
@@ -821,20 +821,20 @@ public class AdjustmentDomainAdditionalTests
     public void Create_NullResourceId_ThrowsDomainException()
     {
         Assert.Throws<DomainException>(() =>
-            Adjustment.Create(null!, "Vacation", 0, DateTime.Today, DateTime.Today.AddDays(3)));
+            Adjustment.Create(null!, "VACATION", 0, DateTime.Today, DateTime.Today.AddDays(3)));
     }
 
     [Fact]
     public void Create_BoundaryAvailabilityPct_Zero_Accepted()
     {
-        var adj = Adjustment.Create("DEV-001", "Vacation", 0, DateTime.Today, DateTime.Today.AddDays(3));
+        var adj = Adjustment.Create("DEV-001", "VACATION", 0, DateTime.Today, DateTime.Today.AddDays(3));
         Assert.Equal(0, adj.AvailabilityPct);
     }
 
     [Fact]
     public void Create_BoundaryAvailabilityPct_Hundred_Accepted()
     {
-        var adj = Adjustment.Create("DEV-001", "Training", 100, DateTime.Today, DateTime.Today.AddDays(3));
+        var adj = Adjustment.Create("DEV-001", "TRAINING", 100, DateTime.Today, DateTime.Today.AddDays(3));
         Assert.Equal(100, adj.AvailabilityPct);
     }
 
@@ -842,7 +842,7 @@ public class AdjustmentDomainAdditionalTests
     public void Create_DoesNotValidateResourceIdFormat()
     {
         // Adjustment.Create only checks IsNullOrWhiteSpace, not ResourceIdVO format
-        var adj = Adjustment.Create("INVALID", "Vacation", 0, DateTime.Today, DateTime.Today.AddDays(3));
+        var adj = Adjustment.Create("INVALID", "VACATION", 0, DateTime.Today, DateTime.Today.AddDays(3));
         Assert.Equal("INVALID", adj.ResourceId);
     }
 
@@ -866,7 +866,7 @@ public class AdjustmentDomainAdditionalTests
     {
         try
         {
-            var adj = Adjustment.Create("DEV-001", "Vacation", double.NaN, DateTime.Today, DateTime.Today.AddDays(3));
+            var adj = Adjustment.Create("DEV-001", "VACATION", double.NaN, DateTime.Today, DateTime.Today.AddDays(3));
             Assert.True(double.IsNaN(adj.AvailabilityPct));
         }
         catch (DomainException)
@@ -878,7 +878,7 @@ public class AdjustmentDomainAdditionalTests
     [Fact]
     public void Create_WhitespaceOnlyNotes_StoredAsIs()
     {
-        var adj = Adjustment.Create("DEV-001", "Vacation", 0, DateTime.Today, DateTime.Today.AddDays(3), "   ");
+        var adj = Adjustment.Create("DEV-001", "VACATION", 0, DateTime.Today, DateTime.Today.AddDays(3), "   ");
         Assert.Equal("   ", adj.Notes);
     }
 }
@@ -928,55 +928,7 @@ public class HolidayDomainAdditionalTests
     [Fact]
     public void Create_DoesNotTrimNotes()
     {
-        var holiday = Holiday.Create("Test", DateTime.Today, DateTime.Today, "National", "  note  ");
+        var holiday = Holiday.Create("Test", DateTime.Today, DateTime.Today, "NATIONAL", "  note  ");
         Assert.Equal("  note  ", holiday.Notes);
-    }
-}
-
-// ============================================================
-// LookupValue — model tests
-// ============================================================
-
-public class LookupValueTests
-{
-    [Fact]
-    public void DefaultValues_AreCorrect()
-    {
-        var lv = new LookupValue();
-
-        Assert.Equal(0, lv.Id);
-        Assert.Equal(string.Empty, lv.Category);
-        Assert.Equal(string.Empty, lv.Code);
-        Assert.Equal(string.Empty, lv.DisplayName);
-        Assert.Equal(0, lv.SortOrder);
-        Assert.True(lv.IsActive);
-    }
-
-    [Fact]
-    public void CanSetProperties()
-    {
-        var lv = new LookupValue
-        {
-            Id = 1,
-            Category = "TaskStatus",
-            Code = "Not Started",
-            DisplayName = "Not Started",
-            SortOrder = 1,
-            IsActive = false
-        };
-
-        Assert.Equal(1, lv.Id);
-        Assert.Equal("TaskStatus", lv.Category);
-        Assert.Equal("Not Started", lv.Code);
-        Assert.Equal("Not Started", lv.DisplayName);
-        Assert.Equal(1, lv.SortOrder);
-        Assert.False(lv.IsActive);
-    }
-
-    [Fact]
-    public void IsActive_DefaultsToTrue()
-    {
-        var lv = new LookupValue { Category = "Test", Code = "TEST" };
-        Assert.True(lv.IsActive);
     }
 }

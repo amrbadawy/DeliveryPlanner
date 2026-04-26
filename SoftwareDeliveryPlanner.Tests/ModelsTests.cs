@@ -18,8 +18,8 @@ public class ModelsTests
         Assert.Equal(string.Empty, task.ServiceName);
         Assert.Equal(0, task.TotalEstimationDays);
         Assert.Equal(5, task.Priority);
-        Assert.Equal("Not Started", task.Status);
-        Assert.Equal("On Track", task.DeliveryRisk);
+        Assert.Equal("NOT_STARTED", task.Status);
+        Assert.Equal("ON_TRACK", task.DeliveryRisk);
         Assert.Null(task.StrictDate);
         Assert.Null(task.PlannedStart);
         Assert.Null(task.PlannedFinish);
@@ -35,8 +35,8 @@ public class ModelsTests
         Assert.True(task.TotalEstimationDays >= 10);
         Assert.Equal(1, task.Priority);
         Assert.Equal(new DateTime(2026, 6, 1), task.StrictDate);
-        Assert.Equal("Not Started", task.Status);
-        Assert.Equal("On Track", task.DeliveryRisk);
+        Assert.Equal("NOT_STARTED", task.Status);
+        Assert.Equal("ON_TRACK", task.DeliveryRisk);
     }
 
     [Fact]
@@ -65,13 +65,13 @@ public class ModelsTests
         Assert.Equal("Delivery", member.Team);
         Assert.Equal(100.0, member.AvailabilityPct);
         Assert.Equal(1.0, member.DailyCapacity);
-        Assert.Equal("Yes", member.Active);
+        Assert.Equal("YES", member.Active);
     }
 
     [Fact]
     public void TeamMember_CanSetProperties()
     {
-        var member = TeamMember.Create("DEV-001", "Ahmed Al-Rashid", "DEV", "Platform", 80.0, 0.8, new DateTime(2026, 1, 1), active: "No");
+        var member = TeamMember.Create("DEV-001", "Ahmed Al-Rashid", "DEV", "Platform", 80.0, 0.8, new DateTime(2026, 1, 1), active: "NO");
 
         Assert.Equal("DEV-001", member.ResourceId);
         Assert.Equal("Ahmed Al-Rashid", member.ResourceName);
@@ -80,7 +80,7 @@ public class ModelsTests
         Assert.Equal(80.0, member.AvailabilityPct);
         Assert.Equal(0.8, member.DailyCapacity);
         Assert.Equal(new DateTime(2026, 1, 1), member.StartDate);
-        Assert.Equal("No", member.Active);
+        Assert.Equal("NO", member.Active);
     }
 
     [Fact]
@@ -100,17 +100,17 @@ public class ModelsTests
         var adj = new Adjustment();
         
         Assert.Equal(string.Empty, adj.ResourceId);
-        Assert.Equal("Other", adj.AdjType);
+        Assert.Equal("OTHER", adj.AdjType);
         Assert.Equal(0.0, adj.AvailabilityPct);
     }
 
     [Fact]
     public void Adjustment_CanSetProperties()
     {
-        var adj = Adjustment.Create("DEV-001", "Vacation", 0.0, new DateTime(2026, 7, 1), new DateTime(2026, 7, 14), "Summer vacation");
+        var adj = Adjustment.Create("DEV-001", "VACATION", 0.0, new DateTime(2026, 7, 1), new DateTime(2026, 7, 14), "Summer vacation");
 
         Assert.Equal("DEV-001", adj.ResourceId);
-        Assert.Equal("Vacation", adj.AdjType);
+        Assert.Equal("VACATION", adj.AdjType);
         Assert.Equal(new DateTime(2026, 7, 1), adj.AdjStart);
         Assert.Equal(new DateTime(2026, 7, 14), adj.AdjEnd);
         Assert.Equal(0.0, adj.AvailabilityPct);
@@ -127,18 +127,18 @@ public class ModelsTests
         var holiday = new Holiday();
         
         Assert.Equal(string.Empty, holiday.HolidayName);
-        Assert.Equal("National", holiday.HolidayType);
+        Assert.Equal("NATIONAL", holiday.HolidayType);
     }
 
     [Fact]
     public void Holiday_CanSetProperties_DateRange()
     {
-        var holiday = Holiday.Create("Eid Al-Fitr", new DateTime(2026, 3, 30), new DateTime(2026, 4, 2), "Religious", "Festival of Breaking Fast");
+        var holiday = Holiday.Create("Eid Al-Fitr", new DateTime(2026, 3, 30), new DateTime(2026, 4, 2), "RELIGIOUS", "Festival of Breaking Fast");
 
         Assert.Equal("Eid Al-Fitr", holiday.HolidayName);
         Assert.Equal(new DateTime(2026, 3, 30), holiday.StartDate);
         Assert.Equal(new DateTime(2026, 4, 2), holiday.EndDate);
-        Assert.Equal("Religious", holiday.HolidayType);
+        Assert.Equal("RELIGIOUS", holiday.HolidayType);
         Assert.Equal("Festival of Breaking Fast", holiday.Notes);
     }
 
@@ -207,7 +207,7 @@ public class ModelsTests
         Assert.Equal(0, alloc.HoursAllocated);
         Assert.Equal(0, alloc.CumulativeEffort);
         Assert.False(alloc.IsComplete);
-        Assert.Equal("Not Started", alloc.ServiceStatus);
+        Assert.Equal("NOT_STARTED", alloc.ServiceStatus);
         Assert.Null(alloc.SchedRank);
         Assert.Null(alloc.Task);
     }
@@ -227,7 +227,7 @@ public class ModelsTests
             HoursAllocated = 1.0,
             CumulativeEffort = 1.0,
             IsComplete = false,
-            ServiceStatus = "In Progress"
+            ServiceStatus = "IN_PROGRESS"
         };
 
         Assert.Equal("ALLOC-000001", alloc.AllocationId);
@@ -240,7 +240,7 @@ public class ModelsTests
         Assert.Equal(1.0, alloc.HoursAllocated);
         Assert.Equal(1.0, alloc.CumulativeEffort);
         Assert.False(alloc.IsComplete);
-        Assert.Equal("In Progress", alloc.ServiceStatus);
+        Assert.Equal("IN_PROGRESS", alloc.ServiceStatus);
     }
 
     #endregion

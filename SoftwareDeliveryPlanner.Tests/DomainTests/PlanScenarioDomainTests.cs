@@ -177,7 +177,7 @@ public class PlanScenarioDomainTests
     {
         var scenario = PlanScenario.Create("Test", 1, 1, 0, 0, 0, null, null, 5.0, null, TestTimestamp);
         var snapshot = ScenarioTaskSnapshot.Create(
-            0, "TSK-001", "Service", 5, null, null, null, null, null, null, null, "NotStarted", "OnTrack", null, null);
+            0, "TSK-001", "Service", 5, null, null, null, null, null, null, null, "NOT_STARTED", "ON_TRACK", null, null);
 
         scenario.AddTaskSnapshot(snapshot);
 
@@ -199,9 +199,9 @@ public class PlanScenarioDomainTests
         var scenario = PlanScenario.Create("Multi", 2, 2, 0, 0, 0, null, null, 10.0, null, TestTimestamp);
 
         scenario.AddTaskSnapshot(ScenarioTaskSnapshot.Create(
-            0, "TSK-001", "Service A", 3, null, null, null, null, null, null, null, "NotStarted", "OnTrack", null, null));
+            0, "TSK-001", "Service A", 3, null, null, null, null, null, null, null, "NOT_STARTED", "ON_TRACK", null, null));
         scenario.AddTaskSnapshot(ScenarioTaskSnapshot.Create(
-            0, "TSK-002", "Service B", 5, null, null, null, null, null, null, null, "NotStarted", "OnTrack", null, null));
+            0, "TSK-002", "Service B", 5, null, null, null, null, null, null, null, "NOT_STARTED", "ON_TRACK", null, null));
 
         Assert.Equal(2, scenario.TaskSnapshots.Count);
     }

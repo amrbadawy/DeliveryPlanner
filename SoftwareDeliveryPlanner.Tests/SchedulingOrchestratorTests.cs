@@ -161,10 +161,10 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         var d2 = new DateTime(2026, 9, 15);
 
         var t1 = TaskItem.Create("SVA-01", "Task A", 5, B(5));
-        t1.ApplySchedulingResult(1.0, d1.AddDays(-5), d1, 5, "Completed", "On Track");
+        t1.ApplySchedulingResult(1.0, d1.AddDays(-5), d1, 5, "COMPLETED", "ON_TRACK");
         db.Tasks.Add(t1);
         var t2 = TaskItem.Create("SVB-02", "Task B", 5, B(5));
-        t2.ApplySchedulingResult(1.0, d2.AddDays(-5), d2, 5, "Completed", "On Track");
+        t2.ApplySchedulingResult(1.0, d2.AddDays(-5), d2, 5, "COMPLETED", "ON_TRACK");
         db.Tasks.Add(t2);
         await db.SaveChangesAsync();
 
@@ -227,7 +227,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     {
 
 
-        await _holidayService.UpsertHolidayAsync(0, "Test New Holiday", new DateTime(2026, 12, 25), new DateTime(2026, 12, 25), "National", null, true);
+        await _holidayService.UpsertHolidayAsync(0, "Test New Holiday", new DateTime(2026, 12, 25), new DateTime(2026, 12, 25), "NATIONAL", null, true);
 
         await using var db = await _factory.CreateDbContextAsync();
         var persisted = await db.Holidays.FirstOrDefaultAsync(h => h.HolidayName == "Test New Holiday");
@@ -246,14 +246,14 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
 
         // Act: update name and type via orchestrator
 
-        await _holidayService.UpsertHolidayAsync(existingId, "Updated Holiday Name", existing.StartDate, existing.EndDate, "Religious", existing.Notes, false);
+        await _holidayService.UpsertHolidayAsync(existingId, "Updated Holiday Name", existing.StartDate, existing.EndDate, "RELIGIOUS", existing.Notes, false);
 
         // Assert
         await using var verifyDb = await _factory.CreateDbContextAsync();
         var reloaded = await verifyDb.Holidays.FirstOrDefaultAsync(h => h.Id == existingId);
         Assert.NotNull(reloaded);
         Assert.Equal("Updated Holiday Name", reloaded.HolidayName);
-        Assert.Equal("Religious", reloaded.HolidayType);
+        Assert.Equal("RELIGIOUS", reloaded.HolidayType);
     }
 
     [Fact]
@@ -262,7 +262,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
 
 
         var exception = await Record.ExceptionAsync(() =>
-            _holidayService.UpsertHolidayAsync(999999, "Ghost Holiday", new DateTime(2026, 12, 31), new DateTime(2026, 12, 31), "National", null, false));
+            _holidayService.UpsertHolidayAsync(999999, "Ghost Holiday", new DateTime(2026, 12, 31), new DateTime(2026, 12, 31), "NATIONAL", null, false));
 
         Assert.Null(exception);
     }
@@ -382,7 +382,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         // Pre-seed a holiday in 2028 that would overlap with one copied from 2026
         // National Day 2026 = Sep 23 → 2028 = Sep 23
         await using var db = await _factory.CreateDbContextAsync();
-        db.Holidays.Add(Holiday.Create("Pre-existing 2028 Holiday", new DateTime(2028, 9, 23), new DateTime(2028, 9, 23), "National"));
+        db.Holidays.Add(Holiday.Create("Pre-existing 2028 Holiday", new DateTime(2028, 9, 23), new DateTime(2028, 9, 23), "NATIONAL"));
         await db.SaveChangesAsync();
 
 
@@ -591,7 +591,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     {
 
 
-        await _resourceService.UpsertResourceAsync(0, "RES-100", "New Resource", "DEV", "Delivery", 100, 8, new DateTime(2026, 1, 1), "Yes", null, true);
+        await _resourceService.UpsertResourceAsync(0, "RES-100", "New Resource", "DEV", "Delivery", 100, 8, new DateTime(2026, 1, 1), "YES", null, true);
 
         await using var db = await _factory.CreateDbContextAsync();
         var persisted = await db.Resources.FirstOrDefaultAsync(r => r.ResourceId == "RES-100");
@@ -607,7 +607,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         var existingId = existing.Id;
 
 
-        await _resourceService.UpsertResourceAsync(existingId, existing.ResourceId, "Updated Resource Name", "DEV", "Delivery", 80, 6, existing.StartDate, "Yes", null, false);
+        await _resourceService.UpsertResourceAsync(existingId, existing.ResourceId, "Updated Resource Name", "DEV", "Delivery", 80, 6, existing.StartDate, "YES", null, false);
 
         await using var verifyDb = await _factory.CreateDbContextAsync();
         var reloaded = await verifyDb.Resources.FirstOrDefaultAsync(r => r.Id == existingId);
@@ -659,7 +659,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     {
 
 
-        await _adjustmentService.AddAdjustmentAsync("DEV-001", "Vacation", 50, new DateTime(2026, 7, 1), new DateTime(2026, 7, 5), "Test adjustment");
+        await _adjustmentService.AddAdjustmentAsync("DEV-001", "VACATION", 50, new DateTime(2026, 7, 1), new DateTime(2026, 7, 5), "Test adjustment");
 
         await using var db = await _factory.CreateDbContextAsync();
         var persisted = await db.Adjustments.FirstOrDefaultAsync(
@@ -673,7 +673,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
     {
         // First add an adjustment
         await using var db = await _factory.CreateDbContextAsync();
-        var adj = Adjustment.Create("DEV-001", "Sick Leave", 0, new DateTime(2026, 8, 1), new DateTime(2026, 8, 5));
+        var adj = Adjustment.Create("DEV-001", "SICK_LEAVE", 0, new DateTime(2026, 8, 1), new DateTime(2026, 8, 5));
         db.Adjustments.Add(adj);
         await db.SaveChangesAsync();
         var adjId = adj.Id;
@@ -738,7 +738,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         await _schedulerService.RunSchedulerAsync();
 
         await using var db = await _factory.CreateDbContextAsync();
-        var resource = await db.Resources.FirstAsync(r => r.Active == "Yes");
+        var resource = await db.Resources.FirstAsync(r => r.Active == "YES");
 
         var start = new DateTime(2026, 5, 1);
         var end = new DateTime(2026, 5, 31);
@@ -755,7 +755,7 @@ public class SchedulingOrchestratorTests : IAsyncDisposable
         await _schedulerService.RunSchedulerAsync();
 
         await using var db = await _factory.CreateDbContextAsync();
-        var resource = await db.Resources.FirstAsync(r => r.Active == "Yes");
+        var resource = await db.Resources.FirstAsync(r => r.Active == "YES");
 
         var start = new DateTime(2026, 5, 1);
         var end = new DateTime(2026, 5, 31);

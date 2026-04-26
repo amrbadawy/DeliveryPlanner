@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.Infrastructure.Data;
 using SoftwareDeliveryPlanner.Domain.Models;
 using SoftwareDeliveryPlanner.Infrastructure.Services;
@@ -458,7 +459,7 @@ public class SchedulingEngineTests : IDisposable
         _engine.RunScheduler();
 
         var task = _db.Tasks.First(t => t.TaskId == "SM-001");
-        Assert.Equal("Completed", task.Status);
+        Assert.Equal(DomainConstants.TaskStatus.Completed, task.Status);
     }
 
     #endregion
@@ -582,7 +583,7 @@ public class SchedulingEngineMonFriTests : IDisposable
 
         // Change working week to Mon-Fri
         var weekSetting = _db.Settings.First(s => s.Key == "working_week");
-        weekSetting.Value = "mon_fri";
+        weekSetting.Value = DomainConstants.WorkingWeek.MonFri;
         _db.SaveChanges();
 
         _engine = new SchedulingEngine(_db, TimeProvider.System);

@@ -33,7 +33,7 @@ public class Enhancement14_PeakConcurrencyTests
     {
         var snap = ScenarioTaskSnapshot.Create(1, "TSK-001", "Service", 5, null,
             null, null, null, null, null, peakConcurrency: 2.5,
-            status: "NotStarted", deliveryRisk: "OnTrack",
+            status: "NOT_STARTED", deliveryRisk: "ON_TRACK",
             dependsOnTaskIds: null, phase: null);
         Assert.Equal(2.5, snap.PeakConcurrency);
     }
@@ -43,7 +43,7 @@ public class Enhancement14_PeakConcurrencyTests
     {
         var snap = ScenarioTaskSnapshot.Create(1, "TSK-002", "Service", 5, null,
             null, null, null, null, null, peakConcurrency: null,
-            status: "NotStarted", deliveryRisk: "OnTrack",
+            status: "NOT_STARTED", deliveryRisk: "ON_TRACK",
             dependsOnTaskIds: null, phase: null);
         Assert.Null(snap.PeakConcurrency);
     }
@@ -467,7 +467,7 @@ public class Enhancement11_12_13_5_SchedulingServicesTests : IDisposable
         _engine.RunScheduler();
 
         var task = _db.Tasks.First(t => t.TaskId == "PP-002");
-        Assert.Equal("Completed", task.Status);
+        Assert.Equal(DomainConstants.TaskStatus.Completed, task.Status);
         Assert.NotNull(task.PlannedStart);
         Assert.NotNull(task.PlannedFinish);
     }
