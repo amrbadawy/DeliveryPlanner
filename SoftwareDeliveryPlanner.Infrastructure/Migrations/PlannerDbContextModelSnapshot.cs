@@ -22,6 +22,51 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.ActiveStatusLookup", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Code");
+
+                    b.HasIndex("SortOrder");
+
+                    b.ToTable("ActiveStatuses", "resource", t =>
+                        {
+                            t.HasCheckConstraint("CK_ActiveStatuses_Code_Format", "Code = UPPER(Code) AND Code NOT LIKE '% %'");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Code = "YES",
+                            DisplayName = "Yes",
+                            IsActive = true,
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            Code = "NO",
+                            DisplayName = "No",
+                            IsActive = true,
+                            SortOrder = 2
+                        });
+                });
+
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.Adjustment", b =>
                 {
                     b.Property<int>("Id")
@@ -38,8 +83,8 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     b.Property<string>("AdjType")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<double>("AvailabilityPct")
                         .HasColumnType("float");
@@ -55,9 +100,70 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AdjType");
+
                     b.HasIndex("ResourceId");
 
                     b.ToTable("Adjustments", "resource");
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.AdjustmentTypeLookup", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Code");
+
+                    b.HasIndex("SortOrder");
+
+                    b.ToTable("AdjustmentTypes", "resource", t =>
+                        {
+                            t.HasCheckConstraint("CK_AdjustmentTypes_Code_Format", "Code = UPPER(Code) AND Code NOT LIKE '% %'");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Code = "VACATION",
+                            DisplayName = "Vacation",
+                            IsActive = true,
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            Code = "TRAINING",
+                            DisplayName = "Training",
+                            IsActive = true,
+                            SortOrder = 2
+                        },
+                        new
+                        {
+                            Code = "SICK_LEAVE",
+                            DisplayName = "Sick Leave",
+                            IsActive = true,
+                            SortOrder = 3
+                        },
+                        new
+                        {
+                            Code = "OTHER",
+                            DisplayName = "Other",
+                            IsActive = true,
+                            SortOrder = 4
+                        });
                 });
 
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.Allocation", b =>
@@ -220,6 +326,58 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.ToTable("CalendarDays", "scheduling");
                 });
 
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.DeliveryRiskLookup", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Code");
+
+                    b.HasIndex("SortOrder");
+
+                    b.ToTable("DeliveryRisks", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_DeliveryRisks_Code_Format", "Code = UPPER(Code) AND Code NOT LIKE '% %'");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Code = "ON_TRACK",
+                            DisplayName = "On Track",
+                            IsActive = true,
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            Code = "AT_RISK",
+                            DisplayName = "At Risk",
+                            IsActive = true,
+                            SortOrder = 2
+                        },
+                        new
+                        {
+                            Code = "LATE",
+                            DisplayName = "Late",
+                            IsActive = true,
+                            SortOrder = 3
+                        });
+                });
+
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.Holiday", b =>
                 {
                     b.Property<int>("Id")
@@ -238,8 +396,8 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     b.Property<string>("HolidayType")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
@@ -252,26 +410,16 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     b.HasIndex("EndDate");
 
+                    b.HasIndex("HolidayType");
+
                     b.HasIndex("StartDate");
 
                     b.ToTable("Holidays", "resource");
                 });
 
-            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.LookupValue", b =>
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.HolidayTypeLookup", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
                     b.Property<string>("Code")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
@@ -281,227 +429,43 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");
 
-                    b.HasKey("Id");
+                    b.HasKey("Code");
 
-                    b.HasIndex("Category");
+                    b.HasIndex("SortOrder");
 
-                    b.HasIndex("Category", "Code")
-                        .IsUnique();
-
-                    b.ToTable("LookupValues", (string)null);
+                    b.ToTable("HolidayTypes", "resource", t =>
+                        {
+                            t.HasCheckConstraint("CK_HolidayTypes_Code_Format", "Code = UPPER(Code) AND Code NOT LIKE '% %'");
+                        });
 
                     b.HasData(
                         new
                         {
-                            Id = 1,
-                            Category = "TaskStatus",
-                            Code = "Not Started",
-                            DisplayName = "Not Started",
-                            IsActive = true,
-                            SortOrder = 1
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Category = "TaskStatus",
-                            Code = "In Progress",
-                            DisplayName = "In Progress",
-                            IsActive = true,
-                            SortOrder = 2
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Category = "TaskStatus",
-                            Code = "Completed",
-                            DisplayName = "Completed",
-                            IsActive = true,
-                            SortOrder = 3
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Category = "DeliveryRisk",
-                            Code = "On Track",
-                            DisplayName = "On Track",
-                            IsActive = true,
-                            SortOrder = 1
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Category = "DeliveryRisk",
-                            Code = "At Risk",
-                            DisplayName = "At Risk",
-                            IsActive = true,
-                            SortOrder = 2
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Category = "DeliveryRisk",
-                            Code = "Late",
-                            DisplayName = "Late",
-                            IsActive = true,
-                            SortOrder = 3
-                        },
-                        new
-                        {
-                            Id = 7,
-                            Category = "HolidayType",
-                            Code = "National",
+                            Code = "NATIONAL",
                             DisplayName = "National",
                             IsActive = true,
                             SortOrder = 1
                         },
                         new
                         {
-                            Id = 8,
-                            Category = "HolidayType",
-                            Code = "Religious",
+                            Code = "RELIGIOUS",
                             DisplayName = "Religious",
                             IsActive = true,
                             SortOrder = 2
                         },
                         new
                         {
-                            Id = 9,
-                            Category = "HolidayType",
-                            Code = "Company",
+                            Code = "COMPANY",
                             DisplayName = "Company",
                             IsActive = true,
                             SortOrder = 3
-                        },
-                        new
-                        {
-                            Id = 10,
-                            Category = "AdjustmentType",
-                            Code = "Vacation",
-                            DisplayName = "Vacation",
-                            IsActive = true,
-                            SortOrder = 1
-                        },
-                        new
-                        {
-                            Id = 11,
-                            Category = "AdjustmentType",
-                            Code = "Training",
-                            DisplayName = "Training",
-                            IsActive = true,
-                            SortOrder = 2
-                        },
-                        new
-                        {
-                            Id = 12,
-                            Category = "AdjustmentType",
-                            Code = "Sick Leave",
-                            DisplayName = "Sick Leave",
-                            IsActive = true,
-                            SortOrder = 3
-                        },
-                        new
-                        {
-                            Id = 13,
-                            Category = "AdjustmentType",
-                            Code = "Other",
-                            DisplayName = "Other",
-                            IsActive = true,
-                            SortOrder = 4
-                        },
-                        new
-                        {
-                            Id = 14,
-                            Category = "ActiveStatus",
-                            Code = "Yes",
-                            DisplayName = "Yes",
-                            IsActive = true,
-                            SortOrder = 1
-                        },
-                        new
-                        {
-                            Id = 15,
-                            Category = "ActiveStatus",
-                            Code = "No",
-                            DisplayName = "No",
-                            IsActive = true,
-                            SortOrder = 2
-                        },
-                        new
-                        {
-                            Id = 16,
-                            Category = "ResourceRole",
-                            Code = "DEV",
-                            DisplayName = "Developer",
-                            IsActive = true,
-                            SortOrder = 1
-                        },
-                        new
-                        {
-                            Id = 17,
-                            Category = "ResourceRole",
-                            Code = "QA",
-                            DisplayName = "Quality Assurance",
-                            IsActive = true,
-                            SortOrder = 2
-                        },
-                        new
-                        {
-                            Id = 18,
-                            Category = "ResourceRole",
-                            Code = "SA",
-                            DisplayName = "System Analyst",
-                            IsActive = true,
-                            SortOrder = 3
-                        },
-                        new
-                        {
-                            Id = 19,
-                            Category = "ResourceRole",
-                            Code = "BA",
-                            DisplayName = "Business Analyst",
-                            IsActive = true,
-                            SortOrder = 4
-                        },
-                        new
-                        {
-                            Id = 20,
-                            Category = "ResourceRole",
-                            Code = "UX",
-                            DisplayName = "UX Designer",
-                            IsActive = true,
-                            SortOrder = 5
-                        },
-                        new
-                        {
-                            Id = 21,
-                            Category = "ResourceRole",
-                            Code = "UI",
-                            DisplayName = "UI Designer",
-                            IsActive = true,
-                            SortOrder = 6
-                        },
-                        new
-                        {
-                            Id = 22,
-                            Category = "WorkingWeek",
-                            Code = "sun_thu",
-                            DisplayName = "Sunday - Thursday",
-                            IsActive = true,
-                            SortOrder = 1
-                        },
-                        new
-                        {
-                            Id = 23,
-                            Category = "WorkingWeek",
-                            Code = "mon_fri",
-                            DisplayName = "Monday - Friday",
-                            IsActive = true,
-                            SortOrder = 2
                         });
                 });
 
@@ -944,8 +908,8 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     b.Property<string>("DeliveryRisk")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<int?>("Duration")
                         .HasColumnType("int");
@@ -983,8 +947,8 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime?>("StrictDate")
                         .HasColumnType("datetime2");
@@ -998,6 +962,10 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DeliveryRisk");
+
+                    b.HasIndex("Status");
 
                     b.HasIndex("TaskId")
                         .IsUnique();
@@ -1038,6 +1006,58 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.ToTable("TaskNotes", "task");
                 });
 
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TaskStatusLookup", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Code");
+
+                    b.HasIndex("SortOrder");
+
+                    b.ToTable("TaskStatuses", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_TaskStatuses_Code_Format", "Code = UPPER(Code) AND Code NOT LIKE '% %'");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Code = "NOT_STARTED",
+                            DisplayName = "Not Started",
+                            IsActive = true,
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            Code = "IN_PROGRESS",
+                            DisplayName = "In Progress",
+                            IsActive = true,
+                            SortOrder = 2
+                        },
+                        new
+                        {
+                            Code = "COMPLETED",
+                            DisplayName = "Completed",
+                            IsActive = true,
+                            SortOrder = 3
+                        });
+                });
+
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TeamMember", b =>
                 {
                     b.Property<int>("Id")
@@ -1048,8 +1068,8 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
 
                     b.Property<string>("Active")
                         .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<double>("AvailabilityPct")
                         .HasColumnType("float");
@@ -1098,21 +1118,76 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("WorkingWeek")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Active");
 
                     b.HasIndex("ResourceId")
                         .IsUnique();
 
                     b.HasIndex("Role");
 
+                    b.HasIndex("WorkingWeek");
+
                     b.ToTable("TeamMembers", "resource");
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.WorkingWeekLookup", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Code");
+
+                    b.HasIndex("SortOrder");
+
+                    b.ToTable("WorkingWeeks", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_WorkingWeeks_Code_Format", "Code = UPPER(Code) AND Code NOT LIKE '% %'");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Code = "SUN_THU",
+                            DisplayName = "Sunday - Thursday",
+                            IsActive = true,
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            Code = "MON_FRI",
+                            DisplayName = "Monday - Friday",
+                            IsActive = true,
+                            SortOrder = 2
+                        });
                 });
 
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.Adjustment", b =>
                 {
+                    b.HasOne("SoftwareDeliveryPlanner.Domain.Models.AdjustmentTypeLookup", null)
+                        .WithMany()
+                        .HasForeignKey("AdjType")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("SoftwareDeliveryPlanner.Domain.Models.TeamMember", null)
                         .WithMany("Adjustments")
                         .HasForeignKey("ResourceId")
@@ -1131,6 +1206,15 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Task");
+                });
+
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.Holiday", b =>
+                {
+                    b.HasOne("SoftwareDeliveryPlanner.Domain.Models.HolidayTypeLookup", null)
+                        .WithMany()
+                        .HasForeignKey("HolidayType")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.ScenarioEffortSnapshot", b =>
@@ -1179,14 +1263,40 @@ namespace SoftwareDeliveryPlanner.Infrastructure.Migrations
                     b.Navigation("Task");
                 });
 
+            modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TaskItem", b =>
+                {
+                    b.HasOne("SoftwareDeliveryPlanner.Domain.Models.DeliveryRiskLookup", null)
+                        .WithMany()
+                        .HasForeignKey("DeliveryRisk")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SoftwareDeliveryPlanner.Domain.Models.TaskStatusLookup", null)
+                        .WithMany()
+                        .HasForeignKey("Status")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.TeamMember", b =>
                 {
+                    b.HasOne("SoftwareDeliveryPlanner.Domain.Models.ActiveStatusLookup", null)
+                        .WithMany()
+                        .HasForeignKey("Active")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("SoftwareDeliveryPlanner.Domain.Models.Role", null)
                         .WithMany()
                         .HasForeignKey("Role")
                         .HasPrincipalKey("Code")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("SoftwareDeliveryPlanner.Domain.Models.WorkingWeekLookup", null)
+                        .WithMany()
+                        .HasForeignKey("WorkingWeek")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("SoftwareDeliveryPlanner.Domain.Models.PlanScenario", b =>

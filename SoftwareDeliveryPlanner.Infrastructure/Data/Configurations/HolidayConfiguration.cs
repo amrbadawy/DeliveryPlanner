@@ -18,7 +18,7 @@ public sealed class HolidayConfiguration : IEntityTypeConfiguration<Holiday>
 
         builder.Property(h => h.HolidayType)
             .IsRequired()
-            .HasMaxLength(30);
+            .HasMaxLength(50);
 
         builder.Property(h => h.Notes)
             .HasMaxLength(500);
@@ -28,5 +28,11 @@ public sealed class HolidayConfiguration : IEntityTypeConfiguration<Holiday>
 
         builder.HasIndex(h => h.StartDate);
         builder.HasIndex(h => h.EndDate);
+
+        builder.HasOne<HolidayTypeLookup>()
+            .WithMany()
+            .HasForeignKey(h => h.HolidayType)
+            .HasPrincipalKey(x => x.Code)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -18,10 +18,16 @@ public sealed class AdjustmentConfiguration : IEntityTypeConfiguration<Adjustmen
 
         builder.Property(a => a.AdjType)
             .IsRequired()
-            .HasMaxLength(30);
+            .HasMaxLength(50);
 
         builder.Property(a => a.Notes)
             .HasMaxLength(500);
+
+        builder.HasOne<AdjustmentTypeLookup>()
+            .WithMany()
+            .HasForeignKey(a => a.AdjType)
+            .HasPrincipalKey(x => x.Code)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // FK to TeamMembers is configured via TeamMemberConfiguration.HasMany(Adjustments)
     }

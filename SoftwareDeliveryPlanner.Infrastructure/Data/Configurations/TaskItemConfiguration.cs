@@ -23,11 +23,11 @@ public sealed class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
 
         builder.Property(t => t.Status)
             .IsRequired()
-            .HasMaxLength(30);
+            .HasMaxLength(50);
 
         builder.Property(t => t.DeliveryRisk)
             .IsRequired()
-            .HasMaxLength(30);
+            .HasMaxLength(50);
 
         builder.Property(t => t.AssignedResourceId)
             .HasMaxLength(500);
@@ -62,5 +62,17 @@ public sealed class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
 
         builder.HasIndex(t => t.TaskId)
             .IsUnique();
+
+        builder.HasOne<TaskStatusLookup>()
+            .WithMany()
+            .HasForeignKey(t => t.Status)
+            .HasPrincipalKey(x => x.Code)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<DeliveryRiskLookup>()
+            .WithMany()
+            .HasForeignKey(t => t.DeliveryRisk)
+            .HasPrincipalKey(x => x.Code)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

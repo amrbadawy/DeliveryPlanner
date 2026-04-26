@@ -31,7 +31,7 @@ public sealed class TeamMemberConfiguration : IEntityTypeConfiguration<TeamMembe
 
         builder.Property(r => r.Active)
             .IsRequired()
-            .HasMaxLength(10);
+            .HasMaxLength(50);
 
         builder.Property(r => r.Notes)
             .HasMaxLength(500);
@@ -42,7 +42,7 @@ public sealed class TeamMemberConfiguration : IEntityTypeConfiguration<TeamMembe
             .HasDefaultValue("Mid");
 
         builder.Property(r => r.WorkingWeek)
-            .HasMaxLength(20);
+            .HasMaxLength(50);
 
         builder.HasIndex(r => r.ResourceId)
             .IsUnique();
@@ -51,6 +51,18 @@ public sealed class TeamMemberConfiguration : IEntityTypeConfiguration<TeamMembe
             .WithMany()
             .HasForeignKey(r => r.Role)
             .HasPrincipalKey(r => r.Code)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<ActiveStatusLookup>()
+            .WithMany()
+            .HasForeignKey(r => r.Active)
+            .HasPrincipalKey(x => x.Code)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<WorkingWeekLookup>()
+            .WithMany()
+            .HasForeignKey(r => r.WorkingWeek)
+            .HasPrincipalKey(x => x.Code)
             .OnDelete(DeleteBehavior.Restrict);
 
         // Configure Adjustments navigation via backing field

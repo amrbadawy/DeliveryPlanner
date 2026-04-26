@@ -15,7 +15,12 @@ internal class ReadOnlyPlannerDbContext : DbContext
     public DbSet<CalendarDay> Calendar { get; set; }
     public DbSet<Allocation> Allocations { get; set; }
     public DbSet<Setting> Settings { get; set; }
-    public DbSet<LookupValue> Lookups { get; set; }
+    public DbSet<TaskStatusLookup> TaskStatuses { get; set; }
+    public DbSet<DeliveryRiskLookup> DeliveryRisks { get; set; }
+    public DbSet<HolidayTypeLookup> HolidayTypes { get; set; }
+    public DbSet<AdjustmentTypeLookup> AdjustmentTypes { get; set; }
+    public DbSet<ActiveStatusLookup> ActiveStatuses { get; set; }
+    public DbSet<WorkingWeekLookup> WorkingWeeks { get; set; }
     public DbSet<Role> Roles { get; set; }
     public DbSet<TaskNote> TaskNotes => Set<TaskNote>();
     public DbSet<SchedulerSnapshot> SchedulerSnapshots => Set<SchedulerSnapshot>();
