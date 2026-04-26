@@ -62,6 +62,7 @@ public static class DependencyInjection
         services.AddScoped<ITaskOrchestrator, TaskService>();
         services.AddScoped<IResourceOrchestrator, ResourceService>();
         services.AddScoped<IRoleOrchestrator, RoleService>();
+        services.AddScoped<ILookupOrchestrator, LookupService>();
         services.AddScoped<IAdjustmentOrchestrator, AdjustmentService>();
         services.AddScoped<IHolidayOrchestrator, HolidayService>();
         services.AddScoped<ISchedulerService, SchedulerService>();

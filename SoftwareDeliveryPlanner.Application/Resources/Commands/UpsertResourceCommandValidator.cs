@@ -5,7 +5,7 @@ namespace SoftwareDeliveryPlanner.Application.Resources.Commands;
 
 public sealed class UpsertResourceCommandValidator : AbstractValidator<UpsertResourceCommand>
 {
-    public UpsertResourceCommandValidator(IRoleOrchestrator roleOrchestrator)
+    public UpsertResourceCommandValidator(IRoleOrchestrator roleOrchestrator, ILookupOrchestrator? lookupOrchestrator = null)
     {
         RuleFor(c => c.ResourceId).NotEmpty().WithMessage("Resource ID is required.");
         RuleFor(c => c.ResourceName).NotEmpty().WithMessage("Name is required.");
@@ -26,5 +26,25 @@ public sealed class UpsertResourceCommandValidator : AbstractValidator<UpsertRes
             })
             .WithName("Role")
             .WithMessage("Selected role is invalid or inactive.");
+
+        RuleFor(c => c.Active)
+            .NotEmpty().WithMessage("Active status is required.");
+
+        if (lookupOrchestrator is not null)
+        {
+            RuleFor(c => c.Active)
+                .MustAsync(async (value, ct) => await lookupOrchestrator.IsActiveLookupValueAsync(LookupCatalogs.ActiveStatuses, value, ct))
+                .WithMessage("Selected active status is invalid or inactive.");
+
+            RuleFor(c => c.WorkingWeek)
+                .MustAsync(async (value, ct) =>
+                {
+                    if (string.IsNullOrWhiteSpace(value))
+                        return true;
+
+                    return await lookupOrchestrator.IsActiveLookupValueAsync(LookupCatalogs.WorkingWeeks, value, ct);
+                })
+                .WithMessage("Selected working week is invalid or inactive.");
+        }
     }
 }

@@ -55,6 +55,12 @@ public interface IRoleOrchestrator
     Task<bool> IsRoleInUseAsync(string code, CancellationToken cancellationToken = default);
 }
 
+public interface ILookupOrchestrator
+{
+    Task<List<LookupOptionDto>> GetLookupOptionsAsync(string catalog, bool includeInactive = false, CancellationToken cancellationToken = default);
+    Task<bool> IsActiveLookupValueAsync(string catalog, string code, CancellationToken cancellationToken = default);
+}
+
 public interface IAdjustmentOrchestrator
 {
     Task<List<Adjustment>> GetAdjustmentsAsync(CancellationToken cancellationToken = default);
