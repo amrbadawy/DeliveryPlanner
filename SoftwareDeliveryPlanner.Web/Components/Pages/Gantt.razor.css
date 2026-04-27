@@ -105,6 +105,11 @@
 }
 
 /* ── Task rows ─────────────────────────────────────────────── */
+.gantt-rows-container {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
 .gantt-row {
     display: flex;
     border-bottom: 1px solid var(--color-border-light);
@@ -199,7 +204,7 @@
     box-shadow: var(--shadow-sm);
     transition: filter 0.15s ease;
     overflow: hidden;
-    background: rgba(0, 0, 0, 0.03);
+    background: var(--gantt-shell-bg);
     border: 1px solid var(--color-border);
     border-radius: 4px;
 }
@@ -318,7 +323,7 @@
     bottom: 0;
     width: 2px;
     background: var(--color-accent);
-    z-index: 3;
+    z-index: 1;
     opacity: 0.7;
 }
 
@@ -396,10 +401,13 @@
     opacity: 0;
     transition: opacity 0.15s ease;
     max-width: 300px;
+    overflow-wrap: break-word;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
-.gantt-tooltip:hover::after {
+.gantt-tooltip:hover::after,
+.gantt-tooltip:focus-within::after,
+.gantt-tooltip:focus::after {
     opacity: 1;
 }
 
@@ -430,6 +438,17 @@
 @keyframes critical-pulse {
     0%, 100% { outline-color: var(--color-danger, #dc3545); }
     50% { outline-color: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gantt-bar-critical { animation: none; }
+}
+
+/* ── Segment focus-visible for keyboard navigation ──── */
+.gantt-segment:focus-visible {
+    outline: 2px solid var(--color-accent, #3b82f6);
+    outline-offset: 1px;
+    z-index: 2;
 }
 
 /* ── Estimated segment styling (dashed, lower opacity) ──── */
@@ -503,4 +522,19 @@
     outline: 2px solid var(--color-accent, #3b82f6);
     outline-offset: -2px;
     border-radius: var(--radius-sm);
+}
+
+/* ── Print styles ──────────────────────────────────────────── */
+@media print {
+    .gantt-container { overflow: visible; }
+    .gantt-rows-container { max-height: none; overflow: visible; }
+    .gantt-segment, .gantt-legend-toggle { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .gantt-today-line { display: none; }
+    .gantt-bar-critical { animation: none; }
+}
+
+/* ── Responsive: narrow viewport guidance ──────────────────── */
+@media (max-width: 768px) {
+    .gantt-label-col { min-width: 160px; max-width: 160px; font-size: 11px; }
+    .gantt-row, .gantt-header { min-width: 700px; }
 }

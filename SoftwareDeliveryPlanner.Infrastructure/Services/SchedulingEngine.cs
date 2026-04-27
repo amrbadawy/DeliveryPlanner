@@ -19,7 +19,9 @@ internal class SchedulingEngine : ISchedulingEngine
     private readonly HashSet<DayOfWeek> _weekendDays;
     private readonly bool _ownsContext;
 
-    // In-memory holiday cache — loaded once per RunScheduler call to avoid 1460+ DB queries.
+    // ── Scheduling constants ────────────────────────────────────────────────
+    /// <summary>Maximum plan horizon in calendar days from plan start date.</summary>
+    private const int PlanHorizonDays = 730;
     private List<Holiday>? _holidayCache;
 
     public SchedulingEngine(PlannerDbContext db, TimeProvider timeProvider, bool ownsContext = false)
@@ -349,13 +351,15 @@ internal class SchedulingEngine : ISchedulingEngine
 
             var predBreakdown = predTask.EffortBreakdown.OrderBy(e => e.SortOrder).ToList();
             if (predBreakdown.Count == 0)
-                return false;
+                continue; // zero-effort predecessor is trivially satisfied
 
             var predTotalHours = predBreakdown.Sum(p => p.EstimationDays * DomainConstants.HoursPerDay);
+            if (predTotalHours <= 0)
+                continue; // zero total hours = milestone task, trivially satisfied
             var predCompletedHours = predBreakdown.Sum(p =>
                 phaseCompletedHours.GetValueOrDefault(dep.PredecessorTaskId)?.GetValueOrDefault(p.Role) ?? 0);
 
-            switch (dep.Type.ToUpperInvariant())
+            switch ((dep.Type ?? DomainConstants.DependencyType.FinishToStart).ToUpperInvariant())
             {
                 case DomainConstants.DependencyType.FinishToStart:
                 {
@@ -430,7 +434,7 @@ internal class SchedulingEngine : ISchedulingEngine
 
         var planStartSetting = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.PlanStartDate);
         var planStart = DateTime.TryParse(planStartSetting?.Value, out var ps) ? ps : new DateTime(2026, 5, 1);
-        var endDate = planStart.AddDays(730);
+        var endDate = planStart.AddDays(PlanHorizonDays);
 
         // Read scheduling strategy
         var strategySetting = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.SchedulingStrategy);
@@ -571,8 +575,9 @@ internal class SchedulingEngine : ISchedulingEngine
         }
 
         // Auto-complete phases where no active resources exist for the role.
-        // Without this, the overlap constraint (line ~648) permanently blocks
+        // Without this, the overlap constraint permanently blocks
         // downstream phases when a preceding phase can never be staffed.
+        var autoSkippedPhases = new List<(string TaskId, string Role)>();
         foreach (var task in tasks)
         {
             foreach (var phase in task.EffortBreakdown)
@@ -581,6 +586,7 @@ internal class SchedulingEngine : ISchedulingEngine
                 {
                     var totalHours = phase.EstimationDays * DomainConstants.HoursPerDay;
                     phaseCompletedHours[task.TaskId][phase.Role] = totalHours;
+                    autoSkippedPhases.Add((task.TaskId, phase.Role));
                 }
             }
         }
@@ -874,6 +880,15 @@ internal class SchedulingEngine : ISchedulingEngine
         _db.SaveChanges();
 
         var resultMessage = $"Successfully scheduled {tasks.Count} tasks with {allocations.Count} allocations";
+
+        // Append warnings for auto-skipped phases and zero active resources
+        if (!resourcesByRole.Any())
+            resultMessage += ". WARNING: No active resources found — all phases were auto-skipped";
+        else if (autoSkippedPhases.Count > 0)
+        {
+            var skippedRoles = autoSkippedPhases.Select(s => s.Role).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(r => r);
+            resultMessage += $". {autoSkippedPhases.Count} phase(s) auto-skipped (no resources for: {string.Join(", ", skippedRoles)})";
+        }
 
         // Tag the trace span with scheduling outcome — visible in Aspire dashboard and APM tools.
         activity?.SetTag("scheduling.task_count", tasks.Count);

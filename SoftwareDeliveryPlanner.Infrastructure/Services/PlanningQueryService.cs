@@ -634,7 +634,9 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
 
         var effortByTask = tasks.ToDictionary(
             t => t.TaskId,
-            t => t.EffortBreakdown.ToDictionary(e => e.Role, e => e.MaxFte, StringComparer.OrdinalIgnoreCase),
+            t => t.EffortBreakdown
+                .GroupBy(e => e.Role, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().MaxFte, StringComparer.OrdinalIgnoreCase),
             StringComparer.OrdinalIgnoreCase);
 
         // Load active resources for names
@@ -690,7 +692,10 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
             var allocatedRoles = allocated.Select(s => s.Role).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             // Build a lookup from allocated role to its actual date range (M11: hybrid fix)
-            var allocatedSegmentLookup = allocated.ToDictionary(s => s.Role, s => s, StringComparer.OrdinalIgnoreCase);
+            // GroupBy guards against duplicate roles in allocation data
+            var allocatedSegmentLookup = allocated
+                .GroupBy(s => s.Role, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
             // Find missing (unallocated) roles
             var missingEfforts = task.EffortBreakdown

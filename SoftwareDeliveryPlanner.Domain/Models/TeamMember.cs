@@ -65,6 +65,12 @@ public class TeamMember : AggregateRoot
         if (dailyCapacity <= 0)
             throw new DomainException("Daily capacity must be greater than zero.");
 
+        if (!DomainConstants.ResourceRole.AllRoles.Contains(role))
+            throw new DomainException($"Invalid role '{role}'. Valid roles: {string.Join(", ", DomainConstants.ResourceRole.AllRoles)}.");
+
+        if (active != DomainConstants.ActiveStatus.Yes && active != DomainConstants.ActiveStatus.No)
+            throw new DomainException($"Invalid active status '{active}'. Valid values: {DomainConstants.ActiveStatus.Yes}, {DomainConstants.ActiveStatus.No}.");
+
         if (!DomainConstants.Seniority.IsValid(seniorityLevel))
             throw new DomainException($"Invalid seniority level '{seniorityLevel}'. Valid levels: {string.Join(", ", DomainConstants.Seniority.Levels)}.");
 
@@ -120,6 +126,12 @@ public class TeamMember : AggregateRoot
 
         if (dailyCapacity <= 0)
             throw new DomainException("Daily capacity must be greater than zero.");
+
+        if (!DomainConstants.ResourceRole.AllRoles.Contains(role))
+            throw new DomainException($"Invalid role '{role}'. Valid roles: {string.Join(", ", DomainConstants.ResourceRole.AllRoles)}.");
+
+        if (active != DomainConstants.ActiveStatus.Yes && active != DomainConstants.ActiveStatus.No)
+            throw new DomainException($"Invalid active status '{active}'. Valid values: {DomainConstants.ActiveStatus.Yes}, {DomainConstants.ActiveStatus.No}.");
 
         if (!DomainConstants.Seniority.IsValid(seniorityLevel))
             throw new DomainException($"Invalid seniority level '{seniorityLevel}'. Valid levels: {string.Join(", ", DomainConstants.Seniority.Levels)}.");

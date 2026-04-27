@@ -266,7 +266,7 @@ else
                 <i class="bi bi-graph-up-arrow me-2"></i>Risk Trend
             </div>
             <div class="card-body" data-testid="risk-trend-chart">
-                <div class="d-flex align-items-end gap-1" style="height: 120px;">
+                <div class="d-flex align-items-end gap-1" style="height: 120px;" role="img" aria-label="Risk trend chart: @riskTrend.Count data points showing on-track, at-risk, and late task distribution over time">
                     @foreach (var point in riskTrend)
                     {
                         var total = Math.Max(point.Total, 1);
@@ -281,7 +281,7 @@ else
                     }
                 </div>
                 <div class="d-flex justify-content-between mt-2 small text-muted">
-                    @if (riskTrend.Any())
+    @if (riskTrend.Any() && riskTrend.Any(p => p.Total > 0))
                     {
                         <span>@riskTrend.First().RunTimestamp.ToString("MMM dd")</span>
                         <span>@riskTrend.Last().RunTimestamp.ToString("MMM dd")</span>

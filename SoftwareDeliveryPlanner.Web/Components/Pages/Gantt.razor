@@ -20,7 +20,7 @@
         <p class="page-subtitle">Visual timeline of task scheduling and progress</p>
     </div>
     <div>
-        <button class="btn @(showCriticalPath ? "btn-danger" : "btn-outline-danger") me-2" @onclick="ToggleCriticalPath" data-testid="gantt-critical-path-toggle">
+        <button class="btn @(showCriticalPath ? "btn-danger" : "btn-outline-danger") me-2" @onclick="ToggleCriticalPath" aria-pressed="@showCriticalPath.ToString().ToLowerInvariant()" data-testid="gantt-critical-path-toggle">
             <i class="bi bi-lightning"></i> Critical Path
         </button>
         <button class="btn btn-outline-secondary" @onclick="RefreshData" disabled="@isRefreshing" data-testid="gantt-refresh">
@@ -73,7 +73,7 @@ else if (!scheduledTasks.Any())
 else
 {
     <div class="mb-2 text-muted" data-testid="gantt-range">
-        Plan range: <strong>@planStart.ToString("dd MMMM yyyy")</strong> to <strong>@planEnd.ToString("dd MMMM yyyy")</strong>
+        Plan range: <strong>@planStart.ToString("dd MMM yyyy")</strong> to <strong>@planEnd.ToString("dd MMM yyyy")</strong>
         (@totalDays days)
         @if (excludedTaskCount > 0)
         {
@@ -120,7 +120,7 @@ else
     </div>
 
     <!-- Timeline headers (months + weeks) -->
-    <div class="gantt-container" data-testid="gantt-chart" role="img" aria-label="Gantt chart showing @scheduledTasks.Count scheduled tasks from @planStart.ToString("dd MMM yyyy") to @planEnd.ToString("dd MMM yyyy")">
+    <div class="gantt-container" data-testid="gantt-chart" role="region" aria-label="Gantt chart showing @scheduledTasks.Count scheduled tasks from @planStart.ToString("dd MMM yyyy") to @planEnd.ToString("dd MMM yyyy")">
         <div class="gantt-header gantt-header-months">
             <div class="gantt-label-col gantt-label-col-header"><strong>Task</strong></div>
             <div class="gantt-timeline-col">
@@ -155,20 +155,22 @@ else
             <div class="gantt-week-line" style="left: calc(240px + (100% - 240px) * @Pct(week.LeftPct) / 100);"></div>
         }
 
-        <!-- Task rows -->
-        @foreach (var task in scheduledTasks)
-        {
-            var segments = GetSegmentsForTask(task.TaskId).Where(s => visibleRoles.Contains(s.Role)).ToList();
-            var visibleSegments = segments.Take(MaxVisibleLanes).ToList();
-            var hiddenCount = segments.Count - visibleSegments.Count;
-            var laneCount = Math.Max(1, visibleSegments.Count);
-            var shellHeight = laneCount * LaneHeight + LanePadding;
-            var maxSegEnd = visibleSegments.Any() && task.PlannedFinish.HasValue
-                ? visibleSegments.Max(s => s.SegmentEnd)
-                : (task.PlannedFinish ?? DateTime.MinValue);
-            var effectiveEnd = maxSegEnd > (task.PlannedFinish ?? DateTime.MinValue) ? maxSegEnd : task.PlannedFinish ?? DateTime.MinValue;
-            var barStyle = GetBarStyle(task, shellHeight, effectiveEnd);
-            var statusClass = GetStatusClass(task);
+        <!-- Task rows (virtualized for 100+ task performance) -->
+        <div class="gantt-rows-container">
+        <Virtualize Items="scheduledTasks" Context="task" OverscanCount="5">
+            @{
+                var segments = GetSegmentsForTask(task.TaskId).Where(s => visibleRoles.Contains(s.Role)).ToList();
+                var visibleSegments = segments.Take(MaxVisibleLanes).ToList();
+                var hiddenCount = segments.Count - visibleSegments.Count;
+                var laneCount = Math.Max(1, visibleSegments.Count);
+                var shellHeight = laneCount * LaneHeight + LanePadding;
+                var maxSegEnd = visibleSegments.Any() && task.PlannedFinish.HasValue
+                    ? visibleSegments.Max(s => s.SegmentEnd)
+                    : (task.PlannedFinish ?? DateTime.MinValue);
+                var effectiveEnd = maxSegEnd > (task.PlannedFinish ?? DateTime.MinValue) ? maxSegEnd : task.PlannedFinish ?? DateTime.MinValue;
+                var barStyle = GetBarStyle(task, shellHeight, effectiveEnd);
+                var statusClass = GetStatusClass(task);
+            }
 
             <div class="gantt-row" data-testid="gantt-row-@task.TaskId" role="group" aria-label="Task @task.TaskId: @task.ServiceName">
                 <div class="gantt-label-col clickable-row" title="@task.ServiceName"
@@ -220,6 +222,7 @@ else
                                 <div class="@segCssClass"
                                      style="@segStyle; top: @(laneIndex * LaneHeight + 2)px;"
                                      data-tooltip="@segTooltip"
+                                     tabindex="0"
                                      aria-label="@segAriaLabel"
                                      data-testid="gantt-segment-@task.TaskId-@seg.Role">
                                     <span class="gantt-segment-label">@seg.Role@(seg.IsEstimated ? "*" : "")</span>
@@ -254,7 +257,8 @@ else
                     }
                 </div>
             </div>
-        }
+        </Virtualize>
+        </div>
 
         <!-- Today marker -->
         @{
@@ -299,8 +303,18 @@ else
         if (settingsResult.IsSuccess && !string.IsNullOrEmpty(settingsResult.Value.GlobalWorkingWeek))
             workingWeekCode = settingsResult.Value.GlobalWorkingWeek;
 
-        await LoadData();
-        isLoaded = true;
+        try
+        {
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Unexpected error: {ex.Message}";
+        }
+        finally
+        {
+            isLoaded = true;
+        }
     }
 
     private async Task LoadData()
@@ -369,8 +383,19 @@ else
         try
         {
             var result = await Mediator.Send(new RunSchedulerCommand());
-            await LoadData();
-            toast.Show("Schedule refreshed.");
+            if (result.IsSuccess)
+            {
+                await LoadData();
+                toast.Show(result.Value ?? "Schedule refreshed.");
+            }
+            else
+            {
+                toast.Show($"Scheduler failed: {result.Error}", "error");
+            }
+        }
+        catch (Exception ex)
+        {
+            toast.Show($"Scheduler error: {ex.Message}", "error");
         }
         finally
         {
@@ -509,7 +534,13 @@ else
     {
         showCriticalPath = !showCriticalPath;
         if (showCriticalPath)
+        {
             ComputeCriticalPath();
+            if (criticalPathTaskIds.Count == 0)
+            {
+                toast.Show("No critical path found — tasks may not have dependency chains.");
+            }
+        }
     }
 
     private void ComputeCriticalPath()

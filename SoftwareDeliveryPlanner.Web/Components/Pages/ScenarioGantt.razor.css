@@ -105,6 +105,11 @@
 }
 
 /* ── Task rows ─────────────────────────────────────────────── */
+.gantt-rows-container {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
 .gantt-row {
     display: flex;
     border-bottom: 1px solid var(--color-border-light);
@@ -181,7 +186,7 @@
     min-width: 4px;
     box-shadow: var(--shadow-sm);
     overflow: hidden;
-    background: rgba(0, 0, 0, 0.03);
+    background: var(--gantt-shell-bg);
     border: 1px solid var(--color-border);
 }
 
@@ -323,6 +328,13 @@
     display: inline-block;
 }
 
+/* ── Legend: estimated swatch indicator ─────────────────── */
+.gantt-legend-estimated-swatch {
+    background: var(--color-text-muted, #94a3b8);
+    border: 2px dashed var(--color-text-secondary, #64748b);
+    opacity: 0.6;
+}
+
 /* ── CSS-only tooltips ─────────────────────────────────────── */
 .gantt-tooltip {
     position: relative;
@@ -347,10 +359,13 @@
     opacity: 0;
     transition: opacity 0.15s ease;
     max-width: 300px;
+    overflow-wrap: break-word;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
-.gantt-tooltip:hover::after {
+.gantt-tooltip:hover::after,
+.gantt-tooltip:focus-within::after,
+.gantt-tooltip:focus::after {
     opacity: 1;
 }
 
@@ -380,6 +395,17 @@
 @keyframes critical-pulse {
     0%, 100% { outline-color: var(--color-danger, #dc3545); }
     50% { outline-color: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gantt-bar-critical { animation: none; }
+}
+
+/* ── Segment focus-visible for keyboard navigation ──── */
+.gantt-segment:focus-visible {
+    outline: 2px solid var(--color-accent, #3b82f6);
+    outline-offset: 1px;
+    z-index: 2;
 }
 
 /* ── Shell hover ───────────────────────────────────────────── */
@@ -443,7 +469,7 @@
     bottom: 0;
     width: 2px;
     background: var(--color-accent);
-    z-index: 3;
+    z-index: 1;
     opacity: 0.7;
 }
 

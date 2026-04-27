@@ -7,8 +7,8 @@ public sealed class UpsertTaskCommandValidator : AbstractValidator<UpsertTaskCom
 {
     public UpsertTaskCommandValidator()
     {
-        RuleFor(c => c.TaskId).NotEmpty().WithMessage("Service ID is required.");
-        RuleFor(c => c.ServiceName).NotEmpty().WithMessage("Service Name is required.");
+        RuleFor(c => c.TaskId).NotEmpty().WithMessage("Service ID is required.").MaximumLength(20).WithMessage("Task ID must not exceed 20 characters.");
+        RuleFor(c => c.ServiceName).NotEmpty().WithMessage("Service Name is required.").MaximumLength(200).WithMessage("Service Name must not exceed 200 characters.");
         RuleFor(c => c.Priority).InclusiveBetween(1, 10).WithMessage("Priority must be between 1 and 10.");
 
         RuleFor(c => c.EffortBreakdown)
@@ -40,6 +40,10 @@ public sealed class UpsertTaskCommandValidator : AbstractValidator<UpsertTaskCom
 
         When(c => c.Dependencies is not null, () =>
         {
+            RuleFor(c => c.Dependencies!)
+                .Must((cmd, deps) => deps.All(d => !d.PredecessorTaskId.Equals(cmd.TaskId, StringComparison.OrdinalIgnoreCase)))
+                .WithMessage("A task cannot depend on itself.");
+
             RuleForEach(c => c.Dependencies!).ChildRules(dep =>
             {
                 dep.RuleFor(d => d.PredecessorTaskId).NotEmpty().WithMessage("PredecessorTaskId is required.");

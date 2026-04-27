@@ -1,5 +1,23 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import { gotoPage, runSchedulerFromDashboard } from './helpers';
+
+/** Wait for either the chart or the empty state to appear, skip if empty. */
+async function ensureChartOrSkip(page: Page) {
+  const chart = page.getByTestId('gantt-chart');
+  const empty = page.getByTestId('gantt-empty');
+
+  await expect.poll(async () => {
+    const c = await chart.isVisible().catch(() => false);
+    const e = await empty.isVisible().catch(() => false);
+    return c || e;
+  }, { timeout: 10_000 }).toBeTruthy();
+
+  if (await empty.isVisible().catch(() => false)) {
+    test.skip(true, 'Scheduler produced no scheduled tasks in this run');
+  }
+  await expect(chart).toBeVisible();
+  return chart;
+}
 
 test.describe('Gantt chart', () => {
   test.beforeEach(async ({ page }) => {
@@ -12,12 +30,7 @@ test.describe('Gantt chart', () => {
   });
 
   test('gantt chart renders with task rows after scheduler run', async ({ page }) => {
-    const chart = page.getByTestId('gantt-chart');
-    const empty = page.getByTestId('gantt-empty');
-    if (await empty.isVisible().catch(() => false)) {
-      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
-    }
-    await expect(chart).toBeVisible();
+    const chart = await ensureChartOrSkip(page);
 
     // Should have at least one gantt row
     const rows = chart.locator('[data-testid^="gantt-row-"]');
@@ -27,12 +40,7 @@ test.describe('Gantt chart', () => {
   });
 
   test('gantt bars are visible for scheduled tasks', async ({ page }) => {
-    const chart = page.getByTestId('gantt-chart');
-    const empty = page.getByTestId('gantt-empty');
-    if (await empty.isVisible().catch(() => false)) {
-      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
-    }
-    await expect(chart).toBeVisible();
+    const chart = await ensureChartOrSkip(page);
 
     // At least one bar should be present
     const bars = chart.locator('[data-testid^="gantt-bar-"]');
@@ -42,11 +50,8 @@ test.describe('Gantt chart', () => {
   });
 
   test('gantt legend is visible', async ({ page }) => {
+    await ensureChartOrSkip(page);
     const legend = page.getByTestId('gantt-legend');
-    const empty = page.getByTestId('gantt-empty');
-    if (await empty.isVisible().catch(() => false)) {
-      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
-    }
     await expect(legend).toBeVisible();
 
     // Legend should contain the expected labels
@@ -58,11 +63,8 @@ test.describe('Gantt chart', () => {
   });
 
   test('gantt shows plan date range', async ({ page }) => {
+    await ensureChartOrSkip(page);
     const range = page.getByTestId('gantt-range');
-    const empty = page.getByTestId('gantt-empty');
-    if (await empty.isVisible().catch(() => false)) {
-      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
-    }
     await expect(range).toBeVisible();
     // Range should contain "Plan range:" and date patterns
     await expect(range).toContainText('Plan range:');
@@ -70,10 +72,7 @@ test.describe('Gantt chart', () => {
   });
 
   test('excluded task count badge shows when tasks are unscheduled', async ({ page }) => {
-    const empty = page.getByTestId('gantt-empty');
-    if (await empty.isVisible().catch(() => false)) {
-      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
-    }
+    await ensureChartOrSkip(page);
 
     // If there are unscheduled tasks, the badge should appear
     const badge = page.getByTestId('gantt-excluded-count');
@@ -86,12 +85,7 @@ test.describe('Gantt chart', () => {
   });
 
   test('refresh button re-runs scheduler and reloads chart', async ({ page }) => {
-    const chart = page.getByTestId('gantt-chart');
-    const empty = page.getByTestId('gantt-empty');
-    if (await empty.isVisible().catch(() => false)) {
-      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
-    }
-    await expect(chart).toBeVisible();
+    const chart = await ensureChartOrSkip(page);
 
     const barsBefore = await chart.locator('[data-testid^="gantt-bar-"]').count();
 
@@ -129,12 +123,7 @@ test.describe('Gantt chart', () => {
   // ── New test scenarios (WP11) ─────────────────────────────
 
   test('multi-role segments: each task bar contains distinct colored role segments', async ({ page }) => {
-    const chart = page.getByTestId('gantt-chart');
-    const empty = page.getByTestId('gantt-empty');
-    if (await empty.isVisible().catch(() => false)) {
-      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
-    }
-    await expect(chart).toBeVisible();
+    const chart = await ensureChartOrSkip(page);
 
     // Find first task bar and check it has at least one role segment inside
     const firstBar = chart.locator('[data-testid^="gantt-bar-"]').first();
@@ -154,12 +143,7 @@ test.describe('Gantt chart', () => {
   });
 
   test('legend toggle hides and shows role segments', async ({ page }) => {
-    const chart = page.getByTestId('gantt-chart');
-    const empty = page.getByTestId('gantt-empty');
-    if (await empty.isVisible().catch(() => false)) {
-      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
-    }
-    await expect(chart).toBeVisible();
+    const chart = await ensureChartOrSkip(page);
 
     // Click DEV toggle to hide DEV segments
     const devToggle = page.getByTestId('gantt-role-toggle-dev');
@@ -185,12 +169,7 @@ test.describe('Gantt chart', () => {
   });
 
   test('critical path toggle highlights critical tasks', async ({ page }) => {
-    const chart = page.getByTestId('gantt-chart');
-    const empty = page.getByTestId('gantt-empty');
-    if (await empty.isVisible().catch(() => false)) {
-      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
-    }
-    await expect(chart).toBeVisible();
+    const chart = await ensureChartOrSkip(page);
 
     const toggle = page.getByTestId('gantt-critical-path-toggle');
     await expect(toggle).toBeVisible();
@@ -211,12 +190,7 @@ test.describe('Gantt chart', () => {
   });
 
   test('estimated vs allocated segments are visually distinct', async ({ page }) => {
-    const chart = page.getByTestId('gantt-chart');
-    const empty = page.getByTestId('gantt-empty');
-    if (await empty.isVisible().catch(() => false)) {
-      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
-    }
-    await expect(chart).toBeVisible();
+    const chart = await ensureChartOrSkip(page);
 
     // Check for estimated segments (marked with *)
     const allSegments = chart.locator('[data-testid^="gantt-segment-"]');
@@ -237,12 +211,7 @@ test.describe('Gantt chart', () => {
   });
 
   test('clicking a task row navigates to task detail page', async ({ page }) => {
-    const chart = page.getByTestId('gantt-chart');
-    const empty = page.getByTestId('gantt-empty');
-    if (await empty.isVisible().catch(() => false)) {
-      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
-    }
-    await expect(chart).toBeVisible();
+    const chart = await ensureChartOrSkip(page);
 
     // Get the first row's task ID from the data-testid
     const firstRow = chart.locator('[data-testid^="gantt-row-"]').first();
@@ -259,12 +228,7 @@ test.describe('Gantt chart', () => {
   });
 
   test('strict date markers appear for tasks with deadlines', async ({ page }) => {
-    const chart = page.getByTestId('gantt-chart');
-    const empty = page.getByTestId('gantt-empty');
-    if (await empty.isVisible().catch(() => false)) {
-      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
-    }
-    await expect(chart).toBeVisible();
+    const chart = await ensureChartOrSkip(page);
 
     // Check for strict markers — may or may not exist depending on seed data
     const strictMarkers = chart.locator('[data-testid^="gantt-strict-"]');
@@ -281,12 +245,7 @@ test.describe('Gantt chart', () => {
   });
 
   test('overflow indicator shows when task has more than 6 role segments', async ({ page }) => {
-    const chart = page.getByTestId('gantt-chart');
-    const empty = page.getByTestId('gantt-empty');
-    if (await empty.isVisible().catch(() => false)) {
-      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
-    }
-    await expect(chart).toBeVisible();
+    const chart = await ensureChartOrSkip(page);
 
     // Overflow indicators appear as "+N" badges when > MaxVisibleLanes segments
     const overflows = chart.locator('[data-testid^="gantt-overflow-"]');
@@ -301,12 +260,7 @@ test.describe('Gantt chart', () => {
   });
 
   test('today marker is visible when plan range includes today', async ({ page }) => {
-    const chart = page.getByTestId('gantt-chart');
-    const empty = page.getByTestId('gantt-empty');
-    if (await empty.isVisible().catch(() => false)) {
-      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
-    }
-    await expect(chart).toBeVisible();
+    const chart = await ensureChartOrSkip(page);
 
     // Today marker should be visible if today falls within the plan range
     const todayMarker = page.getByTestId('gantt-today');
@@ -320,12 +274,7 @@ test.describe('Gantt chart', () => {
   });
 
   test('week grid lines and month headers render correctly', async ({ page }) => {
-    const chart = page.getByTestId('gantt-chart');
-    const empty = page.getByTestId('gantt-empty');
-    if (await empty.isVisible().catch(() => false)) {
-      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
-    }
-    await expect(chart).toBeVisible();
+    const chart = await ensureChartOrSkip(page);
 
     // Month headers should be present
     const months = chart.locator('.gantt-month');

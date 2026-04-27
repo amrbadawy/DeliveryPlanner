@@ -13,6 +13,17 @@
 {
     <SkeletonLoader Variant="block" TestId="scenario-gantt-skeleton" />
 }
+else if (!string.IsNullOrEmpty(loadError))
+{
+    <div class="empty-state" data-testid="scenario-gantt-error">
+        <div class="empty-icon"><i class="bi bi-exclamation-triangle text-danger"></i></div>
+        <h5>Unable to load scenario</h5>
+        <p>@loadError</p>
+        <button class="btn btn-outline-secondary" @onclick="GoBackToScenarios">
+            <i class="bi bi-arrow-left"></i> Back to Scenarios
+        </button>
+    </div>
+}
 else if (scenario is null)
 {
     <div class="empty-state" data-testid="scenario-gantt-not-found">
@@ -33,7 +44,7 @@ else
                 <i class="bi bi-bar-chart-steps me-2"></i>@scenario.ScenarioName
             </h3>
             <p class="page-subtitle">
-                Saved on @scenario.CreatedAt.ToString("MMM dd, yyyy HH:mm")
+                Saved on @scenario.CreatedAt.ToString("dd MMM yyyy HH:mm")
                 @if (!string.IsNullOrWhiteSpace(scenario.Notes))
                 {
                     <span> &mdash; @scenario.Notes</span>
@@ -42,7 +53,7 @@ else
         </div>
         <div>
             <button class="btn @(showCriticalPath ? "btn-danger" : "btn-outline-danger") me-2"
-                    @onclick="ToggleCriticalPath" data-testid="scenario-gantt-critical-path-toggle">
+                    @onclick="ToggleCriticalPath" aria-pressed="@showCriticalPath.ToString().ToLowerInvariant()" data-testid="scenario-gantt-critical-path-toggle">
                 <i class="bi bi-lightning"></i> Critical Path
             </button>
             <button class="btn btn-outline-secondary" @onclick="GoBackToScenarios" data-testid="scenario-gantt-back">
@@ -52,7 +63,7 @@ else
     </div>
 
     <!-- KPI Summary Bar -->
-    <div class="row g-3 mb-4" data-testid="scenario-gantt-kpis">
+    <div class="row g-3 mb-4" data-testid="scenario-gantt-kpis" role="group" aria-label="Scenario KPI summary">
         <div class="col">
             <div class="card border-0 shadow-sm text-center p-2">
                 <small class="text-muted">Total Tasks</small>
@@ -111,7 +122,7 @@ else
     else
     {
         <div class="mb-2 text-muted" data-testid="scenario-gantt-range">
-            Plan range: <strong>@planStart.ToString("dd MMMM yyyy")</strong> to <strong>@planEnd.ToString("dd MMMM yyyy")</strong>
+            Plan range: <strong>@planStart.ToString("dd MMM yyyy")</strong> to <strong>@planEnd.ToString("dd MMM yyyy")</strong>
             (@totalDays days)
         </div>
 
@@ -133,6 +144,10 @@ else
                 }
             </div>
             <div class="gantt-legend-section">
+                <span class="gantt-legend-title">Segments:</span>
+                <span class="gantt-legend-item"><span class="gantt-legend-swatch gantt-legend-estimated-swatch"></span> Estimated*</span>
+            </div>
+            <div class="gantt-legend-section">
                 <span class="gantt-legend-title">Status:</span>
                 <span class="gantt-legend-item"><span class="gantt-status-dot gantt-status-completed"></span> Completed</span>
                 <span class="gantt-legend-item"><span class="gantt-status-dot gantt-status-inprogress"></span> In Progress</span>
@@ -147,7 +162,7 @@ else
         </div>
 
         <!-- Gantt chart -->
-        <div class="gantt-container" data-testid="scenario-gantt-chart" role="img" aria-label="Scenario Gantt chart showing @scheduledTasks.Count scheduled tasks">
+        <div class="gantt-container" data-testid="scenario-gantt-chart" role="region" aria-label="Scenario Gantt chart showing @scheduledTasks.Count scheduled tasks">
             <div class="gantt-header gantt-header-months">
                 <div class="gantt-label-col gantt-label-col-header"><strong>Task</strong></div>
                 <div class="gantt-timeline-col">
@@ -182,15 +197,17 @@ else
                 <div class="gantt-week-line" style="left: calc(240px + (100% - 240px) * @Pct(week.LeftPct) / 100);"></div>
             }
 
-            @foreach (var task in scheduledTasks)
-            {
-                var estimatedSegments = GetEstimatedSegments(task).Where(s => visibleRoles.Contains(s.Role)).ToList();
-                var visibleSegments = estimatedSegments.Take(MaxVisibleLanes).ToList();
-                var hiddenCount = estimatedSegments.Count - visibleSegments.Count;
-                var laneCount = Math.Max(1, visibleSegments.Count);
-                var shellHeight = laneCount * LaneHeight + LanePadding;
-                var barStyle = GetBarStyle(task, shellHeight);
-                var statusClass = GetStatusClass(task);
+            <div class="gantt-rows-container">
+            <Virtualize Items="scheduledTasks" Context="task" OverscanCount="5">
+                @{
+                    var estimatedSegments = GetEstimatedSegments(task).Where(s => visibleRoles.Contains(s.Role)).ToList();
+                    var visibleSegments = estimatedSegments.Take(MaxVisibleLanes).ToList();
+                    var hiddenCount = estimatedSegments.Count - visibleSegments.Count;
+                    var laneCount = Math.Max(1, visibleSegments.Count);
+                    var shellHeight = laneCount * LaneHeight + LanePadding;
+                    var barStyle = GetBarStyle(task, shellHeight);
+                    var statusClass = GetStatusClass(task);
+                }
 
                 <div class="gantt-row" data-testid="scenario-gantt-row-@task.TaskId" role="group" aria-label="Task @task.TaskId: @task.ServiceName">
                     <div class="gantt-label-col clickable-row" title="@task.ServiceName"
@@ -219,6 +236,10 @@ else
                             <div class="gantt-shell gantt-tooltip @(IsCriticalTask(task) ? "gantt-bar-critical" : "")"
                                  style="@barStyle"
                                  data-tooltip="@task.TaskId: @task.ServiceName&#10;Status: @task.Status | Risk: @task.DeliveryRisk&#10;@task.PlannedStart?.ToString("dd MMM yyyy") — @task.PlannedFinish?.ToString("dd MMM yyyy") (@task.Duration d)"
+                                 role="button" tabindex="0"
+                                 aria-label="@task.TaskId bar: @task.PlannedStart?.ToString("dd MMM") to @task.PlannedFinish?.ToString("dd MMM"), @visibleSegments.Count role segments"
+                                 @onclick="() => NavigateToTask(task.TaskId)" @onclick:stopPropagation
+                                 @onkeydown="(e) => OnGanttKeyDown(e, task.TaskId)" @onkeydown:stopPropagation
                                  data-testid="scenario-gantt-bar-@task.TaskId">
 
                                 @foreach (var seg in visibleSegments)
@@ -229,7 +250,7 @@ else
                                          data-tooltip="@seg.Role (estimated)&#10;~@seg.EstDays days&#10;Max FTE: @seg.MaxFte"
                                          aria-label="@seg.Role segment: estimated @seg.EstDays days"
                                          data-testid="scenario-gantt-segment-@task.TaskId-@seg.Role">
-                                        <span class="gantt-segment-label">@seg.Role</span>
+                                        <span class="gantt-segment-label">@seg.Role*</span>
                                     </div>
                                 }
 
@@ -260,7 +281,8 @@ else
                         }
                     </div>
                 </div>
-            }
+            </Virtualize>
+            </div>
 
             <!-- Today marker -->
             @{
@@ -290,10 +312,13 @@ else
     private DateTime planEnd;
     private int totalDays;
     private bool isLoaded;
+    private string? loadError;
     private bool showCriticalPath;
     private HashSet<string> criticalPathTaskIds = new();
     private HashSet<string> visibleRoles = new(DomainConstants.ResourceRole.PipelineOrder, StringComparer.OrdinalIgnoreCase);
     private string workingWeekCode = DomainConstants.WorkingWeek.SunThu;
+    private List<MonthMarker> _cachedMonthMarkers = new();
+    private List<WeekMarker> _cachedWeekMarkers = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -302,11 +327,13 @@ else
         if (settingsResult.IsSuccess && !string.IsNullOrEmpty(settingsResult.Value.GlobalWorkingWeek))
             workingWeekCode = settingsResult.Value.GlobalWorkingWeek;
 
-        var result = await Mediator.Send(new GetScenarioDetailQuery(ScenarioId));
-
-        if (result.IsSuccess)
+        try
         {
-            scenario = result.Value;
+            var result = await Mediator.Send(new GetScenarioDetailQuery(ScenarioId));
+
+            if (result.IsSuccess)
+            {
+                scenario = result.Value;
 
             scheduledTasks = scenario.TaskSnapshots
                 .Where(t => t.PlannedStart.HasValue && t.PlannedFinish.HasValue)
@@ -332,7 +359,20 @@ else
                 planEnd = planEnd.AddDays(5);
                 totalDays = (int)(planEnd - planStart).TotalDays;
                 if (totalDays < 1) totalDays = 1;
+
+                // Pre-compute markers (cached)
+                _cachedMonthMarkers = ComputeMonthMarkers();
+                _cachedWeekMarkers = ComputeWeekMarkers();
             }
+        }
+            else
+            {
+                loadError = result.Error.Message ?? "Failed to load scenario.";
+            }
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Unexpected error: {ex.Message}";
         }
 
         isLoaded = true;
@@ -427,7 +467,9 @@ else
         };
     }
 
-    private List<MonthMarker> GetMonthMarkers()
+    private List<MonthMarker> GetMonthMarkers() => _cachedMonthMarkers;
+
+    private List<MonthMarker> ComputeMonthMarkers()
     {
         var markers = new List<MonthMarker>();
         if (totalDays <= 0) return markers;
@@ -455,7 +497,9 @@ else
         return markers;
     }
 
-    private List<WeekMarker> GetWeekMarkers()
+    private List<WeekMarker> GetWeekMarkers() => _cachedWeekMarkers;
+
+    private List<WeekMarker> ComputeWeekMarkers()
     {
         var markers = new List<WeekMarker>();
         if (totalDays <= 0) return markers;

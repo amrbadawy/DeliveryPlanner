@@ -9,10 +9,14 @@ public sealed class BulkImportTasksCommandValidator : AbstractValidator<BulkImpo
     {
         RuleFor(c => c.Tasks).NotEmpty().WithMessage("At least one task is required.");
 
+        RuleFor(c => c.Tasks)
+            .Must(tasks => tasks is null || tasks.Select(t => t.TaskId).Distinct(StringComparer.OrdinalIgnoreCase).Count() == tasks.Count)
+            .WithMessage("Duplicate Task IDs found in import batch.");
+
         RuleForEach(c => c.Tasks).ChildRules(row =>
         {
-            row.RuleFor(r => r.TaskId).NotEmpty().WithMessage("Task ID is required.");
-            row.RuleFor(r => r.ServiceName).NotEmpty().WithMessage("Service Name is required.");
+            row.RuleFor(r => r.TaskId).NotEmpty().WithMessage("Task ID is required.").MaximumLength(20).WithMessage("Task ID must not exceed 20 characters.");
+            row.RuleFor(r => r.ServiceName).NotEmpty().WithMessage("Service Name is required.").MaximumLength(200).WithMessage("Service Name must not exceed 200 characters.");
             row.RuleFor(r => r.Priority).InclusiveBetween(1, 10).WithMessage("Priority must be between 1 and 10.");
 
             row.RuleFor(r => r.EffortBreakdown)

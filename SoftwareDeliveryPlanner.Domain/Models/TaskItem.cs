@@ -219,6 +219,9 @@ public class TaskItem : AggregateRoot
         if (!DomainConstants.DeliveryRisk.IsValid(deliveryRisk))
             throw new DomainException($"Invalid delivery risk '{deliveryRisk}'.");
 
+        if (plannedStart.HasValue && plannedFinish.HasValue && plannedFinish.Value < plannedStart.Value)
+            throw new DomainException("PlannedFinish cannot be before PlannedStart.");
+
         PeakConcurrency = peakConcurrency;
         PlannedStart = plannedStart;
         PlannedFinish = plannedFinish;

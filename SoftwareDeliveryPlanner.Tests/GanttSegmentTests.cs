@@ -746,6 +746,138 @@ public sealed class GanttSegmentTests : IAsyncDisposable
             $"DEV should start <= QA: DEV={devSegs[0].SegmentStart:yyyy-MM-dd}, QA={qaSegs[0].SegmentStart:yyyy-MM-dd}");
     }
 
+    // ── WP24: Additional guard & validation tests ──────────────────────────
+
+    [Fact]
+    public void ApplySchedulingResult_PlannedFinishBeforeStart_ThrowsDomainException()
+    {
+        // WP19 guard: PlannedFinish < PlannedStart must throw
+        var task = TaskItem.Create("GRD-001", "Guard Test", 5,
+            TestDatabaseHelper.MakeBreakdown(5, 2));
+
+        var ex = Assert.Throws<DomainException>(() =>
+            task.ApplySchedulingResult(
+                peakConcurrency: 1.0,
+                plannedStart: new DateTime(2026, 6, 10),
+                plannedFinish: new DateTime(2026, 6, 5), // before start
+                duration: 5,
+                status: DomainConstants.TaskStatus.InProgress,
+                deliveryRisk: DomainConstants.DeliveryRisk.OnTrack));
+
+        Assert.Contains("PlannedFinish", ex.Message);
+    }
+
+    [Fact]
+    public void ApplySchedulingResult_InvalidStatus_ThrowsDomainException()
+    {
+        var task = TaskItem.Create("GRD-002", "Status Guard Test", 5,
+            TestDatabaseHelper.MakeBreakdown(5, 2));
+
+        var ex = Assert.Throws<DomainException>(() =>
+            task.ApplySchedulingResult(
+                peakConcurrency: 1.0,
+                plannedStart: new DateTime(2026, 6, 1),
+                plannedFinish: new DateTime(2026, 6, 10),
+                duration: 8,
+                status: "BOGUS_STATUS",
+                deliveryRisk: DomainConstants.DeliveryRisk.OnTrack));
+
+        Assert.Contains("status", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ApplySchedulingResult_InvalidDeliveryRisk_ThrowsDomainException()
+    {
+        var task = TaskItem.Create("GRD-003", "Risk Guard Test", 5,
+            TestDatabaseHelper.MakeBreakdown(5, 2));
+
+        var ex = Assert.Throws<DomainException>(() =>
+            task.ApplySchedulingResult(
+                peakConcurrency: 1.0,
+                plannedStart: new DateTime(2026, 6, 1),
+                plannedFinish: new DateTime(2026, 6, 10),
+                duration: 8,
+                status: DomainConstants.TaskStatus.InProgress,
+                deliveryRisk: "INVALID_RISK"));
+
+        Assert.Contains("risk", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ApplySchedulingResult_NullDates_Accepted()
+    {
+        // Null planned dates are valid (unscheduled tasks)
+        var task = TaskItem.Create("GRD-004", "Null Dates Test", 5,
+            TestDatabaseHelper.MakeBreakdown(5, 2));
+
+        task.ApplySchedulingResult(
+            peakConcurrency: 0,
+            plannedStart: null,
+            plannedFinish: null,
+            duration: 0,
+            status: DomainConstants.TaskStatus.NotStarted,
+            deliveryRisk: DomainConstants.DeliveryRisk.OnTrack);
+
+        Assert.Null(task.PlannedStart);
+        Assert.Null(task.PlannedFinish);
+    }
+
+    [Fact]
+    public void GanttRoleSegmentDto_RequiresTaskId()
+    {
+        // WP23/L15: constructor validation on GanttRoleSegmentDto
+        var ex = Assert.Throws<ArgumentException>(() =>
+            new GanttRoleSegmentDto("", "DEV", DateTime.Today, DateTime.Today.AddDays(5), 5, 1.0,
+                Array.Empty<GanttSegmentResourceDto>()));
+
+        Assert.Contains("TaskId", ex.Message);
+    }
+
+    [Fact]
+    public void GanttRoleSegmentDto_RequiresRole()
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            new GanttRoleSegmentDto("TSK-001", "", DateTime.Today, DateTime.Today.AddDays(5), 5, 1.0,
+                Array.Empty<GanttSegmentResourceDto>()));
+
+        Assert.Contains("Role", ex.Message);
+    }
+
+    [Fact]
+    public void GanttRoleSegmentDto_NullResources_DefaultsToEmpty()
+    {
+        var dto = new GanttRoleSegmentDto("TSK-001", "DEV", DateTime.Today, DateTime.Today.AddDays(5), 5, 1.0,
+            null!);
+
+        Assert.NotNull(dto.AssignedResources);
+        Assert.Empty(dto.AssignedResources);
+    }
+
+    [Fact]
+    public void TeamMember_Create_InvalidRole_ThrowsDomainException()
+    {
+        // WP15: domain validation — role must be in AllRoles
+        var ex = Assert.Throws<DomainException>(() =>
+            TeamMember.Create("INV-001", "Invalid Role Member", "WIZARD",
+                DomainConstants.DefaultTeam, 100, 1, new DateTime(2026, 5, 1)));
+
+        Assert.Contains("role", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TaskItem_Create_ZeroEffort_ThrowsDomainException()
+    {
+        // Domain guard: EstimationDays > 0 enforced
+        var ex = Assert.Throws<DomainException>(() =>
+            TaskItem.Create("ZRO-002", "Zero Effort", 5, new List<EffortBreakdownSpec>
+            {
+                new("DEV", 0, 0, 1.0),
+                new("QA", 2, 0, 1.0)
+            }));
+
+        Assert.Contains("greater than zero", ex.Message);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await _fixture.DisposeAsync();

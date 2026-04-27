@@ -90,6 +90,7 @@
     --gantt-label-bg: rgba(255, 255, 255, 0.7);
     --gantt-estimated-border: rgba(255, 255, 255, 0.7);
     --gantt-estimated-stripe: rgba(255, 255, 255, 0.15);
+    --gantt-shell-bg: rgba(0, 0, 0, 0.03);
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -168,6 +169,7 @@
     /* ── Gantt: dark mode overlay adjustments ─────────────── */
     --gantt-overlay-bg: rgba(30, 30, 46, 0.85);
     --gantt-label-bg: rgba(30, 30, 46, 0.7);
+    --gantt-shell-bg: rgba(255, 255, 255, 0.04);
 }
 
 /* ── Dark mode Bootstrap overrides ───────────────────────── */
@@ -970,4 +972,12 @@ th[role="button"] {
     background: linear-gradient(90deg, var(--color-bg-tertiary) 25%, var(--color-bg-secondary) 50%, var(--color-bg-tertiary) 75%);
     background-size: 800px 200px;
     animation: shimmer 1.5s infinite linear;
+}
+
+/* ── Forced colors / high-contrast mode ──────────────────── */
+@media (forced-colors: active) {
+    .gantt-segment { border: 2px solid CanvasText; }
+    .gantt-status-dot { border: 1px solid CanvasText; }
+    .gantt-legend-swatch { border: 1px solid CanvasText; }
+    .gantt-bar-critical { outline-color: Highlight; }
 }
