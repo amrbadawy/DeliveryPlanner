@@ -31,7 +31,7 @@ test.describe('Resource enhancements — Seniority + Working Week', () => {
 
     const workingWeekSelect = page.getByTestId('resources-working-week');
     await expect(workingWeekSelect).toBeVisible();
-    await workingWeekSelect.selectOption('mon_fri');
+    await workingWeekSelect.selectOption('MON_FRI');
 
     await page.getByTestId('resources-save').click();
     await expect(page.getByTestId('resources-modal')).toBeHidden();
@@ -60,7 +60,7 @@ test.describe('Resource enhancements — Seniority + Working Week', () => {
     const resourceId = (await page.getByTestId('resources-id').inputValue()).trim();
     await fillInputByTestId(page, 'resources-name', resourceName);
     await page.getByTestId('resources-seniority').selectOption('Mid');
-    await page.getByTestId('resources-working-week').selectOption('sun_thu');
+    await page.getByTestId('resources-working-week').selectOption('SUN_THU');
     await page.getByTestId('resources-save').click();
     await expect(page.getByTestId('resources-modal')).toBeHidden();
 
@@ -72,7 +72,7 @@ test.describe('Resource enhancements — Seniority + Working Week', () => {
     expect(seniorityValue).toBe('Mid');
 
     const workingWeekValue = await page.getByTestId('resources-working-week').inputValue();
-    expect(workingWeekValue).toBe('sun_thu');
+    expect(workingWeekValue).toBe('SUN_THU');
 
     // Close modal and clean up
     await page.getByTestId('resources-cancel').click();

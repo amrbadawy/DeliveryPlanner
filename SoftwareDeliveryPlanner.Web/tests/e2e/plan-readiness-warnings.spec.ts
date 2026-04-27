@@ -537,7 +537,7 @@ test.describe('Plan readiness warnings', () => {
 
     if (isBannerVisible) {
       // Apply a status filter
-      await fillInputByTestId(page, 'tasks-filter-status', 'NotStarted');
+      await fillInputByTestId(page, 'tasks-filter-status', 'Not Started');
       await page.waitForTimeout(500);
 
       const stillVisible = await banner.isVisible().catch(() => false);
