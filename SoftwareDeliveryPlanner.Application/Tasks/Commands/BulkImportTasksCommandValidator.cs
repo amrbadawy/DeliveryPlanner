@@ -1,4 +1,5 @@
 using FluentValidation;
+using SoftwareDeliveryPlanner.Domain;
 
 namespace SoftwareDeliveryPlanner.Application.Tasks.Commands;
 
@@ -12,7 +13,7 @@ public sealed class BulkImportTasksCommandValidator : AbstractValidator<BulkImpo
         {
             row.RuleFor(r => r.TaskId).NotEmpty().WithMessage("Task ID is required.");
             row.RuleFor(r => r.ServiceName).NotEmpty().WithMessage("Service Name is required.");
-            row.RuleFor(r => r.Priority).GreaterThan(0).WithMessage("Priority must be greater than zero.");
+            row.RuleFor(r => r.Priority).InclusiveBetween(1, 10).WithMessage("Priority must be between 1 and 10.");
 
             row.RuleFor(r => r.EffortBreakdown)
                 .NotNull().WithMessage("Effort breakdown is required.")
@@ -26,9 +27,16 @@ public sealed class BulkImportTasksCommandValidator : AbstractValidator<BulkImpo
                 .Must(e => e is not null && e.Any(r => r.Role.Equals("QA", StringComparison.OrdinalIgnoreCase) && r.EstimationDays > 0))
                 .WithMessage("Effort breakdown must include a QA entry with EstimationDays > 0.");
 
+            row.RuleFor(r => r.EffortBreakdown)
+                .Must(e => e is null || e.Select(r => r.Role.ToUpperInvariant()).Distinct().Count() == e.Count)
+                .WithMessage("Duplicate roles are not allowed in effort breakdown.");
+
             row.RuleForEach(r => r.EffortBreakdown).ChildRules(entry =>
             {
                 entry.RuleFor(e => e.Role).NotEmpty().WithMessage("Role is required.");
+                entry.RuleFor(e => e.Role)
+                    .Must(r => string.IsNullOrWhiteSpace(r) || DomainConstants.ResourceRole.AllRoles.Contains(r))
+                    .WithMessage(e => $"Invalid role '{e.Role}'.");
                 entry.RuleFor(e => e.EstimationDays).GreaterThan(0).WithMessage("EstimationDays must be greater than zero.");
                 entry.RuleFor(e => e.OverlapPct).InclusiveBetween(0, 100).WithMessage("OverlapPct must be between 0 and 100.");
                 entry.RuleFor(e => e.MaxFte).GreaterThan(0).WithMessage("Max FTE must be greater than zero.");

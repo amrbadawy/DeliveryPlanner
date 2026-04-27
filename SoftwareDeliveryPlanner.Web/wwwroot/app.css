@@ -79,6 +79,17 @@
     --color-role-ui:  #f97316;   /* Orange  */
     --color-role-ops: #eab308;   /* Yellow  */
     --color-role-pm:  #64748b;   /* Slate   */
+
+    /* ── Gantt: header/overlay tokens (light on dark header) ── */
+    --gantt-header-border: rgba(255, 255, 255, 0.15);
+    --gantt-header-border-strong: rgba(255, 255, 255, 0.2);
+    --gantt-header-border-subtle: rgba(255, 255, 255, 0.12);
+    --gantt-header-text: rgba(255, 255, 255, 0.8);
+    --gantt-segment-text: rgba(255, 255, 255, 0.9);
+    --gantt-overlay-bg: rgba(255, 255, 255, 0.85);
+    --gantt-label-bg: rgba(255, 255, 255, 0.7);
+    --gantt-estimated-border: rgba(255, 255, 255, 0.7);
+    --gantt-estimated-stripe: rgba(255, 255, 255, 0.15);
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -153,6 +164,10 @@
     --color-role-pm:  #94a3b8;   /* Slate-400   */
 
     color-scheme: dark;
+
+    /* ── Gantt: dark mode overlay adjustments ─────────────── */
+    --gantt-overlay-bg: rgba(30, 30, 46, 0.85);
+    --gantt-label-bg: rgba(30, 30, 46, 0.7);
 }
 
 /* ── Dark mode Bootstrap overrides ───────────────────────── */

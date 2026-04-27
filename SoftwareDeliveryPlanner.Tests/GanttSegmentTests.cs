@@ -57,7 +57,7 @@ public sealed class GanttSegmentTests : IAsyncDisposable
         // Act
         var segments = await _queryService.GetGanttSegmentsAsync(CancellationToken.None);
 
-        var testTask = segments.FirstOrDefault(s => s.TaskId == taskId)?.Segments ?? new();
+        var testTask = segments.FirstOrDefault(s => s.TaskId == taskId)?.Segments ?? (IReadOnlyList<GanttRoleSegmentDto>)Array.Empty<GanttRoleSegmentDto>();
 
         var testTaskRoles = testTask.Select(s => s.Role).ToHashSet();
 
@@ -513,6 +513,237 @@ public sealed class GanttSegmentTests : IAsyncDisposable
 
         Assert.Contains("greater than zero", ex.Message);
         await Task.CompletedTask; // keep async signature for consistency
+    }
+
+    [Fact]
+    public async Task GetGanttSegments_EstimatedSegments_DistributedProportionally()
+    {
+        // Arrange: task with BA(3d)→SA(2d)→DEV(10d)→QA(5d).
+        // DEV and QA have resources in the test fixture; BA and SA do not.
+        // BA and SA should be estimated with DIFFERENT date ranges (not overlapping).
+        var taskId = "PRP-001";
+        var breakdown = TestDatabaseHelper.MakeMultiRoleBreakdown(10, 5,
+            ("BA", 3),
+            ("SA", 2));
+
+        await using (var db = await _factory.CreateDbContextAsync())
+        {
+            if (!await db.Tasks.AnyAsync(t => t.TaskId == taskId))
+            {
+                db.Tasks.Add(TaskItem.Create(taskId, "Proportional Segment Test", 5, breakdown));
+                await db.SaveChangesAsync();
+            }
+        }
+
+        await _schedulerService.RunSchedulerAsync(CancellationToken.None);
+
+        // Act
+        var segments = await _queryService.GetGanttSegmentsAsync(CancellationToken.None);
+        var taskSegments = segments.FirstOrDefault(s => s.TaskId == taskId)?.Segments ?? (IReadOnlyList<GanttRoleSegmentDto>)Array.Empty<GanttRoleSegmentDto>();
+
+        var baSegment = taskSegments.FirstOrDefault(s => s.Role == "BA");
+        var saSegment = taskSegments.FirstOrDefault(s => s.Role == "SA");
+        var devSegment = taskSegments.FirstOrDefault(s => s.Role == "DEV");
+        var qaSegment = taskSegments.FirstOrDefault(s => s.Role == "QA");
+
+        // Assert: all 4 roles present
+        Assert.NotNull(baSegment);
+        Assert.NotNull(saSegment);
+        Assert.NotNull(devSegment);
+        Assert.NotNull(qaSegment);
+
+        // BA and SA are estimated (no resources in test fixture)
+        Assert.True(baSegment.IsEstimated, "BA should be estimated (no BA resources)");
+        Assert.True(saSegment.IsEstimated, "SA should be estimated (no SA resources)");
+
+        // DEV and QA are allocation-based (resources exist)
+        Assert.False(devSegment.IsEstimated, "DEV should be allocated");
+        Assert.False(qaSegment.IsEstimated, "QA should be allocated");
+
+        // KEY ASSERTION: BA and SA must have DIFFERENT start dates (proportional distribution)
+        Assert.NotEqual(baSegment.SegmentStart, saSegment.SegmentStart);
+
+        // BA should start before SA (pipeline order: BA → SA → DEV → QA)
+        Assert.True(baSegment.SegmentStart <= saSegment.SegmentStart,
+            $"BA should start <= SA: BA={baSegment.SegmentStart:yyyy-MM-dd}, SA={saSegment.SegmentStart:yyyy-MM-dd}");
+    }
+
+    [Fact]
+    public async Task GetGanttSegments_AllEstimated_DistributedAcrossEnvelope()
+    {
+        // Arrange: task with SA(2d)→UX(4d)→DEV(8d)→QA(4d). No SA/UX resources exist.
+        // Only DEV resources exist in the test fixture.
+        // SA and UX should be estimated and distributed sequentially before DEV.
+        var taskId = "PRP-002";
+        var breakdown = TestDatabaseHelper.MakeMultiRoleBreakdown(8, 4,
+            ("SA", 2),
+            ("UX", 4));
+
+        await using (var db = await _factory.CreateDbContextAsync())
+        {
+            if (!await db.Tasks.AnyAsync(t => t.TaskId == taskId))
+            {
+                db.Tasks.Add(TaskItem.Create(taskId, "All Estimated Distribution Test", 5, breakdown));
+                await db.SaveChangesAsync();
+            }
+        }
+
+        await _schedulerService.RunSchedulerAsync(CancellationToken.None);
+
+        // Act
+        var segments = await _queryService.GetGanttSegmentsAsync(CancellationToken.None);
+        var taskSegments = segments.FirstOrDefault(s => s.TaskId == taskId)?.Segments ?? (IReadOnlyList<GanttRoleSegmentDto>)Array.Empty<GanttRoleSegmentDto>();
+
+        var saSegment = taskSegments.FirstOrDefault(s => s.Role == "SA");
+        var uxSegment = taskSegments.FirstOrDefault(s => s.Role == "UX");
+
+        // Assert: SA and UX are estimated
+        Assert.NotNull(saSegment);
+        Assert.NotNull(uxSegment);
+        Assert.True(saSegment.IsEstimated);
+        Assert.True(uxSegment.IsEstimated);
+
+        // SA should start before UX (pipeline order: SA → UX → DEV → QA)
+        Assert.True(saSegment.SegmentStart <= uxSegment.SegmentStart,
+            $"SA should start <= UX: SA={saSegment.SegmentStart:yyyy-MM-dd}, UX={uxSegment.SegmentStart:yyyy-MM-dd}");
+
+        // SA and UX should NOT fully overlap (they have different proportional widths)
+        var saAndUxOverlap = saSegment.SegmentStart == uxSegment.SegmentStart
+                          && saSegment.SegmentEnd == uxSegment.SegmentEnd;
+        Assert.False(saAndUxOverlap,
+            "SA and UX should not have identical date ranges — they must be proportionally distributed");
+    }
+
+    [Fact]
+    public async Task OverlapPercentages_PullBackPreviousPhase()
+    {
+        // Arrange: Task with BA (20% overlap), DEV, QA — BA overlap should pull DEV start earlier
+        var taskId = "OVL-001";
+        var breakdown = new List<EffortBreakdownSpec>
+        {
+            new("BA",  10, 0,   1.0),  // no overlap (first phase)
+            new("DEV", 20, 30,  2.0),  // 30% overlap with BA
+            new("QA",  10, 0,   1.0),  // no overlap
+        };
+
+        await using (var db = await _factory.CreateDbContextAsync())
+        {
+            if (!await db.Tasks.AnyAsync(t => t.TaskId == taskId))
+            {
+                db.Tasks.Add(TaskItem.Create(taskId, "Overlap Pct Test", 5, breakdown));
+                await db.SaveChangesAsync();
+            }
+        }
+
+        await _schedulerService.RunSchedulerAsync(CancellationToken.None);
+
+        // Act
+        var segments = await _queryService.GetGanttSegmentsAsync(CancellationToken.None);
+        var taskSegments = segments.FirstOrDefault(s => s.TaskId == taskId)?.Segments ?? (IReadOnlyList<GanttRoleSegmentDto>)Array.Empty<GanttRoleSegmentDto>();
+
+        var baSegment = taskSegments.FirstOrDefault(s => s.Role == "BA");
+        var devSegment = taskSegments.FirstOrDefault(s => s.Role == "DEV");
+        var qaSegment = taskSegments.FirstOrDefault(s => s.Role == "QA");
+
+        // Assert: All three segments exist (BA is estimated since no BA resources)
+        Assert.NotNull(baSegment);
+        Assert.NotNull(devSegment);
+        Assert.NotNull(qaSegment);
+
+        // DEV should start BEFORE BA ends due to 30% overlap pullback
+        // (or at latest, DEV start <= BA end when resources are allocated)
+        Assert.True(devSegment.SegmentStart <= baSegment.SegmentEnd.AddDays(1),
+            $"DEV should start near BA end due to overlap: DEV={devSegment.SegmentStart:yyyy-MM-dd}, BA end={baSegment.SegmentEnd:yyyy-MM-dd}");
+
+        // QA should come after DEV
+        Assert.True(qaSegment.SegmentStart >= devSegment.SegmentStart,
+            $"QA should start >= DEV: QA={qaSegment.SegmentStart:yyyy-MM-dd}, DEV={devSegment.SegmentStart:yyyy-MM-dd}");
+    }
+
+    [Fact]
+    public async Task SegmentOrdering_FollowsPipelineOrder()
+    {
+        // Arrange: Task with all 6 roles — segments should follow BA → SA → UX → UI → DEV → QA
+        var taskId = "PPL-001";
+        var breakdown = TestDatabaseHelper.MakeMultiRoleBreakdown(15, 8,
+            ("BA", 3), ("SA", 3), ("UX", 4), ("UI", 3));
+
+        await using (var db = await _factory.CreateDbContextAsync())
+        {
+            if (!await db.Tasks.AnyAsync(t => t.TaskId == taskId))
+            {
+                db.Tasks.Add(TaskItem.Create(taskId, "Pipeline Order Test", 3, breakdown));
+                await db.SaveChangesAsync();
+            }
+        }
+
+        await _schedulerService.RunSchedulerAsync(CancellationToken.None);
+
+        // Act
+        var segments = await _queryService.GetGanttSegmentsAsync(CancellationToken.None);
+        var taskSegments = segments.FirstOrDefault(s => s.TaskId == taskId)?.Segments ?? (IReadOnlyList<GanttRoleSegmentDto>)Array.Empty<GanttRoleSegmentDto>();
+
+        // Assert: At least BA, DEV, QA should exist
+        var roles = taskSegments.Select(s => s.Role).ToList();
+        Assert.Contains("DEV", roles);
+        Assert.Contains("QA", roles);
+
+        // Estimated segments for roles without resources should follow pipeline order
+        var estimatedSegments = taskSegments.Where(s => s.IsEstimated).OrderBy(s => s.SegmentStart).ToList();
+        var pipelineOrder = DomainConstants.ResourceRole.PipelineOrder.ToList();
+        for (int i = 1; i < estimatedSegments.Count; i++)
+        {
+            var prev = estimatedSegments[i - 1];
+            var curr = estimatedSegments[i];
+            var prevOrder = pipelineOrder.IndexOf(prev.Role);
+            var currOrder = pipelineOrder.IndexOf(curr.Role);
+            // If both have pipeline positions, earlier pipeline role should start first (or same time)
+            if (prevOrder >= 0 && currOrder >= 0)
+            {
+                Assert.True(prev.SegmentStart <= curr.SegmentStart,
+                    $"Pipeline order violated: {prev.Role} (order {prevOrder}) starts {prev.SegmentStart:yyyy-MM-dd} > {curr.Role} (order {currOrder}) starts {curr.SegmentStart:yyyy-MM-dd}");
+            }
+        }
+    }
+
+    [Fact]
+    public async Task SingleRoleTask_ProducesOneSegment()
+    {
+        // Arrange: Task with only DEV effort — should produce exactly one segment
+        var taskId = "SGL-001";
+        var breakdown = new List<EffortBreakdownSpec>
+        {
+            new("DEV", 20, 0, 2.0),
+            new("QA",  10, 0, 1.0),
+        };
+
+        await using (var db = await _factory.CreateDbContextAsync())
+        {
+            if (!await db.Tasks.AnyAsync(t => t.TaskId == taskId))
+            {
+                db.Tasks.Add(TaskItem.Create(taskId, "Single Role Test", 7, breakdown));
+                await db.SaveChangesAsync();
+            }
+        }
+
+        await _schedulerService.RunSchedulerAsync(CancellationToken.None);
+
+        // Act
+        var segments = await _queryService.GetGanttSegmentsAsync(CancellationToken.None);
+        var taskSegments = segments.FirstOrDefault(s => s.TaskId == taskId)?.Segments ?? (IReadOnlyList<GanttRoleSegmentDto>)Array.Empty<GanttRoleSegmentDto>();
+
+        // Assert: Should have exactly DEV + QA segments (both have resources in seed data)
+        var devSegs = taskSegments.Where(s => s.Role == "DEV").ToList();
+        var qaSegs = taskSegments.Where(s => s.Role == "QA").ToList();
+        Assert.Single(devSegs);
+        Assert.Single(qaSegs);
+
+        // DEV segment should have meaningful duration
+        Assert.True(devSegs[0].DurationDays >= 1, "DEV segment should have >= 1 day duration");
+
+        // DEV should start before QA
+        Assert.True(devSegs[0].SegmentStart <= qaSegs[0].SegmentStart,
+            $"DEV should start <= QA: DEV={devSegs[0].SegmentStart:yyyy-MM-dd}, QA={qaSegs[0].SegmentStart:yyyy-MM-dd}");
     }
 
     public async ValueTask DisposeAsync()

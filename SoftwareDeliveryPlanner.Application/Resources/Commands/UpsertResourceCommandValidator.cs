@@ -1,5 +1,6 @@
 using FluentValidation;
 using SoftwareDeliveryPlanner.Application.Abstractions;
+using SoftwareDeliveryPlanner.Domain;
 
 namespace SoftwareDeliveryPlanner.Application.Resources.Commands;
 
@@ -14,6 +15,10 @@ public sealed class UpsertResourceCommandValidator : AbstractValidator<UpsertRes
             .InclusiveBetween(0, 100)
             .WithMessage("Availability must be between 0 and 100.");
         RuleFor(c => c.DailyCapacity).GreaterThan(0).WithMessage("Daily capacity must be greater than zero.");
+
+        RuleFor(c => c.SeniorityLevel)
+            .Must(s => s is null || DomainConstants.Seniority.IsValid(s))
+            .WithMessage(c => $"Invalid seniority level '{c.SeniorityLevel}'. Valid levels: {string.Join(", ", DomainConstants.Seniority.Levels)}.");
 
         RuleFor(c => c)
             .MustAsync(async (cmd, ct) =>

@@ -1,4 +1,5 @@
 using FluentValidation;
+using SoftwareDeliveryPlanner.Domain;
 
 namespace SoftwareDeliveryPlanner.Application.Tasks.Commands;
 
@@ -29,6 +30,9 @@ public sealed class UpsertTaskCommandValidator : AbstractValidator<UpsertTaskCom
         RuleForEach(c => c.EffortBreakdown).ChildRules(entry =>
         {
             entry.RuleFor(e => e.Role).NotEmpty().WithMessage("Role is required.");
+            entry.RuleFor(e => e.Role)
+                .Must(r => string.IsNullOrWhiteSpace(r) || DomainConstants.ResourceRole.AllRoles.Contains(r))
+                .WithMessage(e => $"Invalid role '{e.Role}'. Valid roles: {string.Join(", ", DomainConstants.ResourceRole.AllRoles)}.");
             entry.RuleFor(e => e.EstimationDays).GreaterThan(0).WithMessage("EstimationDays must be greater than zero.");
             entry.RuleFor(e => e.OverlapPct).InclusiveBetween(0, 100).WithMessage("OverlapPct must be between 0 and 100.");
             entry.RuleFor(e => e.MaxFte).GreaterThan(0).WithMessage("Max FTE must be greater than zero.");
@@ -39,7 +43,10 @@ public sealed class UpsertTaskCommandValidator : AbstractValidator<UpsertTaskCom
             RuleForEach(c => c.Dependencies!).ChildRules(dep =>
             {
                 dep.RuleFor(d => d.PredecessorTaskId).NotEmpty().WithMessage("PredecessorTaskId is required.");
-                dep.RuleFor(d => d.Type).NotEmpty().WithMessage("Dependency type is required.");
+                dep.RuleFor(d => d.Type)
+                    .NotEmpty().WithMessage("Dependency type is required.")
+                    .Must(t => string.IsNullOrWhiteSpace(t) || DomainConstants.DependencyType.IsValid(t))
+                    .WithMessage(d => $"Invalid dependency type '{d.Type}'. Valid types: FS, SS, FF.");
                 dep.RuleFor(d => d.LagDays).GreaterThanOrEqualTo(0).WithMessage("LagDays must be >= 0.");
                 dep.RuleFor(d => d.OverlapPct).InclusiveBetween(0, 100).WithMessage("Dependency OverlapPct must be between 0 and 100.");
             });

@@ -41,6 +41,17 @@
 {
     <SkeletonLoader Variant="block" TestId="gantt-skeleton" />
 }
+else if (!string.IsNullOrEmpty(loadError))
+{
+    <div class="empty-state" data-testid="gantt-error">
+        <div class="empty-icon"><i class="bi bi-exclamation-triangle text-danger"></i></div>
+        <h5>Unable to load Gantt chart</h5>
+        <p>@loadError</p>
+        <button class="btn btn-outline-secondary" @onclick="RefreshData">
+            <i class="bi bi-arrow-clockwise"></i> Retry
+        </button>
+    </div>
+}
 else if (!scheduledTasks.Any())
 {
     <div class="empty-state" data-testid="gantt-empty">
@@ -81,6 +92,7 @@ else
                 var isVisible = visibleRoles.Contains(role);
                 <button class="gantt-legend-toggle @(isVisible ? "" : "gantt-legend-toggle-off")"
                         @onclick="() => ToggleRole(role)"
+                        aria-pressed="@isVisible.ToString().ToLowerInvariant()"
                         title="@(isVisible ? "Click to hide" : "Click to show") @DomainConstants.ResourceRole.GetDisplayName(role)"
                         data-testid="gantt-role-toggle-@role.ToLowerInvariant()">
                     <span class="gantt-legend-swatch gantt-role-@role.ToLowerInvariant()"></span>
@@ -108,14 +120,14 @@ else
     </div>
 
     <!-- Timeline headers (months + weeks) -->
-    <div class="gantt-container" data-testid="gantt-chart">
+    <div class="gantt-container" data-testid="gantt-chart" role="img" aria-label="Gantt chart showing @scheduledTasks.Count scheduled tasks from @planStart.ToString("dd MMM yyyy") to @planEnd.ToString("dd MMM yyyy")">
         <div class="gantt-header gantt-header-months">
             <div class="gantt-label-col gantt-label-col-header"><strong>Task</strong></div>
             <div class="gantt-timeline-col">
                 <div class="gantt-months">
                     @foreach (var month in GetMonthMarkers())
                     {
-                        <div class="gantt-month" style="left: @month.LeftPct%; width: @month.WidthPct%;">
+                        <div class="gantt-month" style="left: @Pct(month.LeftPct)%; width: @Pct(month.WidthPct)%;">
                             @month.Label
                         </div>
                     }
@@ -128,7 +140,7 @@ else
                 <div class="gantt-weeks">
                     @foreach (var week in GetWeekMarkers())
                     {
-                        <div class="gantt-week" style="left: @week.LeftPct%; width: @week.WidthPct%;" title="@week.FullLabel">
+                        <div class="gantt-week" style="left: @Pct(week.LeftPct)%; width: @Pct(week.WidthPct)%;" title="@week.FullLabel">
                             <span class="gantt-week-number">@week.Label</span>
                             <span class="gantt-week-dates">@week.DateRange</span>
                         </div>
@@ -140,7 +152,7 @@ else
         @* Week grid lines *@
         @foreach (var week in GetWeekMarkers())
         {
-            <div class="gantt-week-line" style="left: calc(240px + (@week.LeftPct * (100% - 240px) / 100));"></div>
+            <div class="gantt-week-line" style="left: calc(240px + (100% - 240px) * @Pct(week.LeftPct) / 100);"></div>
         }
 
         <!-- Task rows -->
@@ -151,10 +163,14 @@ else
             var hiddenCount = segments.Count - visibleSegments.Count;
             var laneCount = Math.Max(1, visibleSegments.Count);
             var shellHeight = laneCount * LaneHeight + LanePadding;
-            var barStyle = GetBarStyle(task, shellHeight);
+            var maxSegEnd = visibleSegments.Any() && task.PlannedFinish.HasValue
+                ? visibleSegments.Max(s => s.SegmentEnd)
+                : (task.PlannedFinish ?? DateTime.MinValue);
+            var effectiveEnd = maxSegEnd > (task.PlannedFinish ?? DateTime.MinValue) ? maxSegEnd : task.PlannedFinish ?? DateTime.MinValue;
+            var barStyle = GetBarStyle(task, shellHeight, effectiveEnd);
             var statusClass = GetStatusClass(task);
 
-            <div class="gantt-row" data-testid="gantt-row-@task.TaskId">
+            <div class="gantt-row" data-testid="gantt-row-@task.TaskId" role="group" aria-label="Task @task.TaskId: @task.ServiceName">
                 <div class="gantt-label-col clickable-row" title="@task.ServiceName"
                      role="button" tabindex="0"
                      @onclick="() => NavigateToTask(task.TaskId)"
@@ -175,13 +191,14 @@ else
                         </div>
                     }
                 </div>
-                <div class="gantt-timeline-col">
+                <div class="gantt-timeline-col" style="min-height: @(shellHeight + 8)px;">
                     @if (task.PlannedStart.HasValue && task.PlannedFinish.HasValue)
                     {
                         @* Shell bar: transparent container for role segments *@
                         <div class="gantt-shell gantt-tooltip @(IsCriticalTask(task) ? "gantt-bar-critical" : "")" style="@barStyle"
                              data-tooltip="@task.TaskId: @task.ServiceName&#10;Status: @task.Status | Risk: @task.DeliveryRisk&#10;@task.PlannedStart?.ToString("dd MMM yyyy") — @task.PlannedFinish?.ToString("dd MMM yyyy") (@task.Duration d)"
                              role="button" tabindex="0"
+                             aria-label="@task.TaskId bar: @task.PlannedStart?.ToString("dd MMM") to @task.PlannedFinish?.ToString("dd MMM"), @visibleSegments.Count role segments"
                              @onclick="() => NavigateToTask(task.TaskId)" @onclick:stopPropagation
                              @onkeydown="(e) => OnGanttKeyDown(e, task.TaskId)" @onkeydown:stopPropagation
                              data-testid="gantt-bar-@task.TaskId">
@@ -189,7 +206,7 @@ else
                             @* Role segments: full-height colored bars *@
                             @foreach (var seg in visibleSegments)
                             {
-                                var segStyle = GetSegmentStyle(task, seg);
+                                var segStyle = GetSegmentStyle(task, seg, effectiveEnd);
                                 var estimatedLabel = seg.IsEstimated ? " (Estimated - no resources assigned)" : "";
                                 var segTooltip = $"{seg.Role}: {DomainConstants.ResourceRole.GetDisplayName(seg.Role)}{estimatedLabel}\n" +
                                                  $"Start: {seg.SegmentStart:yyyy-MM-dd}\n" +
@@ -199,9 +216,11 @@ else
                                                  (seg.IsEstimated ? "Resources: None (unallocated)" : $"Resources: {string.Join(", ", seg.AssignedResources.Select(r => r.ResourceName))}");
                                 var laneIndex = visibleSegments.IndexOf(seg);
                                 var segCssClass = $"gantt-segment gantt-tooltip gantt-role-{seg.Role.ToLowerInvariant()}{(seg.IsEstimated ? " gantt-segment-estimated" : "")}";
+                                var segAriaLabel = $"{seg.Role} segment: {seg.SegmentStart:dd MMM} to {seg.SegmentEnd:dd MMM}{(seg.IsEstimated ? " (estimated)" : "")}";
                                 <div class="@segCssClass"
                                      style="@segStyle; top: @(laneIndex * LaneHeight + 2)px;"
                                      data-tooltip="@segTooltip"
+                                     aria-label="@segAriaLabel"
                                      data-testid="gantt-segment-@task.TaskId-@seg.Role">
                                     <span class="gantt-segment-label">@seg.Role@(seg.IsEstimated ? "*" : "")</span>
                                 </div>
@@ -222,7 +241,7 @@ else
                             var strictPct = GetDatePercent(task.StrictDate.Value);
                             var delta = (task.StrictDate.Value - task.PlannedFinish!.Value).Days;
                             var deltaClass = delta >= 0 ? "gantt-strict-ok" : "gantt-strict-overdue";
-                            <div class="gantt-strict-marker @deltaClass" style="left: @strictPct%;"
+                            <div class="gantt-strict-marker @deltaClass" style="left: @Pct(strictPct)%;"
                                  title="Deadline: @task.StrictDate.Value.ToString("dd MMM yyyy") (@(delta >= 0 ? $"{delta}d buffer" : $"{Math.Abs(delta)}d overdue"))"
                                  data-testid="gantt-strict-@task.TaskId">
                                 <span class="gantt-strict-flag">@(delta >= 0 ? $"+{delta}d" : $"{delta}d")</span>
@@ -242,7 +261,7 @@ else
             var todayPct = GetDatePercent(DateTime.Today);
             if (todayPct >= 0 && todayPct <= 100)
             {
-                <div class="gantt-today-line" style="left: calc(240px + (@todayPct% * (100% - 240px) / 100));"
+                <div class="gantt-today-line" style="left: calc(240px + (100% - 240px) * @Pct(todayPct) / 100);"
                      data-testid="gantt-today" title="Today: @DateTime.Today.ToString("yyyy-MM-dd")">
                 </div>
             }
@@ -258,17 +277,20 @@ else
     private List<TaskItem> scheduledTasks = new();
     private int totalTaskCount;
     private int excludedTaskCount;
-    private Dictionary<string, List<GanttRoleSegmentDto>> segmentsByTask = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, IReadOnlyList<GanttRoleSegmentDto>> segmentsByTask = new(StringComparer.OrdinalIgnoreCase);
     private DateTime planStart;
     private DateTime planEnd;
     private int totalDays;
     private bool isRefreshing = false;
     private bool isLoaded = false;
+    private string? loadError;
     private bool showCriticalPath = false;
     private HashSet<string> criticalPathTaskIds = new();
     private HashSet<string> visibleRoles = new(DomainConstants.ResourceRole.PipelineOrder, StringComparer.OrdinalIgnoreCase);
     private string workingWeekCode = DomainConstants.WorkingWeek.SunThu;
     private ToastNotification toast = default!;
+    private List<MonthMarker> _cachedMonthMarkers = new();
+    private List<WeekMarker> _cachedWeekMarkers = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -283,7 +305,15 @@ else
 
     private async Task LoadData()
     {
+        loadError = null;
+
         var result = await Mediator.Send(new GetTasksQuery());
+        if (!result.IsSuccess)
+        {
+            loadError = "Failed to load tasks. Please try refreshing.";
+            return;
+        }
+
         var allTasks = result.Value;
         totalTaskCount = allTasks.Count;
 
@@ -298,6 +328,12 @@ else
 
         // Load role-based segments
         var segResult = await Mediator.Send(new GetGanttSegmentsQuery());
+        if (!segResult.IsSuccess)
+        {
+            loadError = "Failed to load Gantt segments. Please try refreshing.";
+            return;
+        }
+
         var allSegments = segResult.Value;
         segmentsByTask = allSegments.ToDictionary(s => s.TaskId, s => s.Segments, StringComparer.OrdinalIgnoreCase);
 
@@ -320,6 +356,10 @@ else
             planEnd = planEnd.AddDays(5);
             totalDays = (int)(planEnd - planStart).TotalDays;
             if (totalDays < 1) totalDays = 1;
+
+            // Pre-compute markers (M5 cache)
+            _cachedMonthMarkers = ComputeMonthMarkers();
+            _cachedWeekMarkers = ComputeWeekMarkers();
         }
     }
 
@@ -338,8 +378,8 @@ else
         }
     }
 
-    private List<GanttRoleSegmentDto> GetSegmentsForTask(string taskId)
-        => segmentsByTask.GetValueOrDefault(taskId) ?? new();
+    private IReadOnlyList<GanttRoleSegmentDto> GetSegmentsForTask(string taskId)
+        => segmentsByTask.GetValueOrDefault(taskId) ?? Array.Empty<GanttRoleSegmentDto>();
 
     private double GetDatePercent(DateTime date)
     {
@@ -348,33 +388,29 @@ else
         return Math.Round(dayOffset / totalDays * 100, 2);
     }
 
-    private string GetBarStyle(TaskItem task, int shellHeight)
+    private string GetBarStyle(TaskItem task, int shellHeight, DateTime effectiveEnd)
     {
         if (!task.PlannedStart.HasValue || !task.PlannedFinish.HasValue)
             return "display: none;";
 
         var leftPct = GetDatePercent(task.PlannedStart.Value);
-        var rightPct = GetDatePercent(task.PlannedFinish.Value);
+        var rightPct = GetDatePercent(effectiveEnd);
         var widthPct = Math.Max(rightPct - leftPct, 0.5); // minimum visible width
 
-        return $"left: {leftPct}%; width: {widthPct}%; height: {shellHeight}px;";
+        return FormattableString.Invariant($"left: {leftPct}%; width: {widthPct}%; height: {shellHeight}px;");
     }
 
     /// <summary>
     /// Computes position of a role segment relative to the shell bar (parent).
     /// Returns left/width as percentages of the shell bar.
     /// </summary>
-    private string GetSegmentStyle(TaskItem task, GanttRoleSegmentDto segment)
+    private string GetSegmentStyle(TaskItem task, GanttRoleSegmentDto segment, DateTime effectiveEnd)
     {
         if (!task.PlannedStart.HasValue || !task.PlannedFinish.HasValue)
             return "display: none;";
 
         var taskStart = task.PlannedStart.Value;
-        var taskEnd = task.PlannedFinish.Value;
-
-        // Extend effective end to cover segments that extend beyond PlannedFinish
-        if (segment.SegmentEnd > taskEnd)
-            taskEnd = segment.SegmentEnd;
+        var taskEnd = effectiveEnd;
 
         var taskSpan = (taskEnd - taskStart).TotalDays;
         if (taskSpan < 1) taskSpan = 1;
@@ -389,7 +425,7 @@ else
         // Guarantee minimum visible width
         if (widthPct < 1) widthPct = 1;
 
-        return $"left: {leftPct}%; width: {widthPct}%";
+        return FormattableString.Invariant($"left: {leftPct}%; width: {widthPct}%");
     }
 
     private string GetStatusClass(TaskItem task)
@@ -408,7 +444,9 @@ else
         };
     }
 
-    private List<MonthMarker> GetMonthMarkers()
+    private List<MonthMarker> GetMonthMarkers() => _cachedMonthMarkers;
+
+    private List<MonthMarker> ComputeMonthMarkers()
     {
         var markers = new List<MonthMarker>();
         if (totalDays <= 0) return markers;
@@ -438,6 +476,9 @@ else
 
     private static string Truncate(string text, int maxLength)
         => text.Length <= maxLength ? text : text[..(maxLength - 1)] + "\u2026";
+
+    /// <summary>Format a double for CSS using invariant culture (defense-in-depth).</summary>
+    private static string Pct(double val) => val.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private void NavigateToTask(string taskId)
     {
@@ -542,7 +583,9 @@ else
         public double WidthPct { get; init; }
     }
 
-    private List<WeekMarker> GetWeekMarkers()
+    private List<WeekMarker> GetWeekMarkers() => _cachedWeekMarkers;
+
+    private List<WeekMarker> ComputeWeekMarkers()
     {
         var markers = new List<WeekMarker>();
         if (totalDays <= 0) return markers;

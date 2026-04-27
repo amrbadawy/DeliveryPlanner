@@ -73,6 +73,9 @@ public class TeamMember : AggregateRoot
             workingWeek != DomainConstants.WorkingWeek.MonFri)
             throw new DomainException($"Invalid working week '{workingWeek}'. Valid values: {DomainConstants.WorkingWeek.SunThu}, {DomainConstants.WorkingWeek.MonFri}.");
 
+        if (endDate.HasValue && endDate.Value < startDate)
+            throw new DomainException("End date cannot be before start date.");
+
         var member = new TeamMember
         {
             ResourceId = resourceId.Trim().ToUpperInvariant(),

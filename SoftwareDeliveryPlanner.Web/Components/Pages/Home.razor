@@ -274,9 +274,9 @@ else
                         var atRiskPct = (double)point.AtRisk / total * 100;
                         var latePct = (double)point.Late / total * 100;
                         <div class="d-flex flex-column flex-fill" style="height: 100%;" title="@point.RunTimestamp.ToString("MMM dd HH:mm")">
-                            <div style="flex: @latePct; background: var(--color-danger); border-radius: 2px 2px 0 0;" class="mb-0"></div>
-                            <div style="flex: @atRiskPct; background: var(--color-warning);" class="mb-0"></div>
-                            <div style="flex: @onTrackPct; background: var(--color-success); border-radius: 0 0 2px 2px;" class="mb-0"></div>
+                            <div style="flex: @Pct(latePct); background: var(--color-danger); border-radius: 2px 2px 0 0;" class="mb-0"></div>
+                            <div style="flex: @Pct(atRiskPct); background: var(--color-warning);" class="mb-0"></div>
+                            <div style="flex: @Pct(onTrackPct); background: var(--color-success); border-radius: 0 0 2px 2px;" class="mb-0"></div>
                         </div>
                     }
                 </div>
@@ -403,6 +403,9 @@ else
         "Modified" => "warning",
         _ => "secondary"
     };
+
+    /// <summary>Format a double for CSS using invariant culture (defense-in-depth).</summary>
+    private static string Pct(double val) => val.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private async Task DismissNotifications()
     {

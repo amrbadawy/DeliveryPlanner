@@ -613,18 +613,23 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
     {
         await using var db = await ReadOnlyDbFactory.CreateDbContextAsync(cancellationToken);
 
-        // Load all allocations grouped by (TaskId, Role) to derive segment date windows
-        var allocations = await db.Allocations
-            .Where(a => a.HoursAllocated > 0)
-            .OrderBy(a => a.CalendarDate)
-            .ToListAsync(cancellationToken);
-
-        
-
         // Load tasks with effort breakdown for MaxFte
         var tasks = await db.Tasks
             .Include(t => t.EffortBreakdown)
             .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+
+        // Derive a date window from task planned dates to filter allocations (H2 performance)
+        var scheduledTasks = tasks.Where(t => t.PlannedStart.HasValue).ToList();
+        DateTime? minDate = scheduledTasks.Any() ? scheduledTasks.Min(t => t.PlannedStart!.Value).AddDays(-30) : null;
+        DateTime? maxDate = scheduledTasks.Any() ? scheduledTasks.Max(t => t.PlannedFinish ?? t.PlannedStart!.Value).AddDays(30) : null;
+
+        // Load allocations filtered by date range when possible
+        var allocQuery = db.Allocations.Where(a => a.HoursAllocated > 0);
+        if (minDate.HasValue && maxDate.HasValue)
+            allocQuery = allocQuery.Where(a => a.CalendarDate >= minDate.Value && a.CalendarDate <= maxDate.Value);
+        var allocations = await allocQuery
+            .OrderBy(a => a.CalendarDate)
             .ToListAsync(cancellationToken);
 
         var effortByTask = tasks.ToDictionary(
@@ -632,111 +637,165 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
             t => t.EffortBreakdown.ToDictionary(e => e.Role, e => e.MaxFte, StringComparer.OrdinalIgnoreCase),
             StringComparer.OrdinalIgnoreCase);
 
-        // Load resources for names
-        var resources = await db.Resources.ToListAsync(cancellationToken);
+        // Load active resources for names
+        var resources = await db.Resources
+            .Where(r => r.Active == Domain.DomainConstants.ActiveStatus.Yes)
+            .ToListAsync(cancellationToken);
         var resourceNames = resources.ToDictionary(r => r.ResourceId, r => r.ResourceName, StringComparer.OrdinalIgnoreCase);
 
-        var grouped = allocations
-            .GroupBy(a => a.TaskId, StringComparer.OrdinalIgnoreCase)
-            .Select(taskGroup =>
-            {
-                var segments = taskGroup
-                    .GroupBy(a => a.Role, StringComparer.OrdinalIgnoreCase)
-                    .Select(roleGroup =>
-                    {
-                        var segStart = roleGroup.Min(a => a.CalendarDate);
-                        var segEnd = roleGroup.Max(a => a.CalendarDate);
-                        var duration = (int)(segEnd - segStart).TotalDays + 1;
-                        var maxFte = effortByTask.GetValueOrDefault(taskGroup.Key)
-                            ?.GetValueOrDefault(roleGroup.Key) ?? 1.0;
+        // Build allocation-based segments per task+role
+        var allocatedSegmentsByTask = new Dictionary<string, List<GanttRoleSegmentDto>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var taskGroup in allocations.GroupBy(a => a.TaskId, StringComparer.OrdinalIgnoreCase))
+        {
+            var segments = taskGroup
+                .GroupBy(a => a.Role, StringComparer.OrdinalIgnoreCase)
+                .Select(roleGroup =>
+                {
+                    var segStart = roleGroup.Min(a => a.CalendarDate);
+                    var segEnd = roleGroup.Max(a => a.CalendarDate);
+                    var duration = (int)(segEnd - segStart).TotalDays + 1;
+                    var maxFte = effortByTask.GetValueOrDefault(taskGroup.Key)
+                        ?.GetValueOrDefault(roleGroup.Key) ?? 1.0;
 
-                        var assignedResources = roleGroup
-                            .Select(a => a.ResourceId)
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
-                            .Select(rid => new GanttSegmentResourceDto(
-                                rid,
-                                resourceNames.GetValueOrDefault(rid) ?? rid))
-                            .ToList();
+                    var assignedResources = roleGroup
+                        .Select(a => a.ResourceId)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Select(rid => new GanttSegmentResourceDto(
+                            rid,
+                            resourceNames.GetValueOrDefault(rid) ?? rid))
+                        .ToList();
 
-                        return new GanttRoleSegmentDto(
-                            taskGroup.Key,
-                            roleGroup.Key,
-                            segStart,
-                            segEnd,
-                            duration,
-                            maxFte,
-                            assignedResources);
-                    })
-                    .OrderBy(s => s.SegmentStart)
-                    .ThenBy(s => s.Role)
-                    .ToList();
+                    return new GanttRoleSegmentDto(
+                        taskGroup.Key,
+                        roleGroup.Key,
+                        segStart,
+                        segEnd,
+                        duration,
+                        maxFte,
+                        assignedResources);
+                })
+                .OrderBy(s => s.SegmentStart)
+                .ThenBy(s => s.Role)
+                .ToList();
 
-                return new TaskGanttSegmentsDto(taskGroup.Key, segments);
-            })
-            .ToList();
+            allocatedSegmentsByTask[taskGroup.Key] = segments;
+        }
 
-        // Build a lookup of tasks that already have allocation-based segments
-        var tasksWithSegments = grouped.ToDictionary(g => g.TaskId, g => g.Segments.Select(s => s.Role).ToHashSet(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+        // Build final result: merge allocated + estimated segments per task (M1: construct once, no mutation)
+        var result = new List<TaskGanttSegmentsDto>();
 
-        // For tasks that have EffortBreakdown roles without allocations, synthesize estimated segments
         foreach (var task in tasks)
         {
-            // Get roles that already have allocation-based segments
-            var alreadySegmentedRoles = tasksWithSegments.GetValueOrDefault(task.TaskId) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var allocated = allocatedSegmentsByTask.GetValueOrDefault(task.TaskId) ?? new List<GanttRoleSegmentDto>();
+            var allocatedRoles = allocated.Select(s => s.Role).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            // Calculate missing roles (in effort but not allocated)
+            // Build a lookup from allocated role to its actual date range (M11: hybrid fix)
+            var allocatedSegmentLookup = allocated.ToDictionary(s => s.Role, s => s, StringComparer.OrdinalIgnoreCase);
+
+            // Find missing (unallocated) roles
             var missingEfforts = task.EffortBreakdown
                 .Where(e => e.EstimationDays > 0)
-                .Where(e => !alreadySegmentedRoles.Contains(e.Role))
+                .Where(e => !allocatedRoles.Contains(e.Role))
                 .OrderBy(e => e.SortOrder)
                 .ToList();
 
-            if (missingEfforts.Count == 0)
-                continue;
+            var estimatedSegments = new List<GanttRoleSegmentDto>();
 
-            // Calculate segment dates
-            var segmentStart = task.PlannedStart ?? task.StrictDate ?? task.CreatedAt.Date;
-            var totalDays = task.TotalEstimationDays;
-            DateTime segmentEnd;
-            if (task.PlannedFinish.HasValue)
+            if (missingEfforts.Count > 0)
             {
-                segmentEnd = task.PlannedFinish.Value;
-            }
-            else if (totalDays > 0)
-            {
-                var calculatedDays = Math.Ceiling(totalDays * 2.0);
-                segmentEnd = segmentStart.AddDays(calculatedDays);
-            }
-            else
-            {
-                segmentEnd = segmentStart.AddDays(30.0);
+                // Calculate envelope dates for proportional positioning
+                var envelopeStart = task.PlannedStart ?? task.StrictDate ?? task.CreatedAt.Date;
+                var totalDays = task.TotalEstimationDays;
+                DateTime envelopeEnd;
+                if (task.PlannedFinish.HasValue)
+                {
+                    envelopeEnd = task.PlannedFinish.Value;
+                }
+                else if (totalDays > 0)
+                {
+                    var calculatedDays = Math.Ceiling(totalDays * 2.0);
+                    envelopeEnd = envelopeStart.AddDays(calculatedDays);
+                }
+                else
+                {
+                    envelopeEnd = envelopeStart.AddDays(30.0);
+                }
+
+                var envelopeDays = (envelopeEnd - envelopeStart).TotalDays;
+                if (envelopeDays < 1) envelopeDays = 1;
+
+                // Walk ALL efforts in pipeline order to compute proportional positions,
+                // but only create segments for missing (unallocated) roles.
+                var allEfforts = task.EffortBreakdown
+                    .Where(e => e.EstimationDays > 0)
+                    .OrderBy(e => e.SortOrder)
+                    .ToList();
+
+                var totalEstDays = allEfforts.Sum(e => e.EstimationDays);
+                if (totalEstDays <= 0) totalEstDays = 1;
+
+                double cursor = 0; // days offset from envelopeStart
+
+                for (int i = 0; i < allEfforts.Count; i++)
+                {
+                    var effort = allEfforts[i];
+                    var proportionDays = effort.EstimationDays / totalEstDays * envelopeDays;
+
+                    // Apply overlap pullback from previous phase
+                    if (i > 0 && effort.OverlapPct > 0)
+                    {
+                        var prevEffort = allEfforts[i - 1];
+                        var prevWidth = prevEffort.EstimationDays / totalEstDays * envelopeDays;
+                        var overlapAmount = prevWidth * effort.OverlapPct / 100.0;
+                        cursor = Math.Max(0, cursor - overlapAmount);
+                    }
+
+                    if (allocatedRoles.Contains(effort.Role))
+                    {
+                        // M11: Use actual allocated segment span for cursor advancement
+                        if (allocatedSegmentLookup.TryGetValue(effort.Role, out var allocSeg))
+                        {
+                            var actualSpan = (allocSeg.SegmentEnd - envelopeStart).TotalDays;
+                            cursor = Math.Max(cursor, actualSpan);
+                        }
+                        else
+                        {
+                            cursor += proportionDays;
+                        }
+                        continue;
+                    }
+
+                    // Estimated role: create segment with computed dates
+                    var estStart = envelopeStart.AddDays(cursor).Date;
+                    var estEnd = envelopeStart.AddDays(cursor + proportionDays).Date;
+                    if (estEnd > envelopeEnd) estEnd = envelopeEnd.Date;
+                    if (estEnd < estStart) estEnd = estStart; // guard
+
+                    estimatedSegments.Add(new GanttRoleSegmentDto(
+                        task.TaskId,
+                        effort.Role,
+                        estStart,
+                        estEnd,
+                        (int)Math.Max(1, Math.Ceiling(proportionDays)),
+                        effort.MaxFte,
+                        new List<GanttSegmentResourceDto>(),
+                        IsEstimated: true));
+
+                    cursor += proportionDays;
+                }
             }
 
-            var estimatedSegments = missingEfforts.Select(effort =>
-                new GanttRoleSegmentDto(
-                    task.TaskId,
-                    effort.Role,
-                    segmentStart,
-                    segmentEnd,
-                    (int)Math.Ceiling(effort.EstimationDays),
-                    effort.MaxFte,
-                    new List<GanttSegmentResourceDto>(),
-                    IsEstimated: true))
-                .ToList();
+            // Only include tasks that have at least one segment
+            var allSegments = new List<GanttRoleSegmentDto>(allocated.Count + estimatedSegments.Count);
+            allSegments.AddRange(allocated);
+            allSegments.AddRange(estimatedSegments);
 
-            var existing = grouped.FirstOrDefault(g => string.Equals(g.TaskId, task.TaskId, StringComparison.OrdinalIgnoreCase));
-            if (existing != null)
+            if (allSegments.Count > 0)
             {
-                // Append estimated segments to existing task entry
-                existing.Segments.AddRange(estimatedSegments);
-            }
-            else
-            {
-                // Create a new entry for this task (all segments are estimated)
-                grouped.Add(new TaskGanttSegmentsDto(task.TaskId, estimatedSegments));
+                result.Add(new TaskGanttSegmentsDto(task.TaskId, allSegments));
             }
         }
 
-        return grouped;
+        return result;
     }
 }

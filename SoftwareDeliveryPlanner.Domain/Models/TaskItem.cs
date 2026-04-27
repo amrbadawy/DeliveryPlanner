@@ -214,6 +214,11 @@ public class TaskItem : AggregateRoot
         string deliveryRisk,
         string? assignedResourceId = null)
     {
+        if (!DomainConstants.TaskStatus.IsValid(status))
+            throw new DomainException($"Invalid task status '{status}'.");
+        if (!DomainConstants.DeliveryRisk.IsValid(deliveryRisk))
+            throw new DomainException($"Invalid delivery risk '{deliveryRisk}'.");
+
         PeakConcurrency = peakConcurrency;
         PlannedStart = plannedStart;
         PlannedFinish = plannedFinish;

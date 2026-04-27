@@ -12,6 +12,11 @@ public static class DomainConstants
         public const string NotStarted = "NOT_STARTED";
         public const string InProgress = "IN_PROGRESS";
         public const string Completed = "COMPLETED";
+
+        private static readonly HashSet<string> All = new(StringComparer.OrdinalIgnoreCase)
+            { NotStarted, InProgress, Completed };
+
+        public static bool IsValid(string status) => All.Contains(status);
     }
 
     /// <summary>Delivery risk assessment labels.</summary>
@@ -20,6 +25,11 @@ public static class DomainConstants
         public const string OnTrack = "ON_TRACK";
         public const string AtRisk = "AT_RISK";
         public const string Late = "LATE";
+
+        private static readonly HashSet<string> All = new(StringComparer.OrdinalIgnoreCase)
+            { OnTrack, AtRisk, Late };
+
+        public static bool IsValid(string risk) => All.Contains(risk);
     }
 
     /// <summary>Keys stored in the Settings table.</summary>

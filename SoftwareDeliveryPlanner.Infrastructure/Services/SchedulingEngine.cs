@@ -127,25 +127,32 @@ internal class SchedulingEngine : ISchedulingEngine
 
     /// <summary>
     /// Computes the critical path depth for a task (longest chain of dependencies).
+    /// Uses a visiting set to detect cycles — cycled tasks return depth 0.
     /// </summary>
     private int ComputeCriticalPathDepth(
         TaskItem task,
         Dictionary<string, TaskItem> taskLookup,
-        Dictionary<string, int> depthCache)
+        Dictionary<string, int> depthCache,
+        HashSet<string>? visiting = null)
     {
         if (depthCache.TryGetValue(task.TaskId, out var cached))
             return cached;
+
+        visiting ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!visiting.Add(task.TaskId))
+            return 0; // cycle detected — break infinite recursion
 
         int maxDepth = 0;
         foreach (var dep in task.Dependencies)
         {
             if (taskLookup.TryGetValue(dep.PredecessorTaskId, out var predTask))
             {
-                int predDepth = ComputeCriticalPathDepth(predTask, taskLookup, depthCache);
+                int predDepth = ComputeCriticalPathDepth(predTask, taskLookup, depthCache, visiting);
                 maxDepth = Math.Max(maxDepth, predDepth + 1);
             }
         }
 
+        visiting.Remove(task.TaskId);
         depthCache[task.TaskId] = maxDepth;
         return maxDepth;
     }

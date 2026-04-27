@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SoftwareDeliveryPlanner.Application.Abstractions;
 using SoftwareDeliveryPlanner.Domain.Models;
 using SoftwareDeliveryPlanner.Infrastructure.Data;
+using SoftwareDeliveryPlanner.SharedKernel;
 
 namespace SoftwareDeliveryPlanner.Infrastructure.Services;
 
@@ -98,6 +99,16 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
             }
         }
 
+        // Detect transitive cycles before persisting
+        if (task.Dependencies.Any())
+        {
+            var allTasks = await db.Tasks
+                .Include(t => t.Dependencies)
+                .AsSplitQuery()
+                .ToListAsync(cancellationToken);
+            DetectDependencyCycle(task.TaskId, allTasks);
+        }
+
         await SaveDispatchAndRescheduleAsync(db, cancellationToken);
     }
 
@@ -135,5 +146,54 @@ internal sealed class TaskService : ServiceBase, ITaskOrchestrator
             db.Tasks.Remove(task);
 
         await SaveDispatchAndRescheduleAsync(db, cancellationToken);
+    }
+
+    /// <summary>
+    /// Detects transitive cycles in the dependency graph using DFS.
+    /// Throws <see cref="DomainException"/> if a cycle is found involving the given task.
+    /// </summary>
+    private static void DetectDependencyCycle(string rootTaskId, List<TaskItem> allTasks)
+    {
+        var adjacency = allTasks.ToDictionary(
+            t => t.TaskId,
+            t => t.Dependencies.Select(d => d.PredecessorTaskId).ToList(),
+            StringComparer.OrdinalIgnoreCase);
+
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var visiting = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (HasCycle(rootTaskId, adjacency, visited, visiting))
+        {
+            throw new DomainException(
+                $"Circular dependency detected involving task '{rootTaskId}'. " +
+                "Please remove one of the dependencies in the cycle.");
+        }
+    }
+
+    private static bool HasCycle(
+        string taskId,
+        Dictionary<string, List<string>> adjacency,
+        HashSet<string> visited,
+        HashSet<string> visiting)
+    {
+        if (visiting.Contains(taskId))
+            return true; // cycle found
+        if (visited.Contains(taskId))
+            return false; // already fully explored
+
+        visiting.Add(taskId);
+
+        if (adjacency.TryGetValue(taskId, out var predecessors))
+        {
+            foreach (var pred in predecessors)
+            {
+                if (HasCycle(pred, adjacency, visited, visiting))
+                    return true;
+            }
+        }
+
+        visiting.Remove(taskId);
+        visited.Add(taskId);
+        return false;
     }
 }

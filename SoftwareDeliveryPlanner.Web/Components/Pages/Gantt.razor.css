@@ -19,7 +19,7 @@
 }
 
 .gantt-header-months {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    border-bottom: 1px solid var(--gantt-header-border);
 }
 
 .gantt-header-weeks {
@@ -64,7 +64,7 @@
     text-align: center;
     font-size: var(--font-size-xs);
     padding: 4px 0;
-    border-left: 1px solid rgba(255, 255, 255, 0.2);
+    border-left: 1px solid var(--gantt-header-border-strong);
 }
 
 .gantt-weeks {
@@ -78,8 +78,8 @@
     text-align: center;
     font-size: 10px;
     padding: 2px 0;
-    border-left: 1px solid rgba(255, 255, 255, 0.12);
-    color: rgba(255, 255, 255, 0.8);
+    border-left: 1px solid var(--gantt-header-border-subtle);
+    color: var(--gantt-header-text);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -234,7 +234,7 @@
 .gantt-segment-label {
     font-size: 9px;
     font-weight: 700;
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--gantt-segment-text);
     padding: 0 4px;
     white-space: nowrap;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -248,7 +248,7 @@
     font-size: 9px;
     font-weight: 700;
     color: var(--color-text-secondary);
-    background: rgba(255, 255, 255, 0.85);
+    background: var(--gantt-overlay-bg);
     border-radius: 3px;
     padding: 0 3px;
     cursor: help;
@@ -266,7 +266,7 @@
     font-weight: 600;
     z-index: 1;
     position: relative;
-    background: rgba(255, 255, 255, 0.7);
+    background: var(--gantt-label-bg);
     border-radius: 2px;
     margin: 1px 2px;
     line-height: 14px;
@@ -435,13 +435,13 @@
 /* ── Estimated segment styling (dashed, lower opacity) ──── */
 .gantt-segment-estimated {
     opacity: 0.55;
-    border: 2px dashed rgba(255, 255, 255, 0.7);
+    border: 2px dashed var(--gantt-estimated-border);
     background-image: repeating-linear-gradient(
         -45deg,
         transparent,
         transparent 3px,
-        rgba(255, 255, 255, 0.15) 3px,
-        rgba(255, 255, 255, 0.15) 6px
+        var(--gantt-estimated-stripe) 3px,
+        var(--gantt-estimated-stripe) 6px
     );
 }
 
@@ -490,4 +490,17 @@
 .gantt-legend-toggle-off .gantt-legend-swatch {
     filter: grayscale(1);
     opacity: 0.4;
+}
+
+/* ── Focus-visible outlines for keyboard navigation (WCAG AA) ── */
+.gantt-shell:focus-visible,
+.gantt-legend-toggle:focus-visible {
+    outline: 2px solid var(--color-accent, #3b82f6);
+    outline-offset: 2px;
+}
+
+.clickable-row:focus-visible {
+    outline: 2px solid var(--color-accent, #3b82f6);
+    outline-offset: -2px;
+    border-radius: var(--radius-sm);
 }

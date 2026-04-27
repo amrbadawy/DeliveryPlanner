@@ -124,6 +124,7 @@ else
                     var isVisible = visibleRoles.Contains(role);
                     <button class="gantt-legend-toggle @(isVisible ? "" : "gantt-legend-toggle-off")"
                             @onclick="() => ToggleRole(role)"
+                            aria-pressed="@isVisible.ToString().ToLowerInvariant()"
                             title="@(isVisible ? "Click to hide" : "Click to show") @DomainConstants.ResourceRole.GetDisplayName(role)"
                             data-testid="scenario-gantt-role-toggle-@role.ToLowerInvariant()">
                         <span class="gantt-legend-swatch gantt-role-@role.ToLowerInvariant()"></span>
@@ -146,16 +147,16 @@ else
         </div>
 
         <!-- Gantt chart -->
-        <div class="gantt-container" data-testid="scenario-gantt-chart">
+        <div class="gantt-container" data-testid="scenario-gantt-chart" role="img" aria-label="Scenario Gantt chart showing @scheduledTasks.Count scheduled tasks">
             <div class="gantt-header gantt-header-months">
                 <div class="gantt-label-col gantt-label-col-header"><strong>Task</strong></div>
                 <div class="gantt-timeline-col">
                     <div class="gantt-months">
                         @foreach (var month in GetMonthMarkers())
                         {
-                            <div class="gantt-month" style="left: @month.LeftPct%; width: @month.WidthPct%;">
-                                @month.Label
-                            </div>
+                        <div class="gantt-month" style="left: @Pct(month.LeftPct)%; width: @Pct(month.WidthPct)%;">
+                            @month.Label
+                        </div>
                         }
                     </div>
                 </div>
@@ -166,7 +167,7 @@ else
                     <div class="gantt-weeks">
                         @foreach (var week in GetWeekMarkers())
                         {
-                            <div class="gantt-week" style="left: @week.LeftPct%; width: @week.WidthPct%;" title="@week.FullLabel">
+                            <div class="gantt-week" style="left: @Pct(week.LeftPct)%; width: @Pct(week.WidthPct)%;" title="@week.FullLabel">
                                 <span class="gantt-week-number">@week.Label</span>
                                 <span class="gantt-week-dates">@week.DateRange</span>
                             </div>
@@ -178,7 +179,7 @@ else
             @* Week grid lines *@
             @foreach (var week in GetWeekMarkers())
             {
-                <div class="gantt-week-line" style="left: calc(240px + (@week.LeftPct * (100% - 240px) / 100));"></div>
+                <div class="gantt-week-line" style="left: calc(240px + (100% - 240px) * @Pct(week.LeftPct) / 100);"></div>
             }
 
             @foreach (var task in scheduledTasks)
@@ -191,12 +192,19 @@ else
                 var barStyle = GetBarStyle(task, shellHeight);
                 var statusClass = GetStatusClass(task);
 
-                <div class="gantt-row" data-testid="scenario-gantt-row-@task.TaskId">
-                    <div class="gantt-label-col" title="@task.ServiceName">
+                <div class="gantt-row" data-testid="scenario-gantt-row-@task.TaskId" role="group" aria-label="Task @task.TaskId: @task.ServiceName">
+                    <div class="gantt-label-col clickable-row" title="@task.ServiceName"
+                         role="button" tabindex="0"
+                         @onclick="() => NavigateToTask(task.TaskId)"
+                         @onkeydown="(e) => OnGanttKeyDown(e, task.TaskId)">
                         <div class="gantt-label-content">
                             <span class="gantt-status-dot @statusClass" title="@task.Status @(task.DeliveryRisk != DomainConstants.DeliveryRisk.OnTrack ? $"({task.DeliveryRisk})" : "")"></span>
                             <span class="gantt-task-id">@task.TaskId</span>
-                            <span class="gantt-task-name">@Truncate(task.ServiceName, 20)</span>
+                            <span class="gantt-task-name" title="@task.ServiceName">@Truncate(task.ServiceName, 20)</span>
+                            @if (task.Priority is > 0 and <= 3)
+                            {
+                                <span class="gantt-priority-badge gantt-priority-high" title="Priority @task.Priority">P@task.Priority</span>
+                            }
                         </div>
                         @if (!string.IsNullOrWhiteSpace(task.DependsOnTaskIds))
                         {
@@ -205,7 +213,7 @@ else
                             </div>
                         }
                     </div>
-                    <div class="gantt-timeline-col">
+                    <div class="gantt-timeline-col" style="min-height: @(shellHeight + 8)px;">
                         @if (task.PlannedStart.HasValue && task.PlannedFinish.HasValue)
                         {
                             <div class="gantt-shell gantt-tooltip @(IsCriticalTask(task) ? "gantt-bar-critical" : "")"
@@ -216,9 +224,10 @@ else
                                 @foreach (var seg in visibleSegments)
                                 {
                                     var laneIndex = visibleSegments.IndexOf(seg);
-                                    <div class="gantt-segment gantt-tooltip gantt-role-@seg.Role.ToLowerInvariant()"
-                                         style="left: @seg.LeftPct%; width: @seg.WidthPct%; top: @(laneIndex * LaneHeight + 2)px;"
+                                    <div class="gantt-segment gantt-tooltip gantt-segment-estimated gantt-role-@seg.Role.ToLowerInvariant()"
+                                         style="left: @Pct(seg.LeftPct)%; width: @Pct(seg.WidthPct)%; top: @(laneIndex * LaneHeight + 2)px;"
                                          data-tooltip="@seg.Role (estimated)&#10;~@seg.EstDays days&#10;Max FTE: @seg.MaxFte"
+                                         aria-label="@seg.Role segment: estimated @seg.EstDays days"
                                          data-testid="scenario-gantt-segment-@task.TaskId-@seg.Role">
                                         <span class="gantt-segment-label">@seg.Role</span>
                                     </div>
@@ -238,7 +247,7 @@ else
                                 var strictPct = GetDatePercent(task.StrictDate.Value);
                                 var delta = (task.StrictDate.Value - task.PlannedFinish!.Value).Days;
                                 var deltaClass = delta >= 0 ? "gantt-strict-ok" : "gantt-strict-overdue";
-                                <div class="gantt-strict-marker @deltaClass" style="left: @strictPct%;"
+                                <div class="gantt-strict-marker @deltaClass" style="left: @Pct(strictPct)%;"
                                      title="Deadline: @task.StrictDate.Value.ToString("dd MMM yyyy") (@(delta >= 0 ? $"{delta}d buffer" : $"{Math.Abs(delta)}d overdue"))"
                                      data-testid="scenario-gantt-strict-@task.TaskId">
                                     <span class="gantt-strict-flag">@(delta >= 0 ? $"+{delta}d" : $"{delta}d")</span>
@@ -251,6 +260,17 @@ else
                         }
                     </div>
                 </div>
+            }
+
+            <!-- Today marker -->
+            @{
+                var todayPct = GetDatePercent(DateTime.Today);
+                if (todayPct >= 0 && todayPct <= 100)
+                {
+                    <div class="gantt-today-line" style="left: calc(240px + (100% - 240px) * @Pct(todayPct) / 100);"
+                         data-testid="scenario-gantt-today" title="Today: @DateTime.Today.ToString("yyyy-MM-dd")">
+                    </div>
+                }
             }
         </div>
     }
@@ -389,7 +409,7 @@ else
         var rightPct = GetDatePercent(task.PlannedFinish.Value);
         var widthPct = Math.Max(rightPct - leftPct, 0.5);
 
-        return $"left: {leftPct}%; width: {widthPct}%; height: {shellHeight}px;";
+        return FormattableString.Invariant($"left: {leftPct}%; width: {widthPct}%; height: {shellHeight}px;");
     }
 
     private string GetStatusClass(ScenarioTaskSnapshot task)
@@ -476,9 +496,23 @@ else
     private static string Truncate(string text, int maxLength)
         => text.Length <= maxLength ? text : text[..(maxLength - 1)] + "\u2026";
 
+    /// <summary>Format a double for CSS using invariant culture (defense-in-depth).</summary>
+    private static string Pct(double val) => val.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
     private void GoBackToScenarios()
     {
         NavigationManager.NavigateTo("/scenarios");
+    }
+
+    private void NavigateToTask(string taskId)
+    {
+        NavigationManager.NavigateTo($"/tasks/{taskId}");
+    }
+
+    private void OnGanttKeyDown(KeyboardEventArgs e, string taskId)
+    {
+        if (e.Key is "Enter" or " ")
+            NavigateToTask(taskId);
     }
 
     private void ToggleRole(string role)

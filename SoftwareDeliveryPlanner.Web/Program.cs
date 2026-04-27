@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Reflection;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -11,6 +12,14 @@ using SoftwareDeliveryPlanner.Infrastructure;
 using SoftwareDeliveryPlanner.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ---------------------------------------------------------------------------
+// Culture: force invariant culture for CSS numeric formatting.
+// Prevents locale-specific decimal separators (e.g. "56,5%") from producing
+// invalid CSS values in server-side rendered Blazor components.
+// ---------------------------------------------------------------------------
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 // ---------------------------------------------------------------------------
 // Observability: OpenTelemetry (traces, metrics, structured logs)

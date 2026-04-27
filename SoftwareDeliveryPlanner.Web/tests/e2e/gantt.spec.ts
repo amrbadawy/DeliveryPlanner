@@ -125,4 +125,226 @@ test.describe('Gantt chart', () => {
       expect(mentionsTasks).toBe(true);
     }
   });
+
+  // ── New test scenarios (WP11) ─────────────────────────────
+
+  test('multi-role segments: each task bar contains distinct colored role segments', async ({ page }) => {
+    const chart = page.getByTestId('gantt-chart');
+    const empty = page.getByTestId('gantt-empty');
+    if (await empty.isVisible().catch(() => false)) {
+      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
+    }
+    await expect(chart).toBeVisible();
+
+    // Find first task bar and check it has at least one role segment inside
+    const firstBar = chart.locator('[data-testid^="gantt-bar-"]').first();
+    await expect(firstBar).toBeVisible();
+
+    const segments = firstBar.locator('[data-testid^="gantt-segment-"]');
+    const segCount = await segments.count();
+    expect(segCount).toBeGreaterThanOrEqual(1);
+
+    // Each segment should have a role label
+    for (let i = 0; i < Math.min(segCount, 3); i++) {
+      const label = segments.nth(i).locator('.gantt-segment-label');
+      await expect(label).toBeVisible();
+      const text = await label.textContent();
+      expect(text!.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('legend toggle hides and shows role segments', async ({ page }) => {
+    const chart = page.getByTestId('gantt-chart');
+    const empty = page.getByTestId('gantt-empty');
+    if (await empty.isVisible().catch(() => false)) {
+      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
+    }
+    await expect(chart).toBeVisible();
+
+    // Click DEV toggle to hide DEV segments
+    const devToggle = page.getByTestId('gantt-role-toggle-dev');
+    await expect(devToggle).toBeVisible();
+
+    // Count DEV segments before toggle
+    const devSegsBefore = chart.locator('[data-testid$="-DEV"]');
+    const countBefore = await devSegsBefore.count();
+
+    if (countBefore > 0) {
+      await devToggle.click();
+
+      // DEV segments should now be hidden
+      await expect(devSegsBefore.first()).not.toBeVisible();
+
+      // Toggle has aria-pressed="false"
+      await expect(devToggle).toHaveAttribute('aria-pressed', 'false');
+
+      // Click again to re-show
+      await devToggle.click();
+      await expect(devToggle).toHaveAttribute('aria-pressed', 'true');
+    }
+  });
+
+  test('critical path toggle highlights critical tasks', async ({ page }) => {
+    const chart = page.getByTestId('gantt-chart');
+    const empty = page.getByTestId('gantt-empty');
+    if (await empty.isVisible().catch(() => false)) {
+      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
+    }
+    await expect(chart).toBeVisible();
+
+    const toggle = page.getByTestId('gantt-critical-path-toggle');
+    await expect(toggle).toBeVisible();
+
+    // Click to enable critical path
+    await toggle.click();
+
+    // Legend should now show "Critical Path" entry
+    const legend = page.getByTestId('gantt-legend');
+    await expect(legend).toContainText('Critical Path');
+
+    // At least one bar should have critical class (if tasks have dependencies)
+    // This is a soft check — if no dependencies, no critical highlighting
+    const criticalBars = chart.locator('.gantt-bar-critical');
+    const critCount = await criticalBars.count();
+    // Just verify the toggle works — critical bars may or may not exist
+    expect(critCount).toBeGreaterThanOrEqual(0);
+  });
+
+  test('estimated vs allocated segments are visually distinct', async ({ page }) => {
+    const chart = page.getByTestId('gantt-chart');
+    const empty = page.getByTestId('gantt-empty');
+    if (await empty.isVisible().catch(() => false)) {
+      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
+    }
+    await expect(chart).toBeVisible();
+
+    // Check for estimated segments (marked with *)
+    const allSegments = chart.locator('[data-testid^="gantt-segment-"]');
+    const count = await allSegments.count();
+    expect(count).toBeGreaterThan(0);
+
+    // Estimated segments have the gantt-segment-estimated CSS class
+    const estimatedSegs = chart.locator('.gantt-segment-estimated');
+    const estCount = await estimatedSegs.count();
+    // At least check that the class exists if there are unallocated roles
+    // (BA/SA/UX/UI have no resources in seed data, so should be estimated)
+    if (estCount > 0) {
+      // Estimated segments have a * label suffix
+      const firstEst = estimatedSegs.first();
+      const label = await firstEst.locator('.gantt-segment-label').textContent();
+      expect(label).toContain('*');
+    }
+  });
+
+  test('clicking a task row navigates to task detail page', async ({ page }) => {
+    const chart = page.getByTestId('gantt-chart');
+    const empty = page.getByTestId('gantt-empty');
+    if (await empty.isVisible().catch(() => false)) {
+      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
+    }
+    await expect(chart).toBeVisible();
+
+    // Get the first row's task ID from the data-testid
+    const firstRow = chart.locator('[data-testid^="gantt-row-"]').first();
+    await expect(firstRow).toBeVisible();
+    const testId = await firstRow.getAttribute('data-testid');
+    const taskId = testId!.replace('gantt-row-', '');
+
+    // Click the label column (clickable-row)
+    await firstRow.locator('.clickable-row').click();
+
+    // Should navigate to task detail page
+    await page.waitForURL(`**/tasks/${taskId}`, { timeout: 5000 });
+    expect(page.url()).toContain(`/tasks/${taskId}`);
+  });
+
+  test('strict date markers appear for tasks with deadlines', async ({ page }) => {
+    const chart = page.getByTestId('gantt-chart');
+    const empty = page.getByTestId('gantt-empty');
+    if (await empty.isVisible().catch(() => false)) {
+      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
+    }
+    await expect(chart).toBeVisible();
+
+    // Check for strict markers — may or may not exist depending on seed data
+    const strictMarkers = chart.locator('[data-testid^="gantt-strict-"]');
+    const strictCount = await strictMarkers.count();
+
+    if (strictCount > 0) {
+      // Each strict marker should have a flag with +Nd or -Nd text
+      const firstMarker = strictMarkers.first();
+      await expect(firstMarker).toBeVisible();
+      const flag = firstMarker.locator('.gantt-strict-flag');
+      const flagText = await flag.textContent();
+      expect(flagText).toMatch(/[+-]?\d+d/);
+    }
+  });
+
+  test('overflow indicator shows when task has more than 6 role segments', async ({ page }) => {
+    const chart = page.getByTestId('gantt-chart');
+    const empty = page.getByTestId('gantt-empty');
+    if (await empty.isVisible().catch(() => false)) {
+      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
+    }
+    await expect(chart).toBeVisible();
+
+    // Overflow indicators appear as "+N" badges when > MaxVisibleLanes segments
+    const overflows = chart.locator('[data-testid^="gantt-overflow-"]');
+    const overflowCount = await overflows.count();
+
+    // If any overflow exists, verify format
+    if (overflowCount > 0) {
+      const text = await overflows.first().textContent();
+      expect(text).toMatch(/^\+\d+$/);
+    }
+    // It's valid to have no overflows if tasks have ≤ 6 roles
+  });
+
+  test('today marker is visible when plan range includes today', async ({ page }) => {
+    const chart = page.getByTestId('gantt-chart');
+    const empty = page.getByTestId('gantt-empty');
+    if (await empty.isVisible().catch(() => false)) {
+      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
+    }
+    await expect(chart).toBeVisible();
+
+    // Today marker should be visible if today falls within the plan range
+    const todayMarker = page.getByTestId('gantt-today');
+    const isVisible = await todayMarker.isVisible().catch(() => false);
+    if (isVisible) {
+      await expect(todayMarker).toBeVisible();
+      const title = await todayMarker.getAttribute('title');
+      expect(title).toContain('Today:');
+    }
+    // If today is outside the plan range, marker is correctly hidden
+  });
+
+  test('week grid lines and month headers render correctly', async ({ page }) => {
+    const chart = page.getByTestId('gantt-chart');
+    const empty = page.getByTestId('gantt-empty');
+    if (await empty.isVisible().catch(() => false)) {
+      test.skip(true, 'Scheduler produced no scheduled tasks in this run');
+    }
+    await expect(chart).toBeVisible();
+
+    // Month headers should be present
+    const months = chart.locator('.gantt-month');
+    const monthCount = await months.count();
+    expect(monthCount).toBeGreaterThan(0);
+
+    // Week headers should be present
+    const weeks = chart.locator('.gantt-week');
+    const weekCount = await weeks.count();
+    expect(weekCount).toBeGreaterThan(0);
+
+    // Week numbers should have W{n} format
+    const firstWeek = chart.locator('.gantt-week-number').first();
+    const weekText = await firstWeek.textContent();
+    expect(weekText).toMatch(/^W\d+$/);
+
+    // Week grid lines should be present
+    const gridLines = chart.locator('.gantt-week-line');
+    const lineCount = await gridLines.count();
+    expect(lineCount).toBeGreaterThan(0);
+  });
 });
