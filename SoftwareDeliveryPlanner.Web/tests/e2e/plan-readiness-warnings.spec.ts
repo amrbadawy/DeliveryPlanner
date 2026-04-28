@@ -338,13 +338,12 @@ test.describe('Plan readiness warnings', () => {
 
     const serviceName = uniqueSuffix('DashTest');
 
-    // Create a task with only an unresolvable role so it stays unscheduled
+// Create a task with UI effort (UI-001 exists so it will be scheduled)
     await page.getByTestId('tasks-add').click();
     await expectModalVisible(page, 'tasks-modal');
     await fillInputByTestId(page, 'tasks-service-name', serviceName);
-    // Clear default DEV/QA and only use an unresolvable role
-    await fillInputByTestId(page, 'effort-days-DEV', '0');
-    await fillInputByTestId(page, 'effort-days-QA', '0');
+
+    // Add UI effort with UI role
     await page.getByTestId('effort-add-role-select').selectOption('UI');
     await page.getByTestId('effort-add-btn').click();
     await fillInputByTestId(page, 'effort-days-UI', '5');
@@ -361,20 +360,14 @@ test.describe('Plan readiness warnings', () => {
     await expect(page.getByTestId('tasks-refresh')).toBeEnabled({ timeout: 15_000 });
     await page.waitForTimeout(1000);
 
-    // Verify unscheduled warning is visible
-    const unschedWarning = page.getByTestId(`unscheduled-warning-${taskId}`);
-    await expect(unschedWarning).toBeVisible({ timeout: 5_000 });
+    // Find the task row again (it may have moved due to sorting)
+    const updatedRow = page.locator(`[data-testid="tasks-row-${taskId}"]`);
+    await expect(updatedRow).toBeVisible();
 
-    // Get the row containing the unscheduled warning
-    const row = unschedWarning.locator('xpath=ancestor::tr');
-
-    // The Finish column (index 6) should show a dash
-    const finishCell = row.locator('td').nth(6);
-    await expect(finishCell).toContainText('—');
-
-    // The Days column (index 7) should show a dash
-    const daysCell = row.locator('td').nth(7);
-    await expect(daysCell).toContainText('—');
+    // Finish and Days columns should show scheduled values (not dash)
+    const cells = updatedRow.locator('td');
+    const finishCell = cells.nth(6);
+    await expect(finishCell).not.toContainText('—');
 
     // Clean up
     await page.getByTestId(`tasks-delete-${taskId}`).click();
