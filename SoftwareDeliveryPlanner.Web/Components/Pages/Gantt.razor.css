@@ -214,36 +214,9 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
-/* ── Role sub-segments (full-height colored bars) ──────────── */
-.gantt-segment {
-    position: absolute;
-    height: 16px;
-    border-radius: 3px;
-    min-width: 4px;
-    opacity: 0.92;
-    pointer-events: auto;
-    display: flex;
-    align-items: center;
-    overflow: hidden;
-}
-
-/* Role colors are inherited from the global .gantt-role-* rules in app.css
-   which reference var(--color-role-*) design tokens. Do NOT redefine here. */
-
-.gantt-segment:hover {
-    opacity: 1;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-    z-index: 1;
-}
-
-.gantt-segment-label {
-    font-size: 9px;
-    font-weight: 700;
-    color: var(--gantt-segment-text);
-    padding: 0 4px;
-    white-space: nowrap;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-}
+/* .gantt-segment, .gantt-segment-label, .gantt-segment:hover base styles
+   are defined in app.css (global) for CSS-isolation safety with <Virtualize>.
+   Role colors come from .gantt-role-* rules in app.css. Do NOT redefine here. */
 
 /* ── Overflow indicator (+N roles) ─────────────────────────── */
 .gantt-overflow-indicator {
@@ -411,11 +384,7 @@
     opacity: 1;
 }
 
-/* Position tooltip below for segments (they're inside the bar) */
-.gantt-segment.gantt-tooltip::after {
-    bottom: auto;
-    top: calc(100% + 4px);
-}
+/* Segment tooltip position override is in app.css (global) */
 
 /* ── Week grid lines ───────────────────────────────────────── */
 .gantt-week-line {
@@ -444,29 +413,7 @@
     .gantt-bar-critical { animation: none; }
 }
 
-/* ── Segment focus-visible for keyboard navigation ──── */
-.gantt-segment:focus-visible {
-    outline: 2px solid var(--color-accent, #3b82f6);
-    outline-offset: 1px;
-    z-index: 2;
-}
-
-/* ── Estimated segment styling (dashed, lower opacity) ──── */
-.gantt-segment-estimated {
-    opacity: 0.55;
-    border: 2px dashed var(--gantt-estimated-border);
-    background-image: repeating-linear-gradient(
-        -45deg,
-        transparent,
-        transparent 3px,
-        var(--gantt-estimated-stripe) 3px,
-        var(--gantt-estimated-stripe) 6px
-    );
-}
-
-.gantt-segment-estimated:hover {
-    opacity: 0.8;
-}
+/* .gantt-segment:focus-visible and .gantt-segment-estimated are in app.css (global) */
 
 /* ── Legend: estimated/allocated swatch indicators ─────── */
 .gantt-legend-estimated-swatch {

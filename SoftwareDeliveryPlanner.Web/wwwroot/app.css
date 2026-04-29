@@ -615,6 +615,66 @@ th[role="button"] {
 .role-badge-pm,
 .gantt-role-pm  { background: var(--color-role-pm); }
 
+/* ── Gantt segment base styles (global for CSS-isolation safety) ── */
+/* These MUST live in global CSS — not scoped .razor.css — so that
+   elements rendered inside <Virtualize> child-content templates are
+   always styled correctly regardless of Blazor CSS-isolation behaviour. */
+
+.gantt-segment {
+    position: absolute;
+    height: 16px;
+    border-radius: 3px;
+    min-width: 4px;
+    opacity: 0.92;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+}
+
+.gantt-segment:hover {
+    opacity: 1;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    z-index: 1;
+}
+
+.gantt-segment-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--gantt-segment-text);
+    padding: 0 4px;
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.gantt-segment:focus-visible {
+    outline: 2px solid var(--color-accent, #3b82f6);
+    outline-offset: 1px;
+    z-index: 2;
+}
+
+.gantt-segment-estimated {
+    opacity: 0.55;
+    border: 2px dashed var(--gantt-estimated-border);
+    background-image: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 3px,
+        var(--gantt-estimated-stripe) 3px,
+        var(--gantt-estimated-stripe) 6px
+    );
+}
+
+.gantt-segment-estimated:hover {
+    opacity: 0.8;
+}
+
+/* Position tooltip below for segments (they're inside the bar) */
+.gantt-segment.gantt-tooltip::after {
+    bottom: auto;
+    top: calc(100% + 4px);
+}
+
 /* ══════════════════════════════════════════════════════════
    Modal Backdrop (shared)
    ══════════════════════════════════════════════════════════ */

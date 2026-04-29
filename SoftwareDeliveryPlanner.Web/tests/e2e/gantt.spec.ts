@@ -125,13 +125,13 @@ test.describe('Gantt chart', () => {
   test('multi-role segments: each task bar contains distinct colored role segments', async ({ page }) => {
     const chart = await ensureChartOrSkip(page);
 
-    // Find first task bar and check it has at least one role segment inside
+    // Find first task bar and check it has at least TWO role segments (DEV + QA minimum)
     const firstBar = chart.locator('[data-testid^="gantt-bar-"]').first();
     await expect(firstBar).toBeVisible();
 
     const segments = firstBar.locator('[data-testid^="gantt-segment-"]');
     const segCount = await segments.count();
-    expect(segCount).toBeGreaterThanOrEqual(1);
+    expect(segCount).toBeGreaterThanOrEqual(2);
 
     // Each segment should have a role label
     for (let i = 0; i < Math.min(segCount, 3); i++) {
@@ -295,5 +295,36 @@ test.describe('Gantt chart', () => {
     const gridLines = chart.locator('.gantt-week-line');
     const lineCount = await gridLines.count();
     expect(lineCount).toBeGreaterThan(0);
+  });
+
+  test('all task bars contain at least 2 role segments (DEV + QA domain invariant)', async ({ page }) => {
+    const chart = await ensureChartOrSkip(page);
+
+    const bars = chart.locator('[data-testid^="gantt-bar-"]');
+    const barCount = await bars.count();
+    expect(barCount).toBeGreaterThan(0);
+
+    // Every scheduled task must have at least DEV + QA segments
+    for (let i = 0; i < barCount; i++) {
+      const bar = bars.nth(i);
+      const testId = await bar.getAttribute('data-testid');
+      const segments = bar.locator('[data-testid^="gantt-segment-"]');
+      const segCount = await segments.count();
+      expect(segCount, `${testId} should have ≥2 segments but has ${segCount}`).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  test('segments have correct CSS positioning (position: absolute)', async ({ page }) => {
+    const chart = await ensureChartOrSkip(page);
+
+    // Verify that segments are absolutely positioned inside the shell bar
+    const firstSegment = chart.locator('[data-testid^="gantt-segment-"]').first();
+    await expect(firstSegment).toBeVisible();
+
+    const position = await firstSegment.evaluate(el => window.getComputedStyle(el).position);
+    expect(position).toBe('absolute');
+
+    const height = await firstSegment.evaluate(el => window.getComputedStyle(el).height);
+    expect(height).toBe('16px');
   });
 });

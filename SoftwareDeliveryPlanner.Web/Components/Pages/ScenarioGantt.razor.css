@@ -190,33 +190,9 @@
     border: 1px solid var(--color-border);
 }
 
-/* ── Role sub-segments (full-height colored bars) ──────────── */
-.gantt-segment {
-    position: absolute;
-    height: 16px;
-    border-radius: 3px;
-    min-width: 4px;
-    opacity: 0.92;
-    pointer-events: auto;
-    display: flex;
-    align-items: center;
-    overflow: hidden;
-}
-
-.gantt-segment:hover {
-    opacity: 1;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-    z-index: 1;
-}
-
-.gantt-segment-label {
-    font-size: 9px;
-    font-weight: 700;
-    color: var(--gantt-segment-text);
-    padding: 0 4px;
-    white-space: nowrap;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-}
+/* .gantt-segment, .gantt-segment-label, .gantt-segment:hover base styles
+   are defined in app.css (global) for CSS-isolation safety with <Virtualize>.
+   Role colors come from .gantt-role-* rules in app.css. Do NOT redefine here. */
 
 /* ── Overflow indicator (+N roles) ─────────────────────────── */
 .gantt-overflow-indicator {
@@ -369,10 +345,7 @@
     opacity: 1;
 }
 
-.gantt-segment.gantt-tooltip::after {
-    bottom: auto;
-    top: calc(100% + 4px);
-}
+/* Segment tooltip position override is in app.css (global) */
 
 /* ── Week grid lines ───────────────────────────────────────── */
 .gantt-week-line {
@@ -402,11 +375,7 @@
 }
 
 /* ── Segment focus-visible for keyboard navigation ──── */
-.gantt-segment:focus-visible {
-    outline: 2px solid var(--color-accent, #3b82f6);
-    outline-offset: 1px;
-    z-index: 2;
-}
+/* Defined in app.css (global) for CSS-isolation safety */
 
 /* ── Shell hover ───────────────────────────────────────────── */
 .gantt-shell:hover {
@@ -484,22 +453,7 @@
     font-weight: 600;
 }
 
-/* ── Estimated segment styling (dashed, lower opacity) ──── */
-.gantt-segment-estimated {
-    opacity: 0.55;
-    border: 2px dashed var(--gantt-estimated-border);
-    background-image: repeating-linear-gradient(
-        -45deg,
-        transparent,
-        transparent 3px,
-        var(--gantt-estimated-stripe) 3px,
-        var(--gantt-estimated-stripe) 6px
-    );
-}
-
-.gantt-segment-estimated:hover {
-    opacity: 0.8;
-}
+/* .gantt-segment-estimated is in app.css (global) for CSS-isolation safety */
 
 /* ── Focus-visible outlines for keyboard navigation (WCAG AA) ── */
 .gantt-shell:focus-visible,
