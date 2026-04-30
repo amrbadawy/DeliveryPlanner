@@ -1,0 +1,27 @@
+.tasks-layout {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.tasks-layout-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+@media (max-width: 992px) {
+    .tasks-layout {
+        flex-direction: column;
+    }
+}
+
+/* Pinned-row highlight: subtle left bar so it's visible without yelling. */
+::deep tr.task-row-pinned {
+    background: var(--color-warning-light, #fff7e0) !important;
+    border-left: 3px solid var(--color-warning, #e0a800);
+}
+
+::deep tr.task-row-pinned td:first-child {
+    font-weight: 600;
+}

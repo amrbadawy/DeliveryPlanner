@@ -12,6 +12,7 @@
 @inject IMediator Mediator
 @inject NavigationManager NavigationManager
 @inject SoftwareDeliveryPlanner.Web.Services.AutoScheduleService autoSchedule
+@inject SoftwareDeliveryPlanner.Web.Services.TaskFilterState SidebarFilter
 @implements IDisposable
 @using Microsoft.AspNetCore.Components
 
@@ -42,6 +43,11 @@
         </button>
     </div>
 </div>
+
+<div class="tasks-layout">
+<TaskFilterSidebar PageKey="@SoftwareDeliveryPlanner.Web.Services.TaskFilterState.PageKeyTasks"
+                   AvailablePhases="availablePhases" />
+<div class="tasks-layout-main">
 
 <!-- Search / Filter bar -->
 <div class="card border-0 shadow-sm mb-3 filter-bar" data-testid="tasks-filter-bar">
@@ -397,7 +403,7 @@ else
                 <tbody>
                     @foreach (var task in FilteredTasks)
                     {
-                        <tr class="clickable-row @(dragTaskId == task.TaskId ? "dragging" : "") @(dragOverTaskId == task.TaskId ? "drag-over" : "")"
+                        <tr class="clickable-row @(dragTaskId == task.TaskId ? "dragging" : "") @(dragOverTaskId == task.TaskId ? "drag-over" : "") @(SidebarFilter.IsPinned(task.TaskId) ? "task-row-pinned" : "")"
                             draggable="true"
                             @ondragstart="() => OnDragStart(task.TaskId)"
                             @ondragover:preventDefault="true"
@@ -468,6 +474,22 @@ else
                                 <a class="btn btn-sm btn-outline-info" href="/tasks/@task.TaskId" @onclick:stopPropagation aria-label="View @task.TaskId" data-testid="tasks-view-@task.TaskId"><i class="bi bi-eye"></i></a>
                                 <button class="btn btn-sm btn-outline-warning" @onclick="() => EditTask(task)" @onclick:stopPropagation aria-label="Edit @task.TaskId" data-testid="tasks-edit-@task.TaskId"><i class="bi bi-pencil"></i></button>
                                 <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteTask(task)" @onclick:stopPropagation aria-label="Delete @task.TaskId" data-testid="tasks-delete-@task.TaskId"><i class="bi bi-trash"></i></button>
+                                <button class="btn btn-sm @(SidebarFilter.IsPinned(task.TaskId) ? "btn-warning" : "btn-outline-secondary")"
+                                        @onclick="() => SidebarFilter.TogglePin(task.TaskId)"
+                                        @onclick:stopPropagation
+                                        aria-label="@(SidebarFilter.IsPinned(task.TaskId) ? $"Unpin {task.TaskId}" : $"Pin {task.TaskId}")"
+                                        title="@(SidebarFilter.IsPinned(task.TaskId) ? "Unpin task" : "Pin task to top")"
+                                        data-testid="tasks-pin-@task.TaskId">
+                                    <i class="bi @(SidebarFilter.IsPinned(task.TaskId) ? "bi-pin-fill" : "bi-pin")"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary"
+                                        @onclick="() => SidebarFilter.ToggleHide(task.TaskId)"
+                                        @onclick:stopPropagation
+                                        aria-label="Hide @task.TaskId"
+                                        title="Hide task"
+                                        data-testid="tasks-hide-@task.TaskId">
+                                    <i class="bi bi-eye-slash"></i>
+                                </button>
                             </td>
                         </tr>
                     }
@@ -481,6 +503,9 @@ else
         <div class="text-center text-muted py-3" data-testid="tasks-no-results">No tasks match the current filters.</div>
     }
 }
+
+</div>
+</div>
 
 @code {
     private List<TaskItem> tasks = new();
@@ -510,6 +535,9 @@ else
     private string scheduledFilter = string.Empty; // "no" = unscheduled only
     private string sortColumn = string.Empty;
     private bool sortAscending = true;
+
+    // Phases discovered in the loaded task set (for sidebar chips)
+    private List<string> availablePhases = new();
 
     // Bulk import state
     private bool showBulkImport = false;
@@ -652,6 +680,10 @@ else
             if (scheduledFilter == "no")
                 result = result.Where(t => !t.PlannedStart.HasValue || !t.PlannedFinish.HasValue);
 
+            // Sidebar multi-dimensional filter (search + chips)
+            var sidebar = SidebarFilter.Current;
+            result = result.Where(t => SoftwareDeliveryPlanner.Web.Services.TaskFilterEvaluator.Matches(t, sidebar));
+
             // Sort
             if (!string.IsNullOrEmpty(sortColumn))
             {
@@ -667,6 +699,12 @@ else
                     "DeliveryRisk" => sortAscending ? result.OrderBy(t => t.DeliveryRisk) : result.OrderByDescending(t => t.DeliveryRisk),
                     _ => result
                 };
+            }
+
+            // Pinned tasks always float to the top, preserving the inner sort.
+            if (SidebarFilter.PinnedTaskIds.Count > 0)
+            {
+                result = result.OrderByDescending(t => SidebarFilter.IsPinned(t.TaskId));
             }
 
             return result.ToList();
@@ -713,10 +751,18 @@ else
             null, 300, System.Threading.Timeout.Infinite);
     }
 
-    public void Dispose() => _debounceTimer?.Dispose();
+    public void Dispose()
+    {
+        _debounceTimer?.Dispose();
+        SidebarFilter.OnChange -= OnSidebarFilterChanged;
+    }
+
+    private void OnSidebarFilterChanged() => InvokeAsync(StateHasChanged);
 
     protected override async Task OnInitializedAsync()
     {
+        SidebarFilter.OnChange += OnSidebarFilterChanged;
+
         // Read URL query params for pre-filtering (e.g., from dashboard KPI click)
         var uri = new Uri(NavigationManager.Uri);
         var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
@@ -749,6 +795,12 @@ else
 
         var taskResult = await Mediator.Send(new GetTasksQuery());
         tasks = taskResult.Value;
+
+        availablePhases = tasks
+            .Select(t => t.Phase ?? string.Empty)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         var resourceResult = await Mediator.Send(new GetResourcesQuery());
         resources = resourceResult.Value;

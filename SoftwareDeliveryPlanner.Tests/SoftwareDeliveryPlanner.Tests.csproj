@@ -29,6 +29,7 @@
     <ProjectReference Include="..\SoftwareDeliveryPlanner.Domain\SoftwareDeliveryPlanner.Domain.csproj" />
     <ProjectReference Include="..\SoftwareDeliveryPlanner.Infrastructure\SoftwareDeliveryPlanner.Infrastructure.csproj" />
     <ProjectReference Include="..\SoftwareDeliveryPlanner.SharedKernel\SoftwareDeliveryPlanner.SharedKernel.csproj" />
+    <ProjectReference Include="..\SoftwareDeliveryPlanner.Web\SoftwareDeliveryPlanner.Web.csproj" />
   </ItemGroup>
 
 </Project>

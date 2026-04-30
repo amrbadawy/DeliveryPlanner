@@ -28,6 +28,7 @@ internal class PlannerDbContext : DbContext
     public DbSet<TaskEffortBreakdown> TaskEffortBreakdowns => Set<TaskEffortBreakdown>();
     public DbSet<TaskDependency> TaskDependencies => Set<TaskDependency>();
     public DbSet<ScenarioEffortSnapshot> ScenarioEffortSnapshots => Set<ScenarioEffortSnapshot>();
+    public DbSet<SavedView> SavedViews => Set<SavedView>();
 
     public PlannerDbContext(DbContextOptions<PlannerDbContext> options) : base(options)
     {

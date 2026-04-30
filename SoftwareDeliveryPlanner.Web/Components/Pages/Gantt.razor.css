@@ -192,6 +192,24 @@
     line-height: 1.2;
 }
 
+/* Ghost dependency indicator: shown when a visible task has hidden predecessor(s).
+   Subtle dashed-border pill so it reads as "stub" rather than active dependency. */
+.gantt-ghost-deps {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    padding: 1px 6px;
+    margin-left: 13px;
+    margin-top: 2px;
+    border: 1px dashed var(--color-text-muted);
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: var(--color-bg-tertiary, transparent);
+    line-height: 1.2;
+    cursor: help;
+}
+
 /* ── Shell bar (transparent container for role segments) ───── */
 .gantt-shell {
     position: absolute;
@@ -545,5 +563,23 @@
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
     margin-left: 8px;
+}
+
+
+
+.gantt-layout {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.gantt-layout-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+@media (max-width: 992px) {
+    .gantt-layout { flex-direction: column; }
 }
 
