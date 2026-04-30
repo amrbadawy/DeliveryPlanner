@@ -107,7 +107,13 @@ internal sealed class DatabaseSeeder : IDatabaseSeeder
             TaskItem.Create("SVC-012", "اتمتة الانذارات على الجهات المعتمدة", 5,
                 [new EffortBreakdownSpec("DEV", 11, 0, 2), new EffortBreakdownSpec("QA", 3.3, 0, 1.0)], phase: "Phase 2"),
             TaskItem.Create("SVC-013", "التكامل مع المؤسسة العامة للري", 5,
-                [new EffortBreakdownSpec("DEV", 22, 0, 3), new EffortBreakdownSpec("QA", 6.6, 20, 1.0)], phase: "Phase 2")
+                [new EffortBreakdownSpec("DEV", 22, 0, 3), new EffortBreakdownSpec("QA", 6.6, 20, 1.0)], phase: "Phase 2"),
+            TaskItem.Create("SVC-014", "خدمة تتطلب خبرة رئيسية غير متاحة", 5,
+                [
+                    new EffortBreakdownSpec("DEV", 6, 0, 1.0, MinSeniority: DomainConstants.Seniority.Principal),
+                    new EffortBreakdownSpec("QA", 2, 0, 1.0, MinSeniority: DomainConstants.Seniority.Principal)
+                ],
+                phase: "Phase 2")
         );
     }
 }
