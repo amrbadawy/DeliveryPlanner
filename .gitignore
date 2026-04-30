@@ -26,6 +26,7 @@ coverage/
 **/playwright-report/
 **/test-results/
 **/.playwright/
+.playwright-mcp/
 
 # User-specific files
 *.user
