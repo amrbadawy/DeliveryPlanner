@@ -386,6 +386,12 @@ else
             <table class="table table-striped table-hover mb-0" data-testid="tasks-table">
                 <thead class="table-light">
                     <tr>
+                        <th>
+                            <input type="checkbox"
+                                   checked="@IsAllVisibleSelected"
+                                   @onchange="(e) => ToggleSelectAllVisible(e.Value is true)"
+                                   data-testid="tasks-select-all-visible" />
+                        </th>
                         <th role="button" @onclick='() => ApplySort("TaskId")' aria-sort="@AriaSort("TaskId")" data-testid="tasks-sort-id">ID @SortIndicator("TaskId")</th>
                         <th role="button" @onclick='() => ApplySort("ServiceName")' aria-sort="@AriaSort("ServiceName")" data-testid="tasks-sort-name">Service @SortIndicator("ServiceName")</th>
                         <th role="button" @onclick='() => ApplySort("TotalEstimationDays")' aria-sort="@AriaSort("TotalEstimationDays")" data-testid="tasks-sort-est">Total Est. @SortIndicator("TotalEstimationDays")</th>
@@ -413,6 +419,13 @@ else
                             @ondragend="OnDragEnd"
                             @onclick="() => NavigateToTask(task.TaskId)"
                             data-testid="tasks-row-@task.TaskId">
+                            <td>
+                                <input type="checkbox"
+                                       checked="@selectedTaskIds.Contains(task.TaskId)"
+                                       @onchange="(e) => ToggleSelection(task.TaskId, e.Value is true)"
+                                       @onclick:stopPropagation
+                                       data-testid="tasks-select-@task.TaskId" />
+                            </td>
                             <td>
                                 <a href="/tasks/@task.TaskId" @onclick:stopPropagation data-testid="tasks-details-link-@task.TaskId">@task.TaskId</a>
                             </td>
@@ -475,7 +488,7 @@ else
                                 <button class="btn btn-sm btn-outline-warning" @onclick="() => EditTask(task)" @onclick:stopPropagation aria-label="Edit @task.TaskId" data-testid="tasks-edit-@task.TaskId"><i class="bi bi-pencil"></i></button>
                                 <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteTask(task)" @onclick:stopPropagation aria-label="Delete @task.TaskId" data-testid="tasks-delete-@task.TaskId"><i class="bi bi-trash"></i></button>
                                 <button class="btn btn-sm @(SidebarFilter.IsPinned(task.TaskId) ? "btn-warning" : "btn-outline-secondary")"
-                                        @onclick="() => SidebarFilter.TogglePin(task.TaskId)"
+                                        @onclick="(e) => TogglePinWithRange(task.TaskId, e)"
                                         @onclick:stopPropagation
                                         aria-label="@(SidebarFilter.IsPinned(task.TaskId) ? $"Unpin {task.TaskId}" : $"Pin {task.TaskId}")"
                                         title="@(SidebarFilter.IsPinned(task.TaskId) ? "Unpin task" : "Pin task to top")"
@@ -483,7 +496,7 @@ else
                                     <i class="bi @(SidebarFilter.IsPinned(task.TaskId) ? "bi-pin-fill" : "bi-pin")"></i>
                                 </button>
                                 <button class="btn btn-sm btn-outline-secondary"
-                                        @onclick="() => SidebarFilter.ToggleHide(task.TaskId)"
+                                        @onclick="(e) => ToggleHideWithRange(task.TaskId, e)"
                                         @onclick:stopPropagation
                                         aria-label="Hide @task.TaskId"
                                         title="Hide task"
@@ -501,6 +514,18 @@ else
     @if (!FilteredTasks.Any() && tasks.Any())
     {
         <div class="text-center text-muted py-3" data-testid="tasks-no-results">No tasks match the current filters.</div>
+    }
+
+    @if (selectedTaskIds.Count > 0)
+    {
+        <div class="alert alert-light border d-flex align-items-center justify-content-between mt-3" data-testid="tasks-bulk-toolbar">
+            <div><strong data-testid="tasks-bulk-count">@selectedTaskIds.Count</strong> selected</div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-warning" @onclick="PinSelected" data-testid="tasks-bulk-pin">Pin selected</button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="HideSelected" data-testid="tasks-bulk-hide">Hide selected</button>
+                <button class="btn btn-sm btn-outline-danger" @onclick="ClearSelection" data-testid="tasks-bulk-clear">Clear selection</button>
+            </div>
+        </div>
     }
 }
 
@@ -549,6 +574,11 @@ else
     // Drag-and-drop state
     private string? dragTaskId;
     private string? dragOverTaskId;
+    private HashSet<string> selectedTaskIds = new(StringComparer.Ordinal);
+    private string? lastRangeAnchorTaskId;
+
+    private bool IsAllVisibleSelected =>
+        FilteredTasks.Count > 0 && FilteredTasks.All(t => selectedTaskIds.Contains(t.TaskId));
 
     private List<EffortEntryModel> effortEntries = new();
     private string selectedRoleToAdd = "";
@@ -740,6 +770,88 @@ else
         scheduledFilter = string.Empty;
         sortColumn = string.Empty;
         sortAscending = true;
+        ClearSelection();
+    }
+
+    private void ToggleSelection(string taskId, bool isSelected)
+    {
+        if (isSelected) selectedTaskIds.Add(taskId);
+        else selectedTaskIds.Remove(taskId);
+    }
+
+    private void ToggleSelectAllVisible(bool isSelected)
+    {
+        if (isSelected)
+        {
+            foreach (var taskId in FilteredTasks.Select(t => t.TaskId))
+                selectedTaskIds.Add(taskId);
+        }
+        else
+        {
+            foreach (var taskId in FilteredTasks.Select(t => t.TaskId).ToList())
+                selectedTaskIds.Remove(taskId);
+        }
+    }
+
+    private void PinSelected()
+    {
+        SidebarFilter.PinMany(selectedTaskIds);
+        ClearSelection();
+    }
+
+    private void HideSelected()
+    {
+        SidebarFilter.HideMany(selectedTaskIds);
+        ClearSelection();
+    }
+
+    private void ClearSelection()
+    {
+        selectedTaskIds.Clear();
+        lastRangeAnchorTaskId = null;
+    }
+
+    private void TogglePinWithRange(string taskId, MouseEventArgs e)
+    {
+        if (e.ShiftKey && lastRangeAnchorTaskId is not null && !string.Equals(lastRangeAnchorTaskId, taskId, StringComparison.Ordinal))
+        {
+            var range = SelectedRange(lastRangeAnchorTaskId, taskId);
+            SidebarFilter.PinMany(range);
+        }
+        else
+        {
+            SidebarFilter.TogglePin(taskId);
+        }
+
+        lastRangeAnchorTaskId = taskId;
+    }
+
+    private void ToggleHideWithRange(string taskId, MouseEventArgs e)
+    {
+        if (e.ShiftKey && lastRangeAnchorTaskId is not null && !string.Equals(lastRangeAnchorTaskId, taskId, StringComparison.Ordinal))
+        {
+            var range = SelectedRange(lastRangeAnchorTaskId, taskId);
+            SidebarFilter.HideMany(range);
+        }
+        else
+        {
+            SidebarFilter.ToggleHide(taskId);
+        }
+
+        lastRangeAnchorTaskId = taskId;
+    }
+
+    private IEnumerable<string> SelectedRange(string fromTaskId, string toTaskId)
+    {
+        var ordered = tasks.Select(t => t.TaskId).ToList();
+        var i = ordered.IndexOf(fromTaskId);
+        var j = ordered.IndexOf(toTaskId);
+        if (i < 0 || j < 0)
+            return new[] { toTaskId };
+
+        var start = Math.Min(i, j);
+        var end = Math.Max(i, j);
+        return ordered.Skip(start).Take(end - start + 1);
     }
 
     private void OnSearchInput(ChangeEventArgs e)
@@ -757,7 +869,13 @@ else
         SidebarFilter.OnChange -= OnSidebarFilterChanged;
     }
 
-    private void OnSidebarFilterChanged() => InvokeAsync(StateHasChanged);
+    private void OnSidebarFilterChanged()
+    {
+        var visible = FilteredTasks.Select(t => t.TaskId).ToHashSet(StringComparer.Ordinal);
+        selectedTaskIds.RemoveWhere(id => !visible.Contains(id));
+
+        InvokeAsync(StateHasChanged);
+    }
 
     protected override async Task OnInitializedAsync()
     {

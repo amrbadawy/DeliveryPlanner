@@ -166,7 +166,7 @@ test.describe('Pin / hide row actions', () => {
 
     // Grab the second visible row's task ID, then pin it.
     const secondRow = tbody.locator('tr').nth(1);
-    const taskId = (await secondRow.locator('td').first().innerText()).trim();
+    const taskId = (await secondRow.locator('td').nth(1).innerText()).trim();
     expect(taskId).toBeTruthy();
 
     await page.getByTestId(`tasks-pin-${taskId}`).click();
@@ -176,7 +176,7 @@ test.describe('Pin / hide row actions', () => {
 
     // After pinning, that task's row should now be at the top of tbody
     const firstRowAfter = tbody.locator('tr').first();
-    await expect(firstRowAfter.locator('td').first()).toHaveText(taskId);
+    await expect(firstRowAfter.locator('td').nth(1)).toHaveText(taskId);
   });
 
   test('hiding a task removes it from the rendered list', async ({ page }) => {
@@ -187,7 +187,7 @@ test.describe('Pin / hide row actions', () => {
 
     const initialCount = await tbody.locator('tr').count();
     const targetRow = tbody.locator('tr').first();
-    const taskId = (await targetRow.locator('td').first().innerText()).trim();
+    const taskId = (await targetRow.locator('td').nth(1).innerText()).trim();
 
     await page.getByTestId(`tasks-hide-${taskId}`).click();
 
@@ -204,7 +204,7 @@ test.describe('Pin / hide row actions', () => {
     const tbody = table.locator('tbody');
 
     const targetRow = tbody.locator('tr').first();
-    const taskId = (await targetRow.locator('td').first().innerText()).trim();
+    const taskId = (await targetRow.locator('td').nth(1).innerText()).trim();
 
     await page.getByTestId(`tasks-hide-${taskId}`).click();
     await expect(page.getByTestId(`tasks-row-${taskId}`)).toHaveCount(0);
@@ -229,7 +229,7 @@ test.describe('Ghost dependency indicator (Gantt)', () => {
     const tbody = table.locator('tbody');
 
     const firstRow = tbody.locator('tr').first();
-    const firstTaskId = (await firstRow.locator('td').first().innerText()).trim();
+    const firstTaskId = (await firstRow.locator('td').nth(1).innerText()).trim();
     await page.getByTestId(`tasks-hide-${firstTaskId}`).click();
 
     await gotoPage(page, '/gantt');
@@ -244,5 +244,47 @@ test.describe('Ghost dependency indicator (Gantt)', () => {
     if (ghostCount > 0) {
       await expect(ghostBadges.first()).toContainText(/hidden dep/);
     }
+  });
+});
+
+test.describe('Bulk pin / hide', () => {
+  test.beforeEach(async ({ page }) => {
+    await runSchedulerFromDashboard(page);
+  });
+
+  test('checkbox selection shows toolbar and pin selected highlights rows', async ({ page }) => {
+    await gotoPage(page, '/tasks');
+    const table = page.getByTestId('tasks-table');
+    await waitForTableRows(table, 3);
+
+    const rows = table.locator('tbody tr');
+    const id1 = (await rows.nth(0).locator('td').nth(1).innerText()).trim();
+    const id2 = (await rows.nth(1).locator('td').nth(1).innerText()).trim();
+
+    await page.getByTestId(`tasks-select-${id1}`).check();
+    await page.getByTestId(`tasks-select-${id2}`).check();
+
+    await expect(page.getByTestId('tasks-bulk-toolbar')).toBeVisible();
+    await expect(page.getByTestId('tasks-bulk-count')).toHaveText('2');
+
+    await page.getByTestId('tasks-bulk-pin').click();
+    await expect(page.getByTestId(`tasks-row-${id1}`)).toHaveClass(/task-row-pinned/);
+    await expect(page.getByTestId(`tasks-row-${id2}`)).toHaveClass(/task-row-pinned/);
+  });
+
+  test('shift-click hide applies to visible range', async ({ page }) => {
+    await gotoPage(page, '/tasks');
+    const table = page.getByTestId('tasks-table');
+    await waitForTableRows(table, 3);
+
+    const rows = table.locator('tbody tr');
+    const firstId = (await rows.nth(0).locator('td').nth(1).innerText()).trim();
+    const thirdId = (await rows.nth(2).locator('td').nth(1).innerText()).trim();
+
+    await page.getByTestId(`tasks-hide-${firstId}`).click();
+    await page.getByTestId(`tasks-hide-${thirdId}`).click({ modifiers: ['Shift'] });
+
+    await expect(page.getByTestId(`tasks-row-${firstId}`)).toHaveCount(0);
+    await expect(page.getByTestId(`tasks-row-${thirdId}`)).toHaveCount(0);
   });
 });

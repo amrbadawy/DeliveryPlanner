@@ -411,6 +411,36 @@ public class TaskFilterEvaluatorTests
         Assert.True(state.IsHidden("SVC-2"));
         Assert.False(state.IsPinned("SVC-2"));
     }
+
+    [Fact]
+    public void PinMany_PinsAndUnhidesAllGivenTasks()
+    {
+        var nav = new TestNavigationManager("http://localhost/tasks");
+        var state = new TaskFilterState(nav);
+        state.Bind(TaskFilterState.PageKeyTasks);
+
+        state.ToggleHide("SVC-001");
+        state.PinMany(new[] { "SVC-001", "SVC-002" });
+
+        Assert.Contains("SVC-001", state.PinnedTaskIds);
+        Assert.Contains("SVC-002", state.PinnedTaskIds);
+        Assert.DoesNotContain("SVC-001", state.HiddenTaskIds);
+    }
+
+    [Fact]
+    public void HideMany_HidesAndUnpinsAllGivenTasks()
+    {
+        var nav = new TestNavigationManager("http://localhost/tasks");
+        var state = new TaskFilterState(nav);
+        state.Bind(TaskFilterState.PageKeyTasks);
+
+        state.TogglePin("SVC-003");
+        state.HideMany(new[] { "SVC-003", "SVC-004" });
+
+        Assert.Contains("SVC-003", state.HiddenTaskIds);
+        Assert.Contains("SVC-004", state.HiddenTaskIds);
+        Assert.DoesNotContain("SVC-003", state.PinnedTaskIds);
+    }
 }
 
 /// <summary>Test double for NavigationManager — captures NavigateTo calls without HTTP.</summary>
