@@ -1,0 +1,230 @@
+@using SoftwareDeliveryPlanner.Domain
+@using SoftwareDeliveryPlanner.Web.Services
+@inject TaskFilterState Filter
+@implements IDisposable
+
+@*
+  Persistent left filter sidebar with multi-select chips.
+  - Search input composes with chip dimensions.
+  - Chips are OR-within-dimension and AND-across-dimensions.
+  - URL query is kept in sync by TaskFilterState.
+  - Sidebar is collapsible; collapsed state is local UI only.
+*@
+
+<aside class="task-filter-sidebar @(isCollapsed ? "collapsed" : "")" data-testid="task-filter-sidebar" aria-label="Filter tasks">
+    <div class="task-filter-sidebar-header">
+        <button type="button" class="task-filter-toggle"
+                @onclick="ToggleCollapsed"
+                aria-expanded="@((!isCollapsed).ToString().ToLowerInvariant())"
+                title="@(isCollapsed ? "Expand filters" : "Collapse filters")"
+                data-testid="task-filter-toggle">
+            <i class="bi @(isCollapsed ? "bi-funnel" : "bi-funnel-fill")"></i>
+            @if (!isCollapsed)
+            {
+                <span class="task-filter-title">Filters</span>
+            }
+            @if (Filter.ActiveCount > 0)
+            {
+                <span class="task-filter-badge" data-testid="task-filter-active-count">@Filter.ActiveCount</span>
+            }
+        </button>
+        @if (!isCollapsed && Filter.IsAnyActive)
+        {
+            <button type="button" class="task-filter-clear-all"
+                    @onclick="ClearAll"
+                    title="Clear all filters"
+                    data-testid="task-filter-clear-all">
+                <i class="bi bi-x-lg"></i> Clear
+            </button>
+        }
+    </div>
+
+    @if (!isCollapsed)
+    {
+        <div class="task-filter-sidebar-body">
+            <!-- Search -->
+            <section class="task-filter-section">
+                <label for="task-filter-search" class="task-filter-section-label">Search</label>
+                <input id="task-filter-search"
+                       class="form-control form-control-sm"
+                       type="search"
+                       placeholder="ID, name, or phase..."
+                       value="@Filter.SearchTerm"
+                       @oninput="OnSearchInput"
+                       data-testid="task-filter-search" />
+            </section>
+
+            <!-- Status -->
+            <section class="task-filter-section">
+                <div class="task-filter-section-label">Status</div>
+                <div class="task-filter-chip-group" role="group" aria-label="Filter by status">
+                    @foreach (var (code, display) in StatusChips)
+                    {
+                        var active = Filter.SelectedStatuses.Contains(code);
+                        <button type="button"
+                                class="task-filter-chip @(active ? "active" : "")"
+                                aria-pressed="@active.ToString().ToLowerInvariant()"
+                                @onclick="() => Filter.ToggleStatus(code)"
+                                data-testid="@($"task-filter-chip-status-{code.ToLowerInvariant()}")">
+                            @display
+                        </button>
+                    }
+                </div>
+            </section>
+
+            <!-- Risk -->
+            <section class="task-filter-section">
+                <div class="task-filter-section-label">Delivery risk</div>
+                <div class="task-filter-chip-group" role="group" aria-label="Filter by risk">
+                    @foreach (var (code, display, swatch) in RiskChips)
+                    {
+                        var active = Filter.SelectedRisks.Contains(code);
+                        <button type="button"
+                                class="task-filter-chip task-filter-chip-risk task-filter-chip-risk-@swatch @(active ? "active" : "")"
+                                aria-pressed="@active.ToString().ToLowerInvariant()"
+                                @onclick="() => Filter.ToggleRisk(code)"
+                                data-testid="@($"task-filter-chip-risk-{code.ToLowerInvariant()}")">
+                            @display
+                        </button>
+                    }
+                </div>
+            </section>
+
+            <!-- Priority -->
+            <section class="task-filter-section">
+                <div class="task-filter-section-label">Priority</div>
+                <div class="task-filter-chip-group" role="group" aria-label="Filter by priority">
+                    @foreach (var (code, display) in PriorityChips)
+                    {
+                        var active = Filter.SelectedPriorityBuckets.Contains(code);
+                        <button type="button"
+                                class="task-filter-chip @(active ? "active" : "")"
+                                aria-pressed="@active.ToString().ToLowerInvariant()"
+                                @onclick="() => Filter.TogglePriorityBucket(code)"
+                                data-testid="@($"task-filter-chip-priority-{code.ToLowerInvariant()}")">
+                            @display
+                        </button>
+                    }
+                </div>
+            </section>
+
+            <!-- Role (effort breakdown) -->
+            <section class="task-filter-section">
+                <div class="task-filter-section-label">Role</div>
+                <div class="task-filter-chip-group" role="group" aria-label="Filter by role">
+                    @foreach (var role in DomainConstants.ResourceRole.PipelineOrder)
+                    {
+                        var active = Filter.SelectedRoles.Contains(role);
+                        <button type="button"
+                                class="task-filter-chip task-filter-chip-role @(active ? "active" : "")"
+                                aria-pressed="@active.ToString().ToLowerInvariant()"
+                                @onclick="() => Filter.ToggleRole(role)"
+                                data-testid="@($"task-filter-chip-role-{role.ToLowerInvariant()}")">
+                            <span class="task-filter-chip-swatch gantt-role-@role.ToLowerInvariant()"></span>
+                            @DomainConstants.ResourceRole.GetDisplayName(role)
+                        </button>
+                    }
+                </div>
+            </section>
+
+            <!-- Phase -->
+            @if (AvailablePhases is { Count: > 0 })
+            {
+                <section class="task-filter-section">
+                    <div class="task-filter-section-label">Phase</div>
+                    <div class="task-filter-chip-group" role="group" aria-label="Filter by phase">
+                        @foreach (var phase in AvailablePhases)
+                        {
+                            var active = Filter.SelectedPhases.Contains(phase);
+                            <button type="button"
+                                    class="task-filter-chip @(active ? "active" : "")"
+                                    aria-pressed="@active.ToString().ToLowerInvariant()"
+                                    @onclick="() => Filter.TogglePhase(phase)"
+                                    data-testid="@($"task-filter-chip-phase-{SanitizeId(phase)}")">
+                                @(string.IsNullOrEmpty(phase) ? "(no phase)" : phase)
+                            </button>
+                        }
+                    </div>
+                </section>
+            }
+
+            <!-- Dependency state -->
+            <section class="task-filter-section">
+                <div class="task-filter-section-label">Dependencies</div>
+                <div class="task-filter-chip-group" role="group" aria-label="Filter by dependency state">
+                    @foreach (var (code, display) in DepStateChips)
+                    {
+                        var active = Filter.SelectedDependencyStates.Contains(code);
+                        <button type="button"
+                                class="task-filter-chip @(active ? "active" : "")"
+                                aria-pressed="@active.ToString().ToLowerInvariant()"
+                                @onclick="() => Filter.ToggleDependencyState(code)"
+                                data-testid="@($"task-filter-chip-dep-{code.ToLowerInvariant()}")">
+                            @display
+                        </button>
+                    }
+                </div>
+            </section>
+        </div>
+    }
+</aside>
+
+@code {
+    /// <summary>Page key — TaskFilterState.PageKeyTasks or TaskFilterState.PageKeyGantt.</summary>
+    [Parameter, EditorRequired] public string PageKey { get; set; } = TaskFilterState.PageKeyTasks;
+
+    /// <summary>Distinct phases discovered in the page's data set.</summary>
+    [Parameter] public IReadOnlyList<string>? AvailablePhases { get; set; }
+
+    private bool isCollapsed;
+
+    private static readonly (string Code, string Display)[] StatusChips =
+    {
+        (DomainConstants.TaskStatus.NotStarted, "Not Started"),
+        (DomainConstants.TaskStatus.InProgress, "In Progress"),
+        (DomainConstants.TaskStatus.Completed, "Completed"),
+    };
+
+    private static readonly (string Code, string Display, string Swatch)[] RiskChips =
+    {
+        (DomainConstants.DeliveryRisk.OnTrack, "On Track", "ontrack"),
+        (DomainConstants.DeliveryRisk.AtRisk, "At Risk", "atrisk"),
+        (DomainConstants.DeliveryRisk.Late, "Late", "late"),
+    };
+
+    private static readonly (string Code, string Display)[] PriorityChips =
+    {
+        (TaskFilterState.PriorityBuckets.High, "High (1–3)"),
+        (TaskFilterState.PriorityBuckets.Medium, "Medium (4–6)"),
+        (TaskFilterState.PriorityBuckets.Low, "Low (7–10)"),
+    };
+
+    private static readonly (string Code, string Display)[] DepStateChips =
+    {
+        (TaskFilterState.DependencyStates.HasDependencies, "Has dependencies"),
+        (TaskFilterState.DependencyStates.NoDependencies, "Independent"),
+    };
+
+    protected override void OnInitialized()
+    {
+        Filter.Bind(PageKey);
+        Filter.OnChange += OnFilterChanged;
+    }
+
+    private void OnFilterChanged() => InvokeAsync(StateHasChanged);
+
+    private void OnSearchInput(ChangeEventArgs e) => Filter.SearchTerm = e.Value?.ToString() ?? string.Empty;
+
+    private void ToggleCollapsed() => isCollapsed = !isCollapsed;
+
+    private void ClearAll() => Filter.Clear();
+
+    private static string SanitizeId(string value) =>
+        string.IsNullOrWhiteSpace(value) ? "none"
+        : new string(value.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
+
+    public void Dispose()
+    {
+        Filter.OnChange -= OnFilterChanged;
+    }
+}

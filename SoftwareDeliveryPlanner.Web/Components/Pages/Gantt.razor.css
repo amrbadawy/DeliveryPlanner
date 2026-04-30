@@ -547,3 +547,21 @@
     margin-left: 8px;
 }
 
+
+
+.gantt-layout {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.gantt-layout-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+@media (max-width: 992px) {
+    .gantt-layout { flex-direction: column; }
+}
+

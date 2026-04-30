@@ -1,0 +1,17 @@
+.tasks-layout {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.tasks-layout-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+@media (max-width: 992px) {
+    .tasks-layout {
+        flex-direction: column;
+    }
+}

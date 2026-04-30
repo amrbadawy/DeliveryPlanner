@@ -12,6 +12,7 @@
 @inject IMediator Mediator
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
+@inject SoftwareDeliveryPlanner.Web.Services.TaskFilterState SidebarFilter
 
 <PageTitle>Gantt Chart</PageTitle>
 
@@ -40,6 +41,11 @@
         </button>
     </div>
 </div>
+
+<div class="gantt-layout">
+<TaskFilterSidebar PageKey="@SoftwareDeliveryPlanner.Web.Services.TaskFilterState.PageKeyGantt"
+                   AvailablePhases="availablePhases" />
+<div class="gantt-layout-main">
 
 @if (!isLoaded)
 {
@@ -83,6 +89,12 @@ else
         {
             <span class="ms-2 badge bg-warning text-dark" data-testid="gantt-excluded-count" title="@excludedTaskCount task(s) are not scheduled and do not appear on the chart">
                 <i class="bi bi-exclamation-triangle me-1"></i>Showing @scheduledTasks.Count of @totalTaskCount tasks (@excludedTaskCount not scheduled)
+            </span>
+        }
+        @if (filteredOutCount > 0)
+        {
+            <span class="ms-2 badge bg-info text-dark" data-testid="gantt-filtered-count" title="Hidden by sidebar filter">
+                <i class="bi bi-funnel me-1"></i>@filteredOutCount hidden by filter
             </span>
         }
     </div>
@@ -304,14 +316,20 @@ else
     </div>
 }
 
+</div>
+</div>
+
 @code {
     private const int MaxVisibleLanes = 6;
     private const int LaneHeight = 18;   // Height per role lane
     private const int LanePadding = 6;   // Top+bottom padding in shell
 
     private List<TaskItem> scheduledTasks = new();
+    private List<TaskItem> allScheduledTasks = new();
     private int totalTaskCount;
     private int excludedTaskCount;
+    private int filteredOutCount;
+    private List<string> availablePhases = new();
     private Dictionary<string, IReadOnlyList<GanttRoleSegmentDto>> segmentsByTask = new(StringComparer.OrdinalIgnoreCase);
     private DateTime planStart;
     private DateTime planEnd;
@@ -346,6 +364,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        SidebarFilter.OnChange += OnSidebarFilterChanged;
+
         // Load settings to get working week config + zoom level
         var settingsResult = await Mediator.Send(new GetSettingsQuery());
         if (settingsResult.IsSuccess && !string.IsNullOrEmpty(settingsResult.Value.GlobalWorkingWeek))
@@ -474,6 +494,7 @@ else
 
     public async ValueTask DisposeAsync()
     {
+        SidebarFilter.OnChange -= OnSidebarFilterChanged;
         try
         {
             if (keyboardBound)
@@ -483,6 +504,21 @@ else
         selfRef?.Dispose();
         _persistCts?.Cancel();
         _persistCts?.Dispose();
+    }
+
+    private void ApplySidebarFilter()
+    {
+        var sidebar = SidebarFilter.Current;
+        scheduledTasks = allScheduledTasks
+            .Where(t => SoftwareDeliveryPlanner.Web.Services.TaskFilterEvaluator.Matches(t, sidebar))
+            .ToList();
+        filteredOutCount = allScheduledTasks.Count - scheduledTasks.Count;
+    }
+
+    private void OnSidebarFilterChanged()
+    {
+        ApplySidebarFilter();
+        InvokeAsync(StateHasChanged);
     }
 
     private async Task LoadData()
@@ -500,13 +536,21 @@ else
         totalTaskCount = allTasks.Count;
 
         // Only show tasks with a planned start and finish
-        scheduledTasks = allTasks
+        allScheduledTasks = allTasks
             .Where(t => t.PlannedStart.HasValue && t.PlannedFinish.HasValue)
             .OrderBy(t => t.PlannedStart)
             .ThenBy(t => t.SchedulingRank)
             .ToList();
 
-        excludedTaskCount = totalTaskCount - scheduledTasks.Count;
+        excludedTaskCount = totalTaskCount - allScheduledTasks.Count;
+
+        availablePhases = allScheduledTasks
+            .Select(t => t.Phase ?? string.Empty)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        ApplySidebarFilter();
 
         // Load role-based segments
         var segResult = await Mediator.Send(new GetGanttSegmentsQuery());
@@ -519,10 +563,10 @@ else
         var allSegments = segResult.Value;
         segmentsByTask = allSegments.ToDictionary(s => s.TaskId, s => s.Segments, StringComparer.OrdinalIgnoreCase);
 
-        if (scheduledTasks.Any())
+        if (allScheduledTasks.Any())
         {
-            planStart = scheduledTasks.Min(t => t.PlannedStart!.Value).Date;
-            planEnd = scheduledTasks.Max(t => t.PlannedFinish!.Value).Date;
+            planStart = allScheduledTasks.Min(t => t.PlannedStart!.Value).Date;
+            planEnd = allScheduledTasks.Max(t => t.PlannedFinish!.Value).Date;
 
             // Extend range to include strict dates
             var maxStrict = allTasks
