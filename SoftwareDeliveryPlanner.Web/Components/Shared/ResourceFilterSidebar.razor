@@ -1,0 +1,63 @@
+@using SoftwareDeliveryPlanner.Domain
+@using SoftwareDeliveryPlanner.Web.Services
+@inject ResourceFilterState Filter
+
+<aside class="resource-filter-sidebar" data-testid="heatmap-filter-sidebar" aria-label="Filter resources">
+    <div class="resource-filter-header">
+        <strong>Filters</strong>
+        @if (Filter.IsAnyActive)
+        {
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="Filter.Clear" data-testid="heatmap-filter-clear">Clear</button>
+        }
+    </div>
+
+    <section class="resource-filter-section">
+        <label for="heatmap-filter-search" class="resource-filter-label">Search</label>
+        <input id="heatmap-filter-search"
+               type="search"
+               class="form-control form-control-sm"
+               value="@Filter.SearchTerm"
+               @oninput="OnSearchInput"
+               placeholder="ID or name..."
+               data-testid="heatmap-filter-search" />
+    </section>
+
+    <section class="resource-filter-section">
+        <div class="resource-filter-label">Role</div>
+        <div class="resource-filter-chip-group">
+            @foreach (var role in DomainConstants.ResourceRole.PipelineOrder)
+            {
+                var active = Filter.SelectedRoles.Contains(role);
+                <button type="button"
+                        class="resource-filter-chip @(active ? "active" : "")"
+                        @onclick="() => Filter.ToggleRole(role)"
+                        aria-pressed="@active.ToString().ToLowerInvariant()"
+                        data-testid="@($"heatmap-filter-role-{role.ToLowerInvariant()}")">
+                    @DomainConstants.ResourceRole.GetDisplayName(role)
+                </button>
+            }
+        </div>
+    </section>
+
+    <section class="resource-filter-section">
+        <div class="resource-filter-label">Seniority</div>
+        <div class="resource-filter-chip-group">
+            @foreach (var level in DomainConstants.Seniority.Levels)
+            {
+                var active = Filter.SelectedSeniorities.Contains(level);
+                <button type="button"
+                        class="resource-filter-chip @(active ? "active" : "")"
+                        @onclick="() => Filter.ToggleSeniority(level)"
+                        aria-pressed="@active.ToString().ToLowerInvariant()"
+                        data-testid="@($"heatmap-filter-seniority-{level.ToLowerInvariant()}")">
+                    @level
+                </button>
+            }
+        </div>
+    </section>
+</aside>
+
+@code {
+    private void OnSearchInput(ChangeEventArgs e)
+        => Filter.SetSearchTerm(e.Value?.ToString() ?? string.Empty);
+}

@@ -2,9 +2,13 @@
 @using MediatR
 @using SoftwareDeliveryPlanner.Application.Planning.Queries
 @using SoftwareDeliveryPlanner.Application.Settings.Queries
+@using SoftwareDeliveryPlanner.Application.Resources.Queries
 @using SoftwareDeliveryPlanner.Domain
 @using SoftwareDeliveryPlanner.Domain.Services
+@using SoftwareDeliveryPlanner.Web.Services
 @inject IMediator Mediator
+@inject ResourceFilterState ResourceFilter
+@implements IDisposable
 
 <PageTitle>Workload Heatmap</PageTitle>
 
@@ -34,23 +38,28 @@
 {
     <SkeletonLoader Variant="table" Rows="6" Columns="8" TestId="heatmap-skeleton" />
 }
-else if (heatmap is null || !heatmap.WeekStarts.Any())
-{
-    <div class="empty-state">
-        <div class="empty-icon"><i class="bi bi-grid-3x3-gap"></i></div>
-        <h5>No heatmap data</h5>
-        <p>Run the scheduler to generate task assignments, then refresh.</p>
-    </div>
-}
 else
 {
-    <div class="card border-0 shadow-sm">
-        <div class="heatmap-scroll" data-testid="heatmap-table-container">
-            <table class="heatmap-table" data-testid="heatmap-table">
+    <div class="heatmap-layout">
+        <ResourceFilterSidebar />
+        <div class="heatmap-layout-main">
+            @if (heatmap is null || !heatmap.WeekStarts.Any())
+            {
+                <div class="empty-state" data-testid="heatmap-empty">
+                    <div class="empty-icon"><i class="bi bi-grid-3x3-gap"></i></div>
+                    <h5>No heatmap data</h5>
+                    <p>Run the scheduler to generate task assignments, then refresh.</p>
+                </div>
+            }
+            else
+            {
+                <div class="card border-0 shadow-sm">
+                    <div class="heatmap-scroll" data-testid="heatmap-table-container">
+                        <table class="heatmap-table" data-testid="heatmap-table">
                 <thead>
                     <tr>
                         <th class="heatmap-resource-header">Resource</th>
-                        @foreach (var week in heatmap.WeekStarts)
+                        @foreach (var week in FilteredWeekStarts)
                         {
                             var weekEnd = week.AddDays(6);
                             var wn = WeekNumberCalculator.GetWeekOfYear(week, weekNumberingCode, workingWeekCode);
@@ -62,13 +71,13 @@ else
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var resourceName in heatmap.ResourceNames)
+                    @foreach (var resourceName in FilteredResourceNames)
                     {
                         <tr>
                             <td class="heatmap-resource-cell">@resourceName</td>
-                            @foreach (var week in heatmap.WeekStarts)
+                            @foreach (var week in FilteredWeekStarts)
                             {
-                                var cell = heatmap.Cells.FirstOrDefault(c => c.ResourceName == resourceName && c.WeekStart == week);
+                                var cell = FilteredCells.FirstOrDefault(c => c.ResourceName == resourceName && c.WeekStart == week);
                                 var pct = cell?.UtilizationPct ?? 0;
                                 <td class="heatmap-cell" style="background-color: @GetCellColor(pct);" title="@resourceName — W@(WeekNumberCalculator.GetWeekOfYear(week, weekNumberingCode, workingWeekCode)) (@week.ToString("dd MMM") - @week.AddDays(6).ToString("dd MMM")) — @pct.ToString("F1")%">
                                     @pct.ToString("F0")%
@@ -77,17 +86,20 @@ else
                         </tr>
                     }
                 </tbody>
-            </table>
-        </div>
-    </div>
+                        </table>
+                    </div>
+                </div>
+            }
 
-    <div class="heatmap-legend mt-3" data-testid="heatmap-legend">
-        <span class="legend-label">Utilization:</span>
-        <span class="legend-item"><span class="legend-swatch" style="background-color: var(--color-bg-secondary);"></span>0%</span>
-        <span class="legend-item"><span class="legend-swatch" style="background-color: var(--color-info-light);"></span>1–50%</span>
-        <span class="legend-item"><span class="legend-swatch" style="background-color: var(--color-success-light);"></span>51–80%</span>
-        <span class="legend-item"><span class="legend-swatch" style="background-color: var(--color-warning-light);"></span>81–100%</span>
-        <span class="legend-item"><span class="legend-swatch" style="background-color: var(--color-danger-light);"></span>&gt;100%</span>
+            <div class="heatmap-legend mt-3" data-testid="heatmap-legend">
+                <span class="legend-label">Utilization:</span>
+                <span class="legend-item"><span class="legend-swatch" style="background-color: var(--color-bg-secondary);"></span>0%</span>
+                <span class="legend-item"><span class="legend-swatch" style="background-color: var(--color-info-light);"></span>1–50%</span>
+                <span class="legend-item"><span class="legend-swatch" style="background-color: var(--color-success-light);"></span>51–80%</span>
+                <span class="legend-item"><span class="legend-swatch" style="background-color: var(--color-warning-light);"></span>81–100%</span>
+                <span class="legend-item"><span class="legend-swatch" style="background-color: var(--color-danger-light);"></span>&gt;100%</span>
+            </div>
+        </div>
     </div>
 }
 
@@ -98,9 +110,26 @@ else
     private ToastNotification toast = default!;
     private string workingWeekCode = DomainConstants.WorkingWeek.SunThu;
     private string weekNumberingCode = DomainConstants.WeekNumbering.Default;
+    private Dictionary<string, ResourceFilterState.ResourceFilterItem> resourceMap = new(StringComparer.OrdinalIgnoreCase);
+
+    private List<WorkloadCellDto> FilteredCells =>
+        heatmap?.Cells
+            .Where(c => resourceMap.TryGetValue(c.ResourceId, out var item) && ResourceFilter.Matches(item))
+            .ToList()
+        ?? new List<WorkloadCellDto>();
+
+    private List<string> FilteredResourceNames =>
+        FilteredCells
+            .Select(c => c.ResourceName)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x)
+            .ToList();
+
+    private List<DateTime> FilteredWeekStarts => heatmap?.WeekStarts ?? new List<DateTime>();
 
     protected override async Task OnInitializedAsync()
     {
+        ResourceFilter.OnChange += OnFilterChanged;
         var settingsResult = await Mediator.Send(new GetSettingsQuery());
         if (settingsResult.IsSuccess)
         {
@@ -117,6 +146,14 @@ else
     {
         var result = await Mediator.Send(new GetWorkloadHeatmapQuery());
         heatmap = result.Value;
+
+        var resourcesResult = await Mediator.Send(new GetResourcesForFilteringQuery());
+        resourceMap = resourcesResult.IsSuccess
+            ? resourcesResult.Value.ToDictionary(
+                r => r.ResourceId,
+                r => new ResourceFilterState.ResourceFilterItem(r.ResourceId, r.ResourceName, r.Role, r.SeniorityLevel),
+                StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, ResourceFilterState.ResourceFilterItem>(StringComparer.OrdinalIgnoreCase);
     }
 
     private async Task RefreshData()
@@ -141,4 +178,11 @@ else
         <= 100 => "var(--color-warning-light)",
         _ => "var(--color-danger-light)"
     };
+
+    private void OnFilterChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        ResourceFilter.OnChange -= OnFilterChanged;
+    }
 }
