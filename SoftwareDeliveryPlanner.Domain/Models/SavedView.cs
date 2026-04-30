@@ -65,4 +65,15 @@ public class SavedView
         PayloadJson = payloadJson;
         UpdatedAt = TimeProvider.System.GetUtcNow().DateTime;
     }
+
+    public void Rename(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("Saved view name must not be empty.");
+        if (name.Length > 100)
+            throw new DomainException("Saved view name must be 100 characters or fewer.");
+
+        Name = name.Trim();
+        UpdatedAt = TimeProvider.System.GetUtcNow().DateTime;
+    }
 }

@@ -122,6 +122,24 @@ test.describe('Task filter sidebar (Tasks page)', () => {
     await page.getByTestId('task-filter-toggle').click();
     await expect(page.getByTestId('task-filter-search')).toBeVisible();
   });
+
+  test('keyboard shortcut / focuses sidebar search', async ({ page }) => {
+    await gotoPage(page, '/tasks');
+
+    await page.keyboard.press('/');
+    await expect(page.getByTestId('task-filter-search')).toBeFocused();
+  });
+
+  test('keyboard shortcut \\ toggles sidebar collapse', async ({ page }) => {
+    await gotoPage(page, '/tasks');
+
+    await expect(page.getByTestId('task-filter-search')).toBeVisible();
+    await page.keyboard.press('\\');
+    await expect(page.getByTestId('task-filter-search')).toBeHidden();
+
+    await page.keyboard.press('\\');
+    await expect(page.getByTestId('task-filter-search')).toBeVisible();
+  });
 });
 
 test.describe('Task filter sidebar (Gantt page)', () => {

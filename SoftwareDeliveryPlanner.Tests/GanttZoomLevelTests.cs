@@ -89,5 +89,6 @@ public class GanttZoomLevelTests
     public void SettingKey_isExpectedSnakeCase()
     {
         Assert.Equal("gantt_zoom_level", DomainConstants.SettingKeys.GanttZoomLevel);
+        Assert.Equal("scenario_gantt_zoom_level", DomainConstants.SettingKeys.ScenarioGanttZoomLevel);
     }
 }

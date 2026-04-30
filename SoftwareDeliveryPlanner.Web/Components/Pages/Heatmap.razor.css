@@ -1,3 +1,14 @@
+.heatmap-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.heatmap-layout-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .heatmap-scroll {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -90,4 +101,10 @@
     height: 16px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--color-border);
+}
+
+@media (max-width: 992px) {
+    .heatmap-layout {
+        flex-direction: column;
+    }
 }

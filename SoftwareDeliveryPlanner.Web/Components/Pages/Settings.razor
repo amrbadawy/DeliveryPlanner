@@ -89,6 +89,37 @@ else
         </div>
     </div>
 
+    <!-- Scenario Gantt Zoom -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header border-bottom">
+            <i class="bi bi-search me-2"></i>Scenario Gantt Zoom
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-3">
+                Controls the default zoom used when opening Scenario Gantt pages.
+                Individual scenarios can override this and later reset back to this default.
+            </p>
+            <div class="d-flex gap-3 align-items-end">
+                <div>
+                    <label class="form-label">Default scenario zoom</label>
+                    <select class="form-select" style="width:220px" @bind="selectedScenarioGanttZoom" data-testid="settings-scenario-gantt-zoom-select">
+                        <option value="@DomainConstants.GanttZoomLevel.Day">Day</option>
+                        <option value="@DomainConstants.GanttZoomLevel.Week">Week</option>
+                        <option value="@DomainConstants.GanttZoomLevel.Month">Month</option>
+                        <option value="@DomainConstants.GanttZoomLevel.Quarter">Quarter</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" @onclick="SaveScenarioGanttZoom" disabled="@isSavingScenarioGanttZoom" data-testid="settings-scenario-gantt-zoom-save">
+                    @if (isSavingScenarioGanttZoom)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                    }
+                    Save Scenario Zoom
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Baseline Management -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header border-bottom">
@@ -145,10 +176,12 @@ else
     private SettingsDto? settings;
     private string selectedStrategy = DomainConstants.SchedulingStrategy.PriorityFirst;
     private string selectedWeekNumbering = DomainConstants.WeekNumbering.Default;
+    private string selectedScenarioGanttZoom = DomainConstants.GanttZoomLevel.Default;
     private string currentBaselineDate = string.Empty;
     private bool isLoaded = false;
     private bool isSavingStrategy = false;
     private bool isSavingWeekNumbering = false;
+    private bool isSavingScenarioGanttZoom = false;
     private bool isFreezing = false;
     private bool isClearing = false;
     private string statusMessage = string.Empty;
@@ -166,6 +199,7 @@ else
         settings = result.Value;
         selectedStrategy = settings.SchedulingStrategy ?? DomainConstants.SchedulingStrategy.PriorityFirst;
         selectedWeekNumbering = settings.WeekNumbering ?? DomainConstants.WeekNumbering.Default;
+        selectedScenarioGanttZoom = settings.ScenarioGanttZoomLevel ?? DomainConstants.GanttZoomLevel.Default;
         currentBaselineDate = settings.BaselineDate ?? string.Empty;
     }
 
@@ -206,6 +240,26 @@ else
         finally
         {
             isSavingWeekNumbering = false;
+        }
+    }
+
+    private async Task SaveScenarioGanttZoom()
+    {
+        isSavingScenarioGanttZoom = true;
+        statusMessage = string.Empty;
+        try
+        {
+            await Mediator.Send(new UpsertSettingCommand(DomainConstants.SettingKeys.ScenarioGanttZoomLevel, selectedScenarioGanttZoom));
+            ShowStatus("Scenario Gantt zoom default saved.", false);
+            await LoadSettings();
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Error: {ex.Message}", true);
+        }
+        finally
+        {
+            isSavingScenarioGanttZoom = false;
         }
     }
 

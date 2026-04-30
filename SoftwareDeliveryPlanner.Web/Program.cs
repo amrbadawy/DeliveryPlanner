@@ -86,6 +86,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddApplication();
 builder.Services.AddScoped<SoftwareDeliveryPlanner.Web.Services.AutoScheduleService>();
 builder.Services.AddScoped<SoftwareDeliveryPlanner.Web.Services.TaskFilterState>();
+builder.Services.AddScoped<SoftwareDeliveryPlanner.Web.Services.ResourceFilterState>();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();

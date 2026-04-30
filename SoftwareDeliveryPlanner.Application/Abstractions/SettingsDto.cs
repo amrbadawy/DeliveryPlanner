@@ -7,4 +7,5 @@ public sealed record SettingsDto(
     string? PlanStartDate,
     int AtRiskThreshold,
     string? WeekNumbering = null,
-    string? GanttZoomLevel = null);
+    string? GanttZoomLevel = null,
+    string? ScenarioGanttZoomLevel = null);

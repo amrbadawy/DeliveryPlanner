@@ -177,6 +177,33 @@ test.describe('Scenario Gantt Chart', () => {
     await expect(page.getByRole('heading', { name: /What-If Scenarios/ })).toBeVisible();
   });
 
+  test('scenario zoom reset returns to settings default', async ({ page }) => {
+    await gotoPage(page, '/settings');
+    await page.getByTestId('settings-scenario-gantt-zoom-select').selectOption('MONTH');
+    await page.getByTestId('settings-scenario-gantt-zoom-save').click();
+
+    await gotoPage(page, '/scenarios');
+    const table = page.getByTestId('scenarios-table');
+    const row = table.locator('tbody tr', { hasText: scenarioName });
+    await row.locator('button[data-testid^="scenarios-view-"]').click();
+
+    await expect(page).toHaveURL(/\/scenarios\/\d+\/gantt/);
+
+    const empty = page.getByTestId('scenario-gantt-empty');
+    if (await empty.isVisible().catch(() => false)) {
+      test.skip(true, 'Scheduler produced no scheduled tasks for this snapshot');
+    }
+
+    const monthBtn = page.getByTestId('scenario-gantt-zoom-month');
+    await expect(monthBtn).toHaveClass(/gantt-zoom-btn-active/);
+
+    await page.getByTestId('scenario-gantt-zoom-day').click();
+    await expect(page.getByTestId('scenario-gantt-zoom-reset')).toBeEnabled();
+
+    await page.getByTestId('scenario-gantt-zoom-reset').click();
+    await expect(page.getByTestId('scenario-gantt-zoom-month')).toHaveClass(/gantt-zoom-btn-active/);
+  });
+
   test('non-existent scenario shows not-found state', async ({ page }) => {
     test.skip(true, 'Skipping - ScenarioGantt page with invalid ID may not render not-found state in test environment');
     await gotoPage(page, '/scenarios/999999/gantt');

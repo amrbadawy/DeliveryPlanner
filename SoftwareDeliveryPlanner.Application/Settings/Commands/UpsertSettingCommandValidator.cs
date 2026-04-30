@@ -14,7 +14,8 @@ public sealed class UpsertSettingCommandValidator : AbstractValidator<UpsertSett
         DomainConstants.SettingKeys.PlanStartDate,
         DomainConstants.SettingKeys.AtRiskThreshold,
         DomainConstants.SettingKeys.WeekNumbering,
-        DomainConstants.SettingKeys.GanttZoomLevel
+        DomainConstants.SettingKeys.GanttZoomLevel,
+        DomainConstants.SettingKeys.ScenarioGanttZoomLevel
     };
 
     public UpsertSettingCommandValidator(ILookupOrchestrator? lookupOrchestrator = null)
@@ -33,6 +34,7 @@ public sealed class UpsertSettingCommandValidator : AbstractValidator<UpsertSett
                     var k when string.Equals(k, DomainConstants.SettingKeys.WeekNumbering, StringComparison.OrdinalIgnoreCase)
                         => DomainConstants.WeekNumbering.IsValid(cmd.Value),
                     var k when string.Equals(k, DomainConstants.SettingKeys.GanttZoomLevel, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(k, DomainConstants.SettingKeys.ScenarioGanttZoomLevel, StringComparison.OrdinalIgnoreCase)
                         => DomainConstants.GanttZoomLevel.IsValid(cmd.Value),
                     _ => true
                 };

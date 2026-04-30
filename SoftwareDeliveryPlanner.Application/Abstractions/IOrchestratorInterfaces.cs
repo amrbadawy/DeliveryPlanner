@@ -96,6 +96,7 @@ public interface ISavedViewOrchestrator
     Task<List<SavedView>> ListAsync(string pageKey, string? ownerKey, CancellationToken cancellationToken = default);
     Task<SavedView?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<SavedView> UpsertAsync(string name, string pageKey, string payloadJson, string? ownerKey, CancellationToken cancellationToken = default);
+    Task<SavedView?> RenameAsync(int id, string name, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);
 }
 
@@ -123,6 +124,7 @@ public interface IScenarioOrchestrator
 {
     Task<List<PlanScenario>> GetScenariosAsync();
     Task<PlanScenario?> GetScenarioWithSnapshotsAsync(int id);
+    Task<PlanScenario?> SetScenarioZoomLevelAsync(int id, string? zoomLevel, CancellationToken cancellationToken = default);
     Task SaveScenarioAsync(PlanScenario scenario);
     Task SaveScenarioWithSnapshotsAsync(PlanScenario scenario, List<TaskItem> tasks);
     Task DeleteScenarioAsync(int id);

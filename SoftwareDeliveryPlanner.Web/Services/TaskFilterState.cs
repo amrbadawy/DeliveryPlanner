@@ -115,6 +115,42 @@ public sealed class TaskFilterState : IDisposable
     public bool IsPinned(string taskId) => Current.PinnedTaskIds.Contains(taskId);
     public bool IsHidden(string taskId) => Current.HiddenTaskIds.Contains(taskId);
 
+    public void PinMany(IEnumerable<string> taskIds)
+    {
+        var changed = false;
+        foreach (var id in taskIds)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                continue;
+
+            if (Current.HiddenTaskIds.Remove(id))
+                changed = true;
+            if (Current.PinnedTaskIds.Add(id))
+                changed = true;
+        }
+
+        if (changed)
+            OnChange?.Invoke();
+    }
+
+    public void HideMany(IEnumerable<string> taskIds)
+    {
+        var changed = false;
+        foreach (var id in taskIds)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                continue;
+
+            if (Current.PinnedTaskIds.Remove(id))
+                changed = true;
+            if (Current.HiddenTaskIds.Add(id))
+                changed = true;
+        }
+
+        if (changed)
+            OnChange?.Invoke();
+    }
+
     public bool IsAnyActive => !string.IsNullOrWhiteSpace(Current.SearchTerm)
         || Current.Statuses.Count > 0
         || Current.Risks.Count > 0
@@ -272,6 +308,7 @@ public sealed class TaskFilterState : IDisposable
             ["phase"] = SerializeSet(page.Phases),
             ["role"] = SerializeSet(page.Roles),
             ["dep"] = SerializeSet(page.DependencyStates),
+            ["view"] = null,
         };
 
         var newUri = _nav.GetUriWithQueryParameters(dict);
