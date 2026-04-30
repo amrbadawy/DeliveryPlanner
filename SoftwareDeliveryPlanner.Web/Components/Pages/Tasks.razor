@@ -403,7 +403,7 @@ else
                 <tbody>
                     @foreach (var task in FilteredTasks)
                     {
-                        <tr class="clickable-row @(dragTaskId == task.TaskId ? "dragging" : "") @(dragOverTaskId == task.TaskId ? "drag-over" : "")"
+                        <tr class="clickable-row @(dragTaskId == task.TaskId ? "dragging" : "") @(dragOverTaskId == task.TaskId ? "drag-over" : "") @(SidebarFilter.IsPinned(task.TaskId) ? "task-row-pinned" : "")"
                             draggable="true"
                             @ondragstart="() => OnDragStart(task.TaskId)"
                             @ondragover:preventDefault="true"
@@ -474,6 +474,22 @@ else
                                 <a class="btn btn-sm btn-outline-info" href="/tasks/@task.TaskId" @onclick:stopPropagation aria-label="View @task.TaskId" data-testid="tasks-view-@task.TaskId"><i class="bi bi-eye"></i></a>
                                 <button class="btn btn-sm btn-outline-warning" @onclick="() => EditTask(task)" @onclick:stopPropagation aria-label="Edit @task.TaskId" data-testid="tasks-edit-@task.TaskId"><i class="bi bi-pencil"></i></button>
                                 <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteTask(task)" @onclick:stopPropagation aria-label="Delete @task.TaskId" data-testid="tasks-delete-@task.TaskId"><i class="bi bi-trash"></i></button>
+                                <button class="btn btn-sm @(SidebarFilter.IsPinned(task.TaskId) ? "btn-warning" : "btn-outline-secondary")"
+                                        @onclick="() => SidebarFilter.TogglePin(task.TaskId)"
+                                        @onclick:stopPropagation
+                                        aria-label="@(SidebarFilter.IsPinned(task.TaskId) ? $"Unpin {task.TaskId}" : $"Pin {task.TaskId}")"
+                                        title="@(SidebarFilter.IsPinned(task.TaskId) ? "Unpin task" : "Pin task to top")"
+                                        data-testid="tasks-pin-@task.TaskId">
+                                    <i class="bi @(SidebarFilter.IsPinned(task.TaskId) ? "bi-pin-fill" : "bi-pin")"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary"
+                                        @onclick="() => SidebarFilter.ToggleHide(task.TaskId)"
+                                        @onclick:stopPropagation
+                                        aria-label="Hide @task.TaskId"
+                                        title="Hide task"
+                                        data-testid="tasks-hide-@task.TaskId">
+                                    <i class="bi bi-eye-slash"></i>
+                                </button>
                             </td>
                         </tr>
                     }
@@ -683,6 +699,12 @@ else
                     "DeliveryRisk" => sortAscending ? result.OrderBy(t => t.DeliveryRisk) : result.OrderByDescending(t => t.DeliveryRisk),
                     _ => result
                 };
+            }
+
+            // Pinned tasks always float to the top, preserving the inner sort.
+            if (SidebarFilter.PinnedTaskIds.Count > 0)
+            {
+                result = result.OrderByDescending(t => SidebarFilter.IsPinned(t.TaskId));
             }
 
             return result.ToList();

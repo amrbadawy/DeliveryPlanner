@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Routing;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace SoftwareDeliveryPlanner.Web.Services;
 
@@ -16,25 +19,39 @@ namespace SoftwareDeliveryPlanner.Web.Services;
 ///   - Role           (derived from EffortBreakdown.Role)
 ///   - DependencyState (NoDeps / HasDeps)
 ///
-/// Plus a free-text Search term (composes with the page's existing search).
+/// Plus a free-text Search term (composes with the page's existing search) and
+/// per-task Pin/Hide sets (Pinned tasks float to top; Hidden tasks are removed
+/// from the page's rendered list — Gantt renders ghost-arrow stubs for hidden
+/// predecessors of visible tasks).
 ///
 /// State is published via OnChange; pages subscribe and call StateHasChanged.
 /// URL sync is bidirectional via NavigationManager — chips serialize as
 /// comma-separated values per dimension (?status=IN_PROGRESS,COMPLETED&role=DEV,QA).
+/// Pin/Hide sets are not URL-synced (too noisy / per-row scope) but are part
+/// of saved-view payloads.
 /// </summary>
 public sealed class TaskFilterState : IDisposable
 {
     public const string PageKeyTasks = "tasks";
     public const string PageKeyGantt = "gantt";
 
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        WriteIndented = false,
+    };
+
     private readonly NavigationManager _nav;
+    private readonly AuthenticationStateProvider? _authStateProvider;
     private readonly Dictionary<string, PageFilters> _byPage = new(StringComparer.Ordinal);
     private string? _activePageKey;
     private bool _suppressUrlWrite;
+    private string? _cachedOwnerKey;
 
-    public TaskFilterState(NavigationManager nav)
+    public TaskFilterState(NavigationManager nav, AuthenticationStateProvider? authStateProvider = null)
     {
         _nav = nav;
+        _authStateProvider = authStateProvider;
         _nav.LocationChanged += OnLocationChanged;
     }
 
@@ -52,6 +69,8 @@ public sealed class TaskFilterState : IDisposable
     public PageFilters Current => _activePageKey != null && _byPage.TryGetValue(_activePageKey, out var p)
         ? p : new PageFilters();
 
+    public string ActivePageKey => _activePageKey ?? string.Empty;
+
     public string SearchTerm
     {
         get => Current.SearchTerm;
@@ -64,6 +83,8 @@ public sealed class TaskFilterState : IDisposable
     public IReadOnlySet<string> SelectedPhases => Current.Phases;
     public IReadOnlySet<string> SelectedRoles => Current.Roles;
     public IReadOnlySet<string> SelectedDependencyStates => Current.DependencyStates;
+    public IReadOnlySet<string> PinnedTaskIds => Current.PinnedTaskIds;
+    public IReadOnlySet<string> HiddenTaskIds => Current.HiddenTaskIds;
 
     public void ToggleStatus(string code) => ToggleSet(Current.Statuses, code);
     public void ToggleRisk(string code) => ToggleSet(Current.Risks, code);
@@ -72,13 +93,37 @@ public sealed class TaskFilterState : IDisposable
     public void ToggleRole(string role) => ToggleSet(Current.Roles, role);
     public void ToggleDependencyState(string state) => ToggleSet(Current.DependencyStates, state);
 
+    /// <summary>Pin a task to the top of the rendered list. Pinning auto-unhides.</summary>
+    public void TogglePin(string taskId)
+    {
+        if (string.IsNullOrWhiteSpace(taskId)) return;
+        if (!Current.PinnedTaskIds.Add(taskId)) Current.PinnedTaskIds.Remove(taskId);
+        else Current.HiddenTaskIds.Remove(taskId);
+        // Pin/hide are not URL-synced; just notify.
+        OnChange?.Invoke();
+    }
+
+    /// <summary>Hide a task from the rendered list. Hiding auto-unpins.</summary>
+    public void ToggleHide(string taskId)
+    {
+        if (string.IsNullOrWhiteSpace(taskId)) return;
+        if (!Current.HiddenTaskIds.Add(taskId)) Current.HiddenTaskIds.Remove(taskId);
+        else Current.PinnedTaskIds.Remove(taskId);
+        OnChange?.Invoke();
+    }
+
+    public bool IsPinned(string taskId) => Current.PinnedTaskIds.Contains(taskId);
+    public bool IsHidden(string taskId) => Current.HiddenTaskIds.Contains(taskId);
+
     public bool IsAnyActive => !string.IsNullOrWhiteSpace(Current.SearchTerm)
         || Current.Statuses.Count > 0
         || Current.Risks.Count > 0
         || Current.PriorityBuckets.Count > 0
         || Current.Phases.Count > 0
         || Current.Roles.Count > 0
-        || Current.DependencyStates.Count > 0;
+        || Current.DependencyStates.Count > 0
+        || Current.PinnedTaskIds.Count > 0
+        || Current.HiddenTaskIds.Count > 0;
 
     public int ActiveCount =>
         (string.IsNullOrWhiteSpace(Current.SearchTerm) ? 0 : 1)
@@ -87,7 +132,9 @@ public sealed class TaskFilterState : IDisposable
         + Current.PriorityBuckets.Count
         + Current.Phases.Count
         + Current.Roles.Count
-        + Current.DependencyStates.Count;
+        + Current.DependencyStates.Count
+        + Current.PinnedTaskIds.Count
+        + Current.HiddenTaskIds.Count;
 
     public void Clear()
     {
@@ -96,11 +143,88 @@ public sealed class TaskFilterState : IDisposable
         Notify();
     }
 
+    // ── Saved-view payload (JSON) ───────────────────────────────────────────
+    /// <summary>Serialize the current page's filter selections (incl. pin/hide) for storage.</summary>
+    public string SerializeCurrentAsPayload()
+    {
+        var c = Current;
+        var dto = new SavedViewPayload
+        {
+            SearchTerm = string.IsNullOrWhiteSpace(c.SearchTerm) ? null : c.SearchTerm,
+            Statuses = c.Statuses.Count == 0 ? null : c.Statuses.OrderBy(x => x, StringComparer.Ordinal).ToList(),
+            Risks = c.Risks.Count == 0 ? null : c.Risks.OrderBy(x => x, StringComparer.Ordinal).ToList(),
+            PriorityBuckets = c.PriorityBuckets.Count == 0 ? null : c.PriorityBuckets.OrderBy(x => x, StringComparer.Ordinal).ToList(),
+            Phases = c.Phases.Count == 0 ? null : c.Phases.OrderBy(x => x, StringComparer.Ordinal).ToList(),
+            Roles = c.Roles.Count == 0 ? null : c.Roles.OrderBy(x => x, StringComparer.Ordinal).ToList(),
+            DependencyStates = c.DependencyStates.Count == 0 ? null : c.DependencyStates.OrderBy(x => x, StringComparer.Ordinal).ToList(),
+            PinnedTaskIds = c.PinnedTaskIds.Count == 0 ? null : c.PinnedTaskIds.OrderBy(x => x, StringComparer.Ordinal).ToList(),
+            HiddenTaskIds = c.HiddenTaskIds.Count == 0 ? null : c.HiddenTaskIds.OrderBy(x => x, StringComparer.Ordinal).ToList(),
+        };
+        return JsonSerializer.Serialize(dto, JsonOptions);
+    }
+
+    /// <summary>Apply a saved-view payload to the current page, replacing all selections.</summary>
+    public void ApplyPayload(string payloadJson)
+    {
+        if (_activePageKey == null) return;
+        SavedViewPayload? dto;
+        try { dto = JsonSerializer.Deserialize<SavedViewPayload>(payloadJson, JsonOptions); }
+        catch (JsonException) { return; }
+        if (dto is null) return;
+
+        var fresh = new PageFilters
+        {
+            SearchTerm = dto.SearchTerm ?? string.Empty,
+        };
+        AddAll(fresh.Statuses, dto.Statuses);
+        AddAll(fresh.Risks, dto.Risks);
+        AddAll(fresh.PriorityBuckets, dto.PriorityBuckets);
+        AddAll(fresh.Phases, dto.Phases);
+        AddAll(fresh.Roles, dto.Roles);
+        AddAll(fresh.DependencyStates, dto.DependencyStates);
+        AddAll(fresh.PinnedTaskIds, dto.PinnedTaskIds);
+        AddAll(fresh.HiddenTaskIds, dto.HiddenTaskIds);
+        _byPage[_activePageKey] = fresh;
+        Notify();
+    }
+
+    // ── Owner key (auth-aware, with caching) ────────────────────────────────
+    /// <summary>
+    /// Resolves the owner key for saved-view scoping. Returns the authenticated
+    /// user's name when an AuthenticationStateProvider is registered AND the
+    /// user is authenticated; otherwise null (= global/shared scope).
+    /// Cached per-circuit so we don't roundtrip on every save/list.
+    /// </summary>
+    public async Task<string?> GetOwnerKeyAsync()
+    {
+        if (_cachedOwnerKey is not null) return _cachedOwnerKey == "\0" ? null : _cachedOwnerKey;
+        if (_authStateProvider is null) { _cachedOwnerKey = "\0"; return null; }
+        try
+        {
+            var state = await _authStateProvider.GetAuthenticationStateAsync();
+            var name = state.User.Identity?.IsAuthenticated == true ? state.User.Identity.Name : null;
+            _cachedOwnerKey = string.IsNullOrWhiteSpace(name) ? "\0" : name;
+            return _cachedOwnerKey == "\0" ? null : _cachedOwnerKey;
+        }
+        catch
+        {
+            _cachedOwnerKey = "\0";
+            return null;
+        }
+    }
+
     private void ToggleSet(HashSet<string> set, string value)
     {
         if (string.IsNullOrWhiteSpace(value)) return;
         if (!set.Add(value)) set.Remove(value);
         Notify();
+    }
+
+    private static void AddAll(HashSet<string> set, IEnumerable<string>? items)
+    {
+        if (items is null) return;
+        foreach (var item in items)
+            if (!string.IsNullOrWhiteSpace(item)) set.Add(item);
     }
 
     private void Notify()
@@ -178,6 +302,8 @@ public sealed class TaskFilterState : IDisposable
         public HashSet<string> Phases { get; } = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<string> Roles { get; } = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<string> DependencyStates { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> PinnedTaskIds { get; } = new(StringComparer.Ordinal);
+        public HashSet<string> HiddenTaskIds { get; } = new(StringComparer.Ordinal);
     }
 
     public static class PriorityBuckets
@@ -194,5 +320,19 @@ public sealed class TaskFilterState : IDisposable
     {
         public const string HasDependencies = "HAS_DEPS";
         public const string NoDependencies = "NO_DEPS";
+    }
+
+    /// <summary>JSON DTO persisted in SavedView.PayloadJson. Versionless; additive only.</summary>
+    public sealed class SavedViewPayload
+    {
+        public string? SearchTerm { get; set; }
+        public List<string>? Statuses { get; set; }
+        public List<string>? Risks { get; set; }
+        public List<string>? PriorityBuckets { get; set; }
+        public List<string>? Phases { get; set; }
+        public List<string>? Roles { get; set; }
+        public List<string>? DependencyStates { get; set; }
+        public List<string>? PinnedTaskIds { get; set; }
+        public List<string>? HiddenTaskIds { get; set; }
     }
 }

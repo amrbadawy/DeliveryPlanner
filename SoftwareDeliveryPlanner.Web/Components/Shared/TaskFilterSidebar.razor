@@ -1,6 +1,12 @@
 @using SoftwareDeliveryPlanner.Domain
+@using SoftwareDeliveryPlanner.Domain.Models
+@using SoftwareDeliveryPlanner.Application.SavedViews.Commands
+@using SoftwareDeliveryPlanner.Application.SavedViews.Queries
 @using SoftwareDeliveryPlanner.Web.Services
+@using MediatR
+@using Microsoft.AspNetCore.Components.Web
 @inject TaskFilterState Filter
+@inject IMediator Mediator
 @implements IDisposable
 
 @*
@@ -165,6 +171,62 @@
                     }
                 </div>
             </section>
+
+            <!-- Saved views -->
+            <section class="task-filter-section task-filter-saved-views" data-testid="task-filter-saved-views">
+                <div class="task-filter-section-label">Saved views</div>
+                @if (savedViews.Count == 0)
+                {
+                    <div class="task-filter-empty" data-testid="task-filter-saved-views-empty">No saved views.</div>
+                }
+                else
+                {
+                    <ul class="task-filter-saved-list">
+                        @foreach (var view in savedViews)
+                        {
+                            <li class="task-filter-saved-item" data-testid="@($"task-filter-saved-view-{view.Id}")">
+                                <button type="button"
+                                        class="task-filter-saved-apply"
+                                        title="Apply this saved view"
+                                        @onclick="() => ApplyView(view)"
+                                        data-testid="@($"task-filter-saved-view-apply-{view.Id}")">
+                                    <i class="bi bi-bookmark-check"></i> @view.Name
+                                </button>
+                                <button type="button"
+                                        class="task-filter-saved-delete"
+                                        title="Delete this saved view"
+                                        @onclick="() => DeleteView(view)"
+                                        data-testid="@($"task-filter-saved-view-delete-{view.Id}")">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </li>
+                        }
+                    </ul>
+                }
+
+                <div class="task-filter-saved-form">
+                    <input type="text"
+                           class="form-control form-control-sm"
+                           placeholder="Save current as..."
+                           maxlength="100"
+                           value="@newViewName"
+                           @oninput="@(e => newViewName = e.Value?.ToString() ?? string.Empty)"
+                           @onkeydown="OnSaveKeyDown"
+                           disabled="@(!Filter.IsAnyActive)"
+                           data-testid="task-filter-saved-view-name" />
+                    <button type="button"
+                            class="btn btn-sm btn-primary"
+                            @onclick="SaveCurrentView"
+                            disabled="@(!CanSave)"
+                            data-testid="task-filter-saved-view-save">
+                        Save
+                    </button>
+                </div>
+                @if (!string.IsNullOrEmpty(saveError))
+                {
+                    <div class="task-filter-error" data-testid="task-filter-saved-view-error">@saveError</div>
+                }
+            </section>
         </div>
     }
 </aside>
@@ -177,6 +239,15 @@
     [Parameter] public IReadOnlyList<string>? AvailablePhases { get; set; }
 
     private bool isCollapsed;
+    private List<SavedView> savedViews = new();
+    private string newViewName = string.Empty;
+    private string? saveError;
+    private string? ownerKey;
+
+    private bool CanSave =>
+        Filter.IsAnyActive
+        && !string.IsNullOrWhiteSpace(newViewName)
+        && newViewName.Trim().Length <= 100;
 
     private static readonly (string Code, string Display)[] StatusChips =
     {
@@ -209,6 +280,53 @@
     {
         Filter.Bind(PageKey);
         Filter.OnChange += OnFilterChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        ownerKey = await Filter.GetOwnerKeyAsync();
+        await ReloadSavedViewsAsync();
+    }
+
+    private async Task ReloadSavedViewsAsync()
+    {
+        var result = await Mediator.Send(new ListSavedViewsQuery(PageKey, ownerKey));
+        savedViews = result.IsSuccess ? result.Value : new List<SavedView>();
+    }
+
+    private async Task SaveCurrentView()
+    {
+        saveError = null;
+        if (!CanSave) return;
+
+        var payload = Filter.SerializeCurrentAsPayload();
+        var cmd = new UpsertSavedViewCommand(newViewName.Trim(), PageKey, payload, ownerKey);
+        var result = await Mediator.Send(cmd);
+        if (!result.IsSuccess)
+        {
+            saveError = result.Error.Message;
+            return;
+        }
+        newViewName = string.Empty;
+        await ReloadSavedViewsAsync();
+    }
+
+    private async Task OnSaveKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await SaveCurrentView();
+    }
+
+    private void ApplyView(SavedView view)
+    {
+        Filter.ApplyPayload(view.PayloadJson);
+    }
+
+    private async Task DeleteView(SavedView view)
+    {
+        var result = await Mediator.Send(new DeleteSavedViewCommand(view.Id));
+        if (result.IsSuccess)
+            await ReloadSavedViewsAsync();
     }
 
     private void OnFilterChanged() => InvokeAsync(StateHasChanged);

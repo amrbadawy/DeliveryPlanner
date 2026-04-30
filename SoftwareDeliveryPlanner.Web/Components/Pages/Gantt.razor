@@ -235,6 +235,18 @@ else
                             <i class="bi bi-arrow-return-right"></i> @task.DependsOnTaskIds
                         </div>
                     }
+                    @{
+                        var hiddenPredCount = CountHiddenPredecessors(task);
+                    }
+                    @if (hiddenPredCount > 0)
+                    {
+                        <div class="gantt-ghost-deps"
+                             title="@hiddenPredCount hidden predecessor task(s) — unhide via the filter sidebar"
+                             data-testid="@($"gantt-ghost-deps-{task.TaskId}")"
+                             data-hidden-count="@hiddenPredCount">
+                            <i class="bi bi-eye-slash"></i> @hiddenPredCount hidden dep@(hiddenPredCount == 1 ? "" : "s")
+                        </div>
+                    }
                 </div>
                 <div class="gantt-timeline-col" style="min-height: @(shellHeight + 8)px;">
                     @if (task.PlannedStart.HasValue && task.PlannedFinish.HasValue)
@@ -513,6 +525,18 @@ else
             .Where(t => SoftwareDeliveryPlanner.Web.Services.TaskFilterEvaluator.Matches(t, sidebar))
             .ToList();
         filteredOutCount = allScheduledTasks.Count - scheduledTasks.Count;
+    }
+
+    /// <summary>
+    /// Counts how many of a task's direct predecessors are hidden by the user
+    /// (either via Hide button or because the predecessor wasn't scheduled and
+    /// thus isn't in the rendered set). Drives the "ghost dep" stub indicator.
+    /// </summary>
+    private int CountHiddenPredecessors(TaskItem task)
+    {
+        if (task.Dependencies.Count == 0) return 0;
+        var visibleIds = scheduledTasks.Select(t => t.TaskId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return task.Dependencies.Count(d => !visibleIds.Contains(d.PredecessorTaskId));
     }
 
     private void OnSidebarFilterChanged()

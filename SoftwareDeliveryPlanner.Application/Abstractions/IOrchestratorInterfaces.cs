@@ -91,6 +91,14 @@ public interface ITaskNoteOrchestrator
     Task DeleteNoteAsync(int id);
 }
 
+public interface ISavedViewOrchestrator
+{
+    Task<List<SavedView>> ListAsync(string pageKey, string? ownerKey, CancellationToken cancellationToken = default);
+    Task<SavedView?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+    Task<SavedView> UpsertAsync(string name, string pageKey, string payloadJson, string? ownerKey, CancellationToken cancellationToken = default);
+    Task DeleteAsync(int id, CancellationToken cancellationToken = default);
+}
+
 public interface ISchedulerService
 {
     Task<string> RunSchedulerAsync(CancellationToken cancellationToken = default);

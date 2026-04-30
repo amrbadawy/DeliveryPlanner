@@ -12,6 +12,15 @@ public static class TaskFilterEvaluator
 {
     public static bool Matches(TaskItem task, TaskFilterState.PageFilters f)
     {
+        // Hidden tasks are excluded outright, regardless of other dimensions.
+        if (f.HiddenTaskIds.Count > 0 && f.HiddenTaskIds.Contains(task.TaskId))
+            return false;
+
+        // Pinned tasks bypass all chip filters so a pin is never accidentally
+        // hidden by an unrelated narrowing selection. Pin acts as "always show".
+        if (f.PinnedTaskIds.Count > 0 && f.PinnedTaskIds.Contains(task.TaskId))
+            return true;
+
         // Search composes with task ID + service name + phase
         if (!string.IsNullOrWhiteSpace(f.SearchTerm))
         {

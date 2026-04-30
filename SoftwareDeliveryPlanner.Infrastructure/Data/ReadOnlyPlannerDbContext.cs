@@ -31,6 +31,7 @@ internal class ReadOnlyPlannerDbContext : DbContext
     public DbSet<TaskEffortBreakdown> TaskEffortBreakdowns => Set<TaskEffortBreakdown>();
     public DbSet<TaskDependency> TaskDependencies => Set<TaskDependency>();
     public DbSet<ScenarioEffortSnapshot> ScenarioEffortSnapshots => Set<ScenarioEffortSnapshot>();
+    public DbSet<SavedView> SavedViews => Set<SavedView>();
 
     public ReadOnlyPlannerDbContext(DbContextOptions<ReadOnlyPlannerDbContext> options)
         : base(options)

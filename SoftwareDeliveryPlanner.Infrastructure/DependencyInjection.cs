@@ -69,6 +69,7 @@ public static class DependencyInjection
         services.AddScoped<IPlanningQueryService, PlanningQueryService>();
         services.AddScoped<ISettingsService, SettingsService>();
         services.AddScoped<ITaskNoteOrchestrator, TaskNoteOrchestrator>();
+        services.AddScoped<ISavedViewOrchestrator, SavedViewOrchestrator>();
         services.AddScoped<INotificationOrchestrator, NotificationOrchestrator>();
         services.AddScoped<IScenarioOrchestrator, ScenarioOrchestrator>();
         services.AddScoped<IAuditService, AuditService>();

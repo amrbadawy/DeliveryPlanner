@@ -15,3 +15,13 @@
         flex-direction: column;
     }
 }
+
+/* Pinned-row highlight: subtle left bar so it's visible without yelling. */
+::deep tr.task-row-pinned {
+    background: var(--color-warning-light, #fff7e0) !important;
+    border-left: 3px solid var(--color-warning, #e0a800);
+}
+
+::deep tr.task-row-pinned td:first-child {
+    font-weight: 600;
+}

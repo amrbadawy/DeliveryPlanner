@@ -264,4 +264,172 @@ public class TaskFilterEvaluatorTests
         f.Statuses.Add(DomainConstants.TaskStatus.Completed); // task default = NOT_STARTED
         Assert.False(TaskFilterEvaluator.Matches(task, f));
     }
+
+    // ── Pin / Hide (overrides) ──────────────────────────────────────────────
+
+    [Fact]
+    public void HiddenTask_IsAlwaysExcluded_RegardlessOfChips()
+    {
+        var task = MakeTask("SVC-009", "Reporting");
+        var f = Filters();
+        f.HiddenTaskIds.Add("SVC-009");
+        Assert.False(TaskFilterEvaluator.Matches(task, f));
+
+        // Even with no other filters, hidden trumps.
+        Assert.False(TaskFilterEvaluator.Matches(task, f));
+    }
+
+    [Fact]
+    public void HiddenTask_DoesNotAffectOtherTasks()
+    {
+        var hidden = MakeTask("SVC-001", "A");
+        var visible = MakeTask("SVC-002", "B");
+        var f = Filters();
+        f.HiddenTaskIds.Add("SVC-001");
+        Assert.False(TaskFilterEvaluator.Matches(hidden, f));
+        Assert.True(TaskFilterEvaluator.Matches(visible, f));
+    }
+
+    [Fact]
+    public void PinnedTask_BypassesAllChipFilters()
+    {
+        // Task is high-priority; chips select Low only — but pin makes it visible.
+        var task = MakeTask("SVC-100", priority: 1);
+        var f = Filters();
+        f.PriorityBuckets.Add(TaskFilterState.PriorityBuckets.Low);
+        Assert.False(TaskFilterEvaluator.Matches(task, f)); // baseline: chip excludes
+
+        f.PinnedTaskIds.Add("SVC-100");
+        Assert.True(TaskFilterEvaluator.Matches(task, f)); // pin overrides
+    }
+
+    [Fact]
+    public void HiddenTrumpsPinned_WhenBothSet()
+    {
+        // Defensive: TogglePin/Hide on the state mutually-exclude, but a
+        // tampered payload could theoretically contain both. Hide wins.
+        var task = MakeTask("SVC-200");
+        var f = Filters();
+        f.PinnedTaskIds.Add("SVC-200");
+        f.HiddenTaskIds.Add("SVC-200");
+        Assert.False(TaskFilterEvaluator.Matches(task, f));
+    }
+
+    // ── SavedView payload roundtrip (state-level) ───────────────────────────
+
+    [Fact]
+    public void SavedViewPayload_RoundtripsAllDimensions()
+    {
+        var nav = new TestNavigationManager("http://localhost/tasks");
+        var state = new TaskFilterState(nav);
+        state.Bind(TaskFilterState.PageKeyTasks);
+
+        state.SearchTerm = "payment";
+        state.ToggleStatus(DomainConstants.TaskStatus.InProgress);
+        state.ToggleRisk(DomainConstants.DeliveryRisk.Late);
+        state.TogglePriorityBucket(TaskFilterState.PriorityBuckets.High);
+        state.TogglePhase("Build");
+        state.ToggleRole("DEV");
+        state.ToggleDependencyState(TaskFilterState.DependencyStates.HasDependencies);
+        state.TogglePin("SVC-001");
+        state.ToggleHide("SVC-002");
+
+        var payload = state.SerializeCurrentAsPayload();
+        Assert.Contains("\"searchTerm\":\"payment\"", payload);
+        Assert.Contains("\"pinnedTaskIds\":[\"SVC-001\"]", payload);
+        Assert.Contains("\"hiddenTaskIds\":[\"SVC-002\"]", payload);
+
+        // Apply onto a fresh state
+        var nav2 = new TestNavigationManager("http://localhost/tasks");
+        var fresh = new TaskFilterState(nav2);
+        fresh.Bind(TaskFilterState.PageKeyTasks);
+        fresh.ApplyPayload(payload);
+
+        Assert.Equal("payment", fresh.SearchTerm);
+        Assert.Contains(DomainConstants.TaskStatus.InProgress, fresh.SelectedStatuses);
+        Assert.Contains(DomainConstants.DeliveryRisk.Late, fresh.SelectedRisks);
+        Assert.Contains(TaskFilterState.PriorityBuckets.High, fresh.SelectedPriorityBuckets);
+        Assert.Contains("Build", fresh.SelectedPhases);
+        Assert.Contains("DEV", fresh.SelectedRoles);
+        Assert.Contains(TaskFilterState.DependencyStates.HasDependencies, fresh.SelectedDependencyStates);
+        Assert.Contains("SVC-001", fresh.PinnedTaskIds);
+        Assert.Contains("SVC-002", fresh.HiddenTaskIds);
+    }
+
+    [Fact]
+    public void ApplyPayload_OnEmptyJsonObject_ClearsCurrentState()
+    {
+        var nav = new TestNavigationManager("http://localhost/tasks");
+        var state = new TaskFilterState(nav);
+        state.Bind(TaskFilterState.PageKeyTasks);
+        state.ToggleStatus(DomainConstants.TaskStatus.NotStarted);
+        Assert.Single(state.SelectedStatuses);
+
+        state.ApplyPayload("{}");
+        Assert.Empty(state.SelectedStatuses);
+        Assert.Equal(string.Empty, state.SearchTerm);
+    }
+
+    [Fact]
+    public void ApplyPayload_OnInvalidJson_IsNoOp()
+    {
+        var nav = new TestNavigationManager("http://localhost/tasks");
+        var state = new TaskFilterState(nav);
+        state.Bind(TaskFilterState.PageKeyTasks);
+        state.ToggleStatus(DomainConstants.TaskStatus.NotStarted);
+
+        state.ApplyPayload("not-json-{{{");
+        Assert.Single(state.SelectedStatuses); // unchanged
+    }
+
+    [Fact]
+    public void TogglePin_UnhidesIfHidden()
+    {
+        var nav = new TestNavigationManager("http://localhost/tasks");
+        var state = new TaskFilterState(nav);
+        state.Bind(TaskFilterState.PageKeyTasks);
+
+        state.ToggleHide("SVC-1");
+        Assert.True(state.IsHidden("SVC-1"));
+
+        state.TogglePin("SVC-1");
+        Assert.True(state.IsPinned("SVC-1"));
+        Assert.False(state.IsHidden("SVC-1"));
+    }
+
+    [Fact]
+    public void ToggleHide_UnpinsIfPinned()
+    {
+        var nav = new TestNavigationManager("http://localhost/tasks");
+        var state = new TaskFilterState(nav);
+        state.Bind(TaskFilterState.PageKeyTasks);
+
+        state.TogglePin("SVC-2");
+        Assert.True(state.IsPinned("SVC-2"));
+
+        state.ToggleHide("SVC-2");
+        Assert.True(state.IsHidden("SVC-2"));
+        Assert.False(state.IsPinned("SVC-2"));
+    }
+}
+
+/// <summary>Test double for NavigationManager — captures NavigateTo calls without HTTP.</summary>
+internal sealed class TestNavigationManager : Microsoft.AspNetCore.Components.NavigationManager
+{
+    public TestNavigationManager(string uri) => Initialize("http://localhost/", uri);
+
+    protected override void NavigateToCore(string uri, bool forceLoad)
+        => NavigateInternal(uri);
+
+    protected override void NavigateToCore(string uri, Microsoft.AspNetCore.Components.NavigationOptions options)
+        => NavigateInternal(uri);
+
+    private void NavigateInternal(string uri)
+    {
+        var absolute = uri.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+            ? uri
+            : ToAbsoluteUri(uri).ToString();
+        Uri = absolute;
+        NotifyLocationChanged(isInterceptedLink: false);
+    }
 }
