@@ -11,7 +11,7 @@
 @inject TaskFilterState Filter
 @inject IMediator Mediator
 @inject IJSRuntime JS
-@implements IDisposable
+@implements IAsyncDisposable
 
 @*
   Persistent left filter sidebar with multi-select chips.
@@ -324,6 +324,7 @@
     private int? editingViewId;
     private string editingViewName = string.Empty;
     private string? renameError;
+    private DotNetObjectReference<TaskFilterSidebar>? selfRef;
 
     /// <summary>Hard cap on a single imported file (1 MiB) — guards against accidentally selecting a huge non-JSON file.</summary>
     private const long MaxImportBytes = 1 * 1024 * 1024;
@@ -386,6 +387,15 @@
     {
         ownerKey = await Filter.GetOwnerKeyAsync();
         await ReloadSavedViewsAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        selfRef = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("TaskFilterSidebarKeyboard.bind", selfRef);
     }
 
     private async Task ReloadSavedViewsAsync()
@@ -476,15 +486,46 @@
 
     private void ToggleCollapsed() => isCollapsed = !isCollapsed;
 
+    [JSInvokable]
+    public async Task OnSidebarShortcut(string action)
+    {
+        if (string.Equals(action, "TOGGLE", StringComparison.Ordinal))
+        {
+            ToggleCollapsed();
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        if (string.Equals(action, "FOCUS", StringComparison.Ordinal))
+        {
+            if (isCollapsed)
+            {
+                isCollapsed = false;
+                await InvokeAsync(StateHasChanged);
+            }
+
+            await JS.InvokeVoidAsync("TaskFilterSidebarKeyboard.focusSearch");
+        }
+    }
+
     private void ClearAll() => Filter.Clear();
 
     private static string SanitizeId(string value) =>
         string.IsNullOrWhiteSpace(value) ? "none"
         : new string(value.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         Filter.OnChange -= OnFilterChanged;
+        try
+        {
+            await JS.InvokeVoidAsync("TaskFilterSidebarKeyboard.unbind");
+        }
+        catch
+        {
+            // Circuit may already be torn down; best-effort cleanup only.
+        }
+        selfRef?.Dispose();
     }
 
     private async Task ExportViewsAsync()
