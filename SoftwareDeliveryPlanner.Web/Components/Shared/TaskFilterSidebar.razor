@@ -1,12 +1,16 @@
+@using System.Text.Json
 @using SoftwareDeliveryPlanner.Domain
 @using SoftwareDeliveryPlanner.Domain.Models
 @using SoftwareDeliveryPlanner.Application.SavedViews.Commands
 @using SoftwareDeliveryPlanner.Application.SavedViews.Queries
 @using SoftwareDeliveryPlanner.Web.Services
 @using MediatR
+@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
 @inject TaskFilterState Filter
 @inject IMediator Mediator
+@inject IJSRuntime JS
 @implements IDisposable
 
 @*
@@ -226,6 +230,33 @@
                 {
                     <div class="task-filter-error" data-testid="task-filter-saved-view-error">@saveError</div>
                 }
+
+                <div class="task-filter-saved-io">
+                    <button type="button"
+                            class="btn btn-sm btn-outline-secondary"
+                            @onclick="ExportViewsAsync"
+                            disabled="@(savedViews.Count == 0)"
+                            title="Download all saved views for this page as JSON"
+                            data-testid="task-filter-saved-views-export">
+                        <i class="bi bi-download"></i> Export
+                    </button>
+                    <label class="btn btn-sm btn-outline-secondary task-filter-saved-import-label"
+                           title="Import saved views from a JSON file"
+                           data-testid="task-filter-saved-views-import-label">
+                        <i class="bi bi-upload"></i> Import
+                        <InputFile OnChange="OnImportFileSelected"
+                                   accept=".json,application/json"
+                                   data-testid="task-filter-saved-views-import" />
+                    </label>
+                </div>
+                @if (!string.IsNullOrEmpty(ioMessage))
+                {
+                    <div class="task-filter-info" data-testid="task-filter-saved-views-io-message">@ioMessage</div>
+                }
+                @if (!string.IsNullOrEmpty(ioError))
+                {
+                    <div class="task-filter-error" data-testid="task-filter-saved-views-io-error">@ioError</div>
+                }
             </section>
         </div>
     }
@@ -243,6 +274,22 @@
     private string newViewName = string.Empty;
     private string? saveError;
     private string? ownerKey;
+    private string? ioMessage;
+    private string? ioError;
+
+    /// <summary>Hard cap on a single imported file (1 MiB) — guards against accidentally selecting a huge non-JSON file.</summary>
+    private const long MaxImportBytes = 1 * 1024 * 1024;
+
+    private static readonly JsonSerializerOptions ExportSerializerOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    private static readonly JsonSerializerOptions ImportSerializerOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     private bool CanSave =>
         Filter.IsAnyActive
@@ -345,4 +392,134 @@
     {
         Filter.OnChange -= OnFilterChanged;
     }
+
+    private async Task ExportViewsAsync()
+    {
+        ioError = null;
+        ioMessage = null;
+        if (savedViews.Count == 0)
+            return;
+
+        var dto = new SavedViewsExportDto(
+            PageKey,
+            DateTime.UtcNow,
+            savedViews
+                .Select(v => new SavedViewExportItem(v.Name, v.PayloadJson))
+                .ToList());
+
+        var json = JsonSerializer.Serialize(dto, ExportSerializerOptions);
+        var fileName = $"saved-views-{PageKey}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json";
+
+        try
+        {
+            await JS.InvokeVoidAsync("BlazorDownloadFile", fileName, json, "application/json");
+            ioMessage = $"Exported {savedViews.Count} view(s).";
+        }
+        catch (Exception ex)
+        {
+            ioError = $"Export failed: {ex.Message}";
+        }
+    }
+
+    private async Task OnImportFileSelected(InputFileChangeEventArgs e)
+    {
+        ioError = null;
+        ioMessage = null;
+
+        var file = e.File;
+        if (file is null) return;
+
+        if (file.Size > MaxImportBytes)
+        {
+            ioError = $"File is too large (>{MaxImportBytes / 1024} KB).";
+            return;
+        }
+
+        string raw;
+        try
+        {
+            await using var stream = file.OpenReadStream(MaxImportBytes);
+            using var reader = new StreamReader(stream);
+            raw = await reader.ReadToEndAsync();
+        }
+        catch (Exception ex)
+        {
+            ioError = $"Could not read file: {ex.Message}";
+            return;
+        }
+
+        SavedViewsExportDto? dto;
+        try
+        {
+            dto = JsonSerializer.Deserialize<SavedViewsExportDto>(raw, ImportSerializerOptions);
+        }
+        catch (JsonException ex)
+        {
+            ioError = $"Invalid JSON: {ex.Message}";
+            return;
+        }
+
+        if (dto is null || dto.Views is null || dto.Views.Count == 0)
+        {
+            ioError = "File contains no saved views.";
+            return;
+        }
+
+        // Page-scope guard: only import views whose pageKey matches the current page.
+        // Honours the per-page scoping the rest of the feature enforces and prevents
+        // cross-page leakage when a user accidentally imports a Tasks export on Gantt.
+        var targetPage = (PageKey ?? string.Empty).Trim().ToLowerInvariant();
+        var filePageKey = dto.PageKey?.Trim().ToLowerInvariant();
+
+        if (!string.IsNullOrEmpty(filePageKey) && filePageKey != targetPage)
+        {
+            ioError = $"This file was exported for '{dto.PageKey}'; current page is '{PageKey}'. Import on the matching page.";
+            return;
+        }
+
+        var importedCount = 0;
+        var skippedCount = 0;
+        var errorCount = 0;
+
+        foreach (var item in dto.Views)
+        {
+            if (string.IsNullOrWhiteSpace(item.Name) || string.IsNullOrWhiteSpace(item.Payload))
+            {
+                skippedCount++;
+                continue;
+            }
+
+            // Validate payload is parseable JSON before sending to the orchestrator.
+            try
+            {
+                using var _ = JsonDocument.Parse(item.Payload);
+            }
+            catch (JsonException)
+            {
+                skippedCount++;
+                continue;
+            }
+
+            var cmd = new UpsertSavedViewCommand(item.Name.Trim(), PageKey ?? string.Empty, item.Payload, ownerKey);
+            var result = await Mediator.Send(cmd);
+            if (result.IsSuccess) importedCount++;
+            else errorCount++;
+        }
+
+        await ReloadSavedViewsAsync();
+
+        var parts = new List<string> { $"Imported {importedCount} view(s)" };
+        if (skippedCount > 0) parts.Add($"skipped {skippedCount} invalid");
+        if (errorCount > 0) parts.Add($"{errorCount} failed");
+        ioMessage = string.Join(", ", parts) + ".";
+    }
+
+    /// <summary>Top-level shape of the export file. Camel-cased on the wire.</summary>
+    private sealed record SavedViewsExportDto(
+        string PageKey,
+        DateTime ExportedAt,
+        List<SavedViewExportItem> Views);
+
+    /// <summary>One saved view inside the export. Payload is the raw filter JSON — stored as-is.</summary>
+    private sealed record SavedViewExportItem(string Name, string Payload);
 }
