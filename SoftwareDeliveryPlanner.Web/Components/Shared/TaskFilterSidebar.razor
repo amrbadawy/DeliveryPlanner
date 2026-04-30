@@ -189,13 +189,54 @@
                         @foreach (var view in savedViews)
                         {
                             <li class="task-filter-saved-item" data-testid="@($"task-filter-saved-view-{view.Id}")">
-                                <button type="button"
-                                        class="task-filter-saved-apply"
-                                        title="Apply this saved view"
-                                        @onclick="() => ApplyView(view)"
-                                        data-testid="@($"task-filter-saved-view-apply-{view.Id}")">
-                                    <i class="bi bi-bookmark-check"></i> @view.Name
-                                </button>
+                                @if (editingViewId == view.Id)
+                                {
+                                    <input type="text"
+                                           class="form-control form-control-sm task-filter-saved-rename-input"
+                                           maxlength="100"
+                                           value="@editingViewName"
+                                           @oninput="@(e => editingViewName = e.Value?.ToString() ?? string.Empty)"
+                                           @onkeydown="OnRenameKeyDown"
+                                           data-testid="@($"task-filter-saved-view-rename-input-{view.Id}")" />
+                                }
+                                else
+                                {
+                                    <button type="button"
+                                            class="task-filter-saved-apply"
+                                            title="Apply this saved view"
+                                            @onclick="() => ApplyView(view)"
+                                            data-testid="@($"task-filter-saved-view-apply-{view.Id}")">
+                                        <i class="bi bi-bookmark-check"></i> @view.Name
+                                    </button>
+                                }
+                                @if (editingViewId == view.Id)
+                                {
+                                    <button type="button"
+                                            class="task-filter-saved-edit"
+                                            title="Save renamed view"
+                                            @onclick="SaveRenameAsync"
+                                            disabled="@(!CanRename)"
+                                            data-testid="@($"task-filter-saved-view-rename-save-{view.Id}")">
+                                        <i class="bi bi-check-lg"></i>
+                                    </button>
+                                    <button type="button"
+                                            class="task-filter-saved-edit"
+                                            title="Cancel rename"
+                                            @onclick="CancelRename"
+                                            data-testid="@($"task-filter-saved-view-rename-cancel-{view.Id}")">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button type="button"
+                                            class="task-filter-saved-edit"
+                                            title="Rename this saved view"
+                                            @onclick="() => BeginRename(view)"
+                                            data-testid="@($"task-filter-saved-view-rename-{view.Id}")">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                }
                                 <button type="button"
                                         class="task-filter-saved-delete"
                                         title="Delete this saved view"
@@ -229,6 +270,10 @@
                 @if (!string.IsNullOrEmpty(saveError))
                 {
                     <div class="task-filter-error" data-testid="task-filter-saved-view-error">@saveError</div>
+                }
+                @if (!string.IsNullOrEmpty(renameError))
+                {
+                    <div class="task-filter-error" data-testid="task-filter-saved-view-rename-error">@renameError</div>
                 }
 
                 <div class="task-filter-saved-io">
@@ -276,6 +321,9 @@
     private string? ownerKey;
     private string? ioMessage;
     private string? ioError;
+    private int? editingViewId;
+    private string editingViewName = string.Empty;
+    private string? renameError;
 
     /// <summary>Hard cap on a single imported file (1 MiB) — guards against accidentally selecting a huge non-JSON file.</summary>
     private const long MaxImportBytes = 1 * 1024 * 1024;
@@ -295,6 +343,11 @@
         Filter.IsAnyActive
         && !string.IsNullOrWhiteSpace(newViewName)
         && newViewName.Trim().Length <= 100;
+
+    private bool CanRename =>
+        editingViewId.HasValue
+        && !string.IsNullOrWhiteSpace(editingViewName)
+        && editingViewName.Trim().Length <= 100;
 
     private static readonly (string Code, string Display)[] StatusChips =
     {
@@ -344,6 +397,7 @@
     private async Task SaveCurrentView()
     {
         saveError = null;
+        renameError = null;
         if (!CanSave) return;
 
         var payload = Filter.SerializeCurrentAsPayload();
@@ -366,7 +420,47 @@
 
     private void ApplyView(SavedView view)
     {
+        renameError = null;
         Filter.ApplyPayload(view.PayloadJson);
+    }
+
+    private void BeginRename(SavedView view)
+    {
+        renameError = null;
+        editingViewId = view.Id;
+        editingViewName = view.Name;
+    }
+
+    private void CancelRename()
+    {
+        editingViewId = null;
+        editingViewName = string.Empty;
+        renameError = null;
+    }
+
+    private async Task SaveRenameAsync()
+    {
+        renameError = null;
+        if (!CanRename || editingViewId is null)
+            return;
+
+        var result = await Mediator.Send(new RenameSavedViewCommand(editingViewId.Value, editingViewName.Trim()));
+        if (!result.IsSuccess)
+        {
+            renameError = result.Error.Message;
+            return;
+        }
+
+        await ReloadSavedViewsAsync();
+        CancelRename();
+    }
+
+    private async Task OnRenameKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await SaveRenameAsync();
+        else if (e.Key == "Escape")
+            CancelRename();
     }
 
     private async Task DeleteView(SavedView view)

@@ -53,6 +53,28 @@ internal sealed class SavedViewOrchestrator : ServiceBase, ISavedViewOrchestrato
         return view;
     }
 
+    public async Task<SavedView?> RenameAsync(int id, string name, CancellationToken cancellationToken = default)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync(cancellationToken);
+        var view = await db.SavedViews.FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
+        if (view is null)
+            return null;
+
+        var trimmedName = name.Trim();
+        var duplicate = await db.SavedViews
+            .AnyAsync(v => v.Id != id
+                && v.PageKey == view.PageKey
+                && v.OwnerKey == view.OwnerKey
+                && v.Name == trimmedName,
+                cancellationToken);
+        if (duplicate)
+            return null;
+
+        view.Rename(trimmedName);
+        await db.SaveChangesAsync(cancellationToken);
+        return view;
+    }
+
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
         await using var db = await DbFactory.CreateDbContextAsync(cancellationToken);

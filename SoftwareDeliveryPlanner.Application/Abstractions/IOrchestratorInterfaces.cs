@@ -96,6 +96,7 @@ public interface ISavedViewOrchestrator
     Task<List<SavedView>> ListAsync(string pageKey, string? ownerKey, CancellationToken cancellationToken = default);
     Task<SavedView?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<SavedView> UpsertAsync(string name, string pageKey, string payloadJson, string? ownerKey, CancellationToken cancellationToken = default);
+    Task<SavedView?> RenameAsync(int id, string name, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);
 }
 

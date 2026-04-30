@@ -65,6 +65,36 @@ test.describe('Saved views', () => {
     await expect(savedList).not.toContainText(viewName);
   });
 
+  test('rename a saved view updates its label and keeps it applicable', async ({ page }) => {
+    await gotoPage(page, '/tasks');
+
+    await page.getByTestId('task-filter-chip-risk-late').click();
+    const originalName = `Rename me ${uniqueSuffix('r')}`;
+    const renamedName = `Renamed ${uniqueSuffix('r2')}`;
+
+    await page.getByTestId('task-filter-saved-view-name').fill(originalName);
+    await page.getByTestId('task-filter-saved-view-save').click();
+
+    const savedList = page.getByTestId('task-filter-saved-views');
+    await expect(savedList).toContainText(originalName);
+
+    const savedItem = savedList.locator('[data-testid^="task-filter-saved-view-"]', { hasText: originalName }).first();
+    await savedItem.locator('[data-testid^="task-filter-saved-view-rename-"]').first().click();
+
+    const renameInput = page.locator('[data-testid^="task-filter-saved-view-rename-input-"]').first();
+    await expect(renameInput).toBeVisible();
+    await renameInput.fill(renamedName);
+    await page.locator('[data-testid^="task-filter-saved-view-rename-save-"]').first().click();
+
+    await expect(savedList).toContainText(renamedName);
+    await expect(savedList).not.toContainText(originalName);
+
+    await page.getByTestId('task-filter-clear-all').click();
+    const applyRenamed = savedList.locator('[data-testid^="task-filter-saved-view-apply-"]', { hasText: renamedName });
+    await applyRenamed.click();
+    await expect(page.getByTestId('task-filter-chip-risk-late')).toHaveAttribute('aria-pressed', 'true');
+  });
+
   test('save button is disabled when no filters are active', async ({ page }) => {
     await gotoPage(page, '/tasks');
     await expect(page.getByTestId('task-filter-saved-view-name')).toBeDisabled();

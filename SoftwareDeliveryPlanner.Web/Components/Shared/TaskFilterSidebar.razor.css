@@ -203,6 +203,11 @@
     gap: 0.25rem;
 }
 
+.task-filter-saved-rename-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .task-filter-saved-apply {
     flex: 1 1 auto;
     background: var(--color-bg-tertiary);
@@ -234,6 +239,21 @@
     color: var(--color-text-muted);
     cursor: pointer;
     font-size: 0.85rem;
+}
+
+.task-filter-saved-edit {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 0 0.4rem;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.task-filter-saved-edit:hover {
+    color: var(--color-accent);
+    border-color: var(--color-accent);
 }
 
 .task-filter-saved-delete:hover {
