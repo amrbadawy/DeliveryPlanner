@@ -7,6 +7,8 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     overflow-x: auto;
+    --gantt-label-col-width: 240px;
+    --gantt-timeline-width: 660px;
 }
 
 /* ── Two-tier header (months + weeks) ──────────────────────── */
@@ -15,7 +17,7 @@
     background: var(--color-sidebar);
     color: var(--color-text-inverse);
     font-size: var(--font-size-sm);
-    min-width: 900px;
+    min-width: calc(var(--gantt-label-col-width) + var(--gantt-timeline-width));
 }
 
 .gantt-header-months {
@@ -113,7 +115,7 @@
 .gantt-row {
     display: flex;
     border-bottom: 1px solid var(--color-border-light);
-    min-width: 900px;
+    min-width: calc(var(--gantt-label-col-width) + var(--gantt-timeline-width));
 }
 
 .gantt-row:nth-child(even) {
@@ -474,4 +476,48 @@
     outline: 2px solid var(--color-accent, #3b82f6);
     outline-offset: -2px;
     border-radius: var(--radius-sm);
+}
+
+/* ══════════════════════════════════════════════════════════
+   Zoom toolbar (mirrors Gantt.razor.css)
+   ══════════════════════════════════════════════════════════ */
+.gantt-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.gantt-zoom-group {
+    display: inline-flex;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm, 4px);
+    overflow: hidden;
+}
+
+.gantt-zoom-btn {
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    border: none;
+    padding: 4px 12px;
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    border-right: 1px solid var(--color-border);
+    transition: background-color 0.15s ease;
+}
+
+.gantt-zoom-btn:last-child { border-right: none; }
+.gantt-zoom-btn:hover { background: var(--color-accent-light); }
+
+.gantt-zoom-btn-active {
+    background: var(--color-accent);
+    color: var(--color-text-inverse);
+}
+.gantt-zoom-btn-active:hover { background: var(--color-accent); }
+
+.gantt-zoom-hint {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-left: 8px;
 }
