@@ -6,4 +6,5 @@ public sealed record SettingsDto(
     string? GlobalWorkingWeek,
     string? PlanStartDate,
     int AtRiskThreshold,
-    string? WeekNumbering = null);
+    string? WeekNumbering = null,
+    string? GanttZoomLevel = null);

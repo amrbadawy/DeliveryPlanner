@@ -1,11 +1,15 @@
 @page "/scenarios/{ScenarioId:int}/gantt"
 @using MediatR
+@using Microsoft.JSInterop
 @using SoftwareDeliveryPlanner.Application.Scenarios.Queries
 @using SoftwareDeliveryPlanner.Application.Settings.Queries
+@using SoftwareDeliveryPlanner.Application.Settings.Commands
 @using SoftwareDeliveryPlanner.Domain.Models
 @using SoftwareDeliveryPlanner.Domain
+@implements IAsyncDisposable
 @inject IMediator Mediator
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JS
 
 <PageTitle>Scenario Gantt Chart</PageTitle>
 
@@ -161,8 +165,35 @@ else
             </div>
         </div>
 
+        <!-- Zoom toolbar -->
+        <div class="gantt-toolbar" data-testid="scenario-gantt-toolbar" role="toolbar" aria-label="Gantt zoom controls">
+            <div class="gantt-zoom-group" role="group" aria-label="Zoom level">
+                @foreach (var level in DomainConstants.GanttZoomLevel.Levels)
+                {
+                    var isActive = string.Equals(zoomLevel, level, StringComparison.OrdinalIgnoreCase);
+                    <button type="button"
+                            class="gantt-zoom-btn @(isActive ? "gantt-zoom-btn-active" : "")"
+                            @onclick="() => SetZoomAsync(level)"
+                            aria-pressed="@isActive.ToString().ToLowerInvariant()"
+                            title="Zoom to @DomainConstants.GanttZoomLevel.DisplayName(level)"
+                            data-testid="scenario-gantt-zoom-@level.ToLowerInvariant()">
+                        @DomainConstants.GanttZoomLevel.DisplayName(level)
+                    </button>
+                }
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="FitToScreenAsync"
+                    title="Fit timeline to screen (F)" data-testid="scenario-gantt-fit">
+                <i class="bi bi-arrows-collapse-vertical"></i> Fit
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ScrollToTodayAsync"
+                    title="Scroll to today (T)" data-testid="scenario-gantt-today-btn">
+                <i class="bi bi-calendar-event"></i> Today
+            </button>
+            <span class="gantt-zoom-hint">Shortcuts: 1/2/3/4 zoom · F fit · T today</span>
+        </div>
+
         <!-- Gantt chart -->
-        <div class="gantt-container" data-testid="scenario-gantt-chart" role="region" aria-label="Scenario Gantt chart showing @scheduledTasks.Count scheduled tasks">
+        <div class="gantt-container" @ref="containerRef" style="@TimelineCssVariableStyle()" data-testid="scenario-gantt-chart" role="region" aria-label="Scenario Gantt chart showing @scheduledTasks.Count scheduled tasks">
             <div class="gantt-header gantt-header-months">
                 <div class="gantt-label-col gantt-label-col-header"><strong>Task</strong></div>
                 <div class="gantt-timeline-col">
@@ -321,14 +352,34 @@ else
     private List<MonthMarker> _cachedMonthMarkers = new();
     private List<WeekMarker> _cachedWeekMarkers = new();
 
+    // ── Zoom state (mirrors Gantt.razor) ──────────────────────
+    private const int LabelColPx = 240;
+    private const int MinTimelineWidthPx = 660;
+    private string zoomLevel = DomainConstants.GanttZoomLevel.Default;
+    private ElementReference containerRef;
+    private DotNetObjectReference<ScenarioGantt>? selfRef;
+    private bool keyboardBound = false;
+    private CancellationTokenSource? _persistCts;
+
+    private double PixelsPerDay => DomainConstants.GanttZoomLevel.PixelsPerDay(zoomLevel);
+    private int TimelineWidthPx => Math.Max(MinTimelineWidthPx, (int)Math.Ceiling(totalDays * PixelsPerDay));
+
+    private string TimelineCssVariableStyle()
+        => System.FormattableString.Invariant($"--gantt-timeline-width: {TimelineWidthPx}px; --gantt-label-col-width: {LabelColPx}px;");
+
     protected override async Task OnInitializedAsync()
     {
-        // Load settings to get working week config
+        // Load settings to get working week config + zoom level
         var settingsResult = await Mediator.Send(new GetSettingsQuery());
         if (settingsResult.IsSuccess && !string.IsNullOrEmpty(settingsResult.Value.GlobalWorkingWeek))
             workingWeekCode = settingsResult.Value.GlobalWorkingWeek;
         if (settingsResult.IsSuccess && !string.IsNullOrEmpty(settingsResult.Value.WeekNumbering))
             weekNumberingCode = settingsResult.Value.WeekNumbering;
+        if (settingsResult.IsSuccess && !string.IsNullOrEmpty(settingsResult.Value.GanttZoomLevel)
+            && DomainConstants.GanttZoomLevel.IsValid(settingsResult.Value.GanttZoomLevel))
+        {
+            zoomLevel = settingsResult.Value.GanttZoomLevel!.ToUpperInvariant();
+        }
 
         try
         {
@@ -662,5 +713,109 @@ else
         public double WidthPct { get; init; }
         public double EstDays { get; init; }
         public double MaxFte { get; init; }
+    }
+
+    // ── Zoom interop ──────────────────────────────────────────
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && isLoaded && scheduledTasks.Any() && !keyboardBound)
+        {
+            selfRef = DotNetObjectReference.Create(this);
+            try
+            {
+                await JS.InvokeVoidAsync("GanttZoom.bindKeyboard", selfRef);
+                keyboardBound = true;
+            }
+            catch { }
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnZoomKey(string action)
+    {
+        switch (action)
+        {
+            case "DAY":
+            case "WEEK":
+            case "MONTH":
+            case "QUARTER":
+                await SetZoomAsync(action);
+                break;
+            case "FIT":
+                await FitToScreenAsync();
+                break;
+            case "TODAY":
+                await ScrollToTodayAsync();
+                break;
+        }
+    }
+
+    private async Task SetZoomAsync(string newLevel)
+    {
+        if (!DomainConstants.GanttZoomLevel.IsValid(newLevel)) return;
+        var canonical = newLevel.ToUpperInvariant();
+        if (string.Equals(zoomLevel, canonical, StringComparison.OrdinalIgnoreCase)) return;
+
+        var beforeWidth = TimelineWidthPx;
+        zoomLevel = canonical;
+        var afterWidth = TimelineWidthPx;
+
+        StateHasChanged();
+
+        try
+        {
+            await JS.InvokeVoidAsync("GanttZoom.preserveAnchor", containerRef, (double)beforeWidth, (double)afterWidth, (double)LabelColPx);
+        }
+        catch { }
+
+        _ = PersistZoomAsync(canonical);
+    }
+
+    private async Task PersistZoomAsync(string level)
+    {
+        try
+        {
+            _persistCts?.Cancel();
+            _persistCts = new CancellationTokenSource();
+            var token = _persistCts.Token;
+            await Task.Delay(300, token);
+            if (token.IsCancellationRequested) return;
+            await Mediator.Send(new UpsertSettingCommand(DomainConstants.SettingKeys.GanttZoomLevel, level), token);
+        }
+        catch (OperationCanceledException) { }
+        catch { }
+    }
+
+    private async Task FitToScreenAsync()
+    {
+        try { await JS.InvokeVoidAsync("GanttZoom.scrollToFit", containerRef); }
+        catch { }
+    }
+
+    private async Task ScrollToTodayAsync()
+    {
+        if (totalDays <= 0) return;
+        var todayOffsetDays = (DateTime.Today - planStart).TotalDays;
+        if (todayOffsetDays < 0) todayOffsetDays = 0;
+        if (todayOffsetDays > totalDays) todayOffsetDays = totalDays;
+        var todayLeftPx = todayOffsetDays * PixelsPerDay + LabelColPx;
+        try
+        {
+            await JS.InvokeVoidAsync("GanttZoom.scrollToToday", containerRef, todayLeftPx, (double)LabelColPx);
+        }
+        catch { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (keyboardBound)
+                await JS.InvokeVoidAsync("GanttZoom.unbindKeyboard");
+        }
+        catch { }
+        selfRef?.Dispose();
+        _persistCts?.Cancel();
+        _persistCts?.Dispose();
     }
 }

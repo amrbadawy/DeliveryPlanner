@@ -357,4 +357,99 @@ test.describe('Gantt chart', () => {
     const height = await firstSegment.evaluate(el => window.getComputedStyle(el).height);
     expect(height).toBe('16px');
   });
+
+  // ── Zoom feature ───────────────────────────────────────────
+  test('zoom toolbar renders with all four levels + fit + today', async ({ page }) => {
+    await ensureChartOrSkip(page);
+
+    await expect(page.getByTestId('gantt-toolbar')).toBeVisible();
+    for (const level of ['day', 'week', 'month', 'quarter']) {
+      await expect(page.getByTestId(`gantt-zoom-${level}`)).toBeVisible();
+    }
+    await expect(page.getByTestId('gantt-fit')).toBeVisible();
+    await expect(page.getByTestId('gantt-today-btn')).toBeVisible();
+  });
+
+  test('exactly one zoom level is active at a time (aria-pressed)', async ({ page }) => {
+    await ensureChartOrSkip(page);
+
+    const buttons = page.locator('[data-testid^="gantt-zoom-"]').filter({ hasNot: page.getByTestId('gantt-zoom-hint') });
+    const all = await buttons.all();
+    let pressed = 0;
+    for (const b of all) {
+      const ap = await b.getAttribute('aria-pressed');
+      if (ap === 'true') pressed++;
+    }
+    expect(pressed).toBe(1);
+  });
+
+  test('clicking DAY zoom widens the timeline; QUARTER narrows it', async ({ page }) => {
+    const chart = await ensureChartOrSkip(page);
+
+    const measureWidth = () => chart.evaluate(el => {
+      const cs = window.getComputedStyle(el);
+      // CSS variable drives min-width via calc(); read the variable directly.
+      return parseFloat(cs.getPropertyValue('--gantt-timeline-width')) || 0;
+    });
+
+    await page.getByTestId('gantt-zoom-week').click();
+    await page.waitForTimeout(50);
+    const weekWidth = await measureWidth();
+
+    await page.getByTestId('gantt-zoom-day').click();
+    await page.waitForTimeout(50);
+    const dayWidth = await measureWidth();
+
+    await page.getByTestId('gantt-zoom-quarter').click();
+    await page.waitForTimeout(50);
+    const quarterWidth = await measureWidth();
+
+    expect(dayWidth).toBeGreaterThan(weekWidth);
+    expect(weekWidth).toBeGreaterThan(quarterWidth);
+  });
+
+  test('zoom level persists across reload (server-side setting)', async ({ page }) => {
+    await ensureChartOrSkip(page);
+
+    await page.getByTestId('gantt-zoom-month').click();
+    await page.waitForTimeout(500); // debounced persistence (300ms) + buffer
+
+    await page.reload();
+    await ensureChartOrSkip(page);
+
+    await expect(page.getByTestId('gantt-zoom-month')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('keyboard shortcut "1" switches to Day zoom', async ({ page }) => {
+    await ensureChartOrSkip(page);
+
+    // Make sure we don't start on Day
+    await page.getByTestId('gantt-zoom-week').click();
+    await page.waitForTimeout(50);
+
+    // Focus body so the shortcut handler picks it up (input filter)
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press('1');
+    await page.waitForTimeout(50);
+
+    await expect(page.getByTestId('gantt-zoom-day')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('Fit button resets horizontal scroll to start', async ({ page }) => {
+    const chart = await ensureChartOrSkip(page);
+
+    // Zoom in to make scrolling possible
+    await page.getByTestId('gantt-zoom-day').click();
+    await page.waitForTimeout(50);
+
+    await chart.evaluate(el => { el.scrollLeft = 200; });
+    const before = await chart.evaluate(el => el.scrollLeft);
+    expect(before).toBeGreaterThan(0);
+
+    await page.getByTestId('gantt-fit').click();
+    await page.waitForTimeout(50);
+
+    const after = await chart.evaluate(el => el.scrollLeft);
+    expect(after).toBe(0);
+  });
 });
