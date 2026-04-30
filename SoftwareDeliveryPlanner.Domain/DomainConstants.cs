@@ -41,6 +41,8 @@ public static class DomainConstants
         public const string LastSchedulerRun = "last_scheduler_run";
         public const string BaselineDate = "baseline_date";
         public const string SchedulingStrategy = "scheduling_strategy";
+        public const string WeekNumbering = "week_numbering";
+        public const string GanttZoomLevel = "gantt_zoom_level";
     }
 
     /// <summary>Holiday classification types.</summary>
@@ -218,6 +220,89 @@ public static class DomainConstants
         public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             PriorityFirst, DeadlineFirst, BalancedWorkload, CriticalPath
+        };
+    }
+
+    /// <summary>
+    /// Week-numbering rule used when rendering calendar week labels (e.g. on the Gantt header).
+    /// Centralized so all screens (Gantt, ScenarioGantt, Heatmap, UtilizationForecast) stay consistent.
+    /// </summary>
+    public static class WeekNumbering
+    {
+        /// <summary>ISO 8601 — Monday-start, FirstFourDayWeek rule. Standard in Europe and most of the world.</summary>
+        public const string Iso8601 = "ISO_8601";
+
+        /// <summary>Sunday-start, FirstDay rule (week containing Jan 1 is week 1). Common in Arab countries and the US.</summary>
+        public const string SundayFirstDay = "SUNDAY_FIRSTDAY";
+
+        /// <summary>Monday-start, FirstDay rule.</summary>
+        public const string MondayFirstDay = "MONDAY_FIRSTDAY";
+
+        /// <summary>Derive numbering from the configured WorkingWeek setting (SUN_THU → Sunday, MON_FRI → ISO).</summary>
+        public const string FollowWorkingWeek = "FOLLOW_WORKING_WEEK";
+
+        public const string Default = FollowWorkingWeek;
+
+        public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            Iso8601, SundayFirstDay, MondayFirstDay, FollowWorkingWeek
+        };
+
+        public static bool IsValid(string? code) => code is not null && All.Contains(code);
+
+        public static string DisplayName(string code) => code switch
+        {
+            Iso8601 => "ISO 8601 (Monday-start)",
+            SundayFirstDay => "Sunday-start (FirstDay rule)",
+            MondayFirstDay => "Monday-start (FirstDay rule)",
+            FollowWorkingWeek => "Follow Working Week setting",
+            _ => code
+        };
+    }
+
+    /// <summary>
+    /// Default zoom level for the Gantt timeline. Persisted in Settings so the user's choice
+    /// survives reloads and is shared across Gantt and ScenarioGantt screens.
+    /// </summary>
+    public static class GanttZoomLevel
+    {
+        public const string Day = "DAY";
+        public const string Week = "WEEK";
+        public const string Month = "MONTH";
+        public const string Quarter = "QUARTER";
+
+        public const string Default = Week;
+
+        public static readonly IReadOnlyList<string> Levels = new[] { Day, Week, Month, Quarter };
+
+        public static bool IsValid(string? code) => code is not null && Levels.Contains(code, StringComparer.OrdinalIgnoreCase);
+
+        public static string DisplayName(string code) => code switch
+        {
+            Day => "Day",
+            Week => "Week",
+            Month => "Month",
+            Quarter => "Quarter",
+            _ => code
+        };
+
+        /// <summary>Pixel-per-day density used to compute timeline min-width per zoom level.</summary>
+        public static double PixelsPerDay(string code) => code switch
+        {
+            Day => 32.0,
+            Week => 80.0 / 7.0,
+            Month => 120.0 / 30.0,
+            Quarter => 160.0 / 90.0,
+            _ => 80.0 / 7.0
+        };
+
+        /// <summary>Picks an adaptive default zoom level based on plan length. Used on first visit only.</summary>
+        public static string AdaptiveDefault(int totalDays) => totalDays switch
+        {
+            <= 21 => Day,
+            <= 180 => Week,
+            <= 540 => Month,
+            _ => Quarter
         };
     }
 }

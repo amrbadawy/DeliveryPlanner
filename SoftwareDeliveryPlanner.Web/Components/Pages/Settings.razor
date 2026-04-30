@@ -57,6 +57,38 @@ else
         </div>
     </div>
 
+    <!-- Week Numbering -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header border-bottom">
+            <i class="bi bi-calendar3-week me-2"></i>Week Numbering
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-3">
+                Controls how calendar week numbers are displayed across the Gantt, Heatmap, and Utilization Forecast.
+                The default <em>Follow Working Week</em> option derives numbering from the configured working week
+                (Sun–Thu → Sunday-start, Mon–Fri → ISO 8601). Choose an explicit option to override.
+            </p>
+            <div class="d-flex gap-3 align-items-end">
+                <div>
+                    <label class="form-label">Numbering rule</label>
+                    <select class="form-select" style="width:300px" @bind="selectedWeekNumbering" data-testid="settings-week-numbering-select">
+                        <option value="@DomainConstants.WeekNumbering.FollowWorkingWeek">@DomainConstants.WeekNumbering.DisplayName(DomainConstants.WeekNumbering.FollowWorkingWeek)</option>
+                        <option value="@DomainConstants.WeekNumbering.Iso8601">@DomainConstants.WeekNumbering.DisplayName(DomainConstants.WeekNumbering.Iso8601)</option>
+                        <option value="@DomainConstants.WeekNumbering.SundayFirstDay">@DomainConstants.WeekNumbering.DisplayName(DomainConstants.WeekNumbering.SundayFirstDay)</option>
+                        <option value="@DomainConstants.WeekNumbering.MondayFirstDay">@DomainConstants.WeekNumbering.DisplayName(DomainConstants.WeekNumbering.MondayFirstDay)</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" @onclick="SaveWeekNumbering" disabled="@isSavingWeekNumbering" data-testid="settings-week-numbering-save">
+                    @if (isSavingWeekNumbering)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                    }
+                    Save Numbering
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Baseline Management -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header border-bottom">
@@ -112,9 +144,11 @@ else
 @code {
     private SettingsDto? settings;
     private string selectedStrategy = DomainConstants.SchedulingStrategy.PriorityFirst;
+    private string selectedWeekNumbering = DomainConstants.WeekNumbering.Default;
     private string currentBaselineDate = string.Empty;
     private bool isLoaded = false;
     private bool isSavingStrategy = false;
+    private bool isSavingWeekNumbering = false;
     private bool isFreezing = false;
     private bool isClearing = false;
     private string statusMessage = string.Empty;
@@ -131,6 +165,7 @@ else
         var result = await Mediator.Send(new GetSettingsQuery());
         settings = result.Value;
         selectedStrategy = settings.SchedulingStrategy ?? DomainConstants.SchedulingStrategy.PriorityFirst;
+        selectedWeekNumbering = settings.WeekNumbering ?? DomainConstants.WeekNumbering.Default;
         currentBaselineDate = settings.BaselineDate ?? string.Empty;
     }
 
@@ -151,6 +186,26 @@ else
         finally
         {
             isSavingStrategy = false;
+        }
+    }
+
+    private async Task SaveWeekNumbering()
+    {
+        isSavingWeekNumbering = true;
+        statusMessage = string.Empty;
+        try
+        {
+            await Mediator.Send(new UpsertSettingCommand(DomainConstants.SettingKeys.WeekNumbering, selectedWeekNumbering));
+            ShowStatus("Week numbering rule saved. Reload the Gantt, Heatmap, or Forecast pages to see the change.", false);
+            await LoadSettings();
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Error: {ex.Message}", true);
+        }
+        finally
+        {
+            isSavingWeekNumbering = false;
         }
     }
 

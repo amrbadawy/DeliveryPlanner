@@ -5,4 +5,5 @@ public sealed record SettingsDto(
     string? BaselineDate,
     string? GlobalWorkingWeek,
     string? PlanStartDate,
-    int AtRiskThreshold);
+    int AtRiskThreshold,
+    string? WeekNumbering = null);

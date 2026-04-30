@@ -297,6 +297,36 @@ test.describe('Gantt chart', () => {
     expect(lineCount).toBeGreaterThan(0);
   });
 
+  test('week numbers are real calendar week-of-year (not sequential 1,2,3,...)', async ({ page }) => {
+    const chart = await ensureChartOrSkip(page);
+
+    const weekLabels = chart.locator('.gantt-week-number');
+    const count = await weekLabels.count();
+    expect(count).toBeGreaterThan(0);
+
+    // Collect all visible labels
+    const numbers: number[] = [];
+    for (let i = 0; i < count; i++) {
+      const text = (await weekLabels.nth(i).textContent()) ?? '';
+      expect(text).toMatch(/^W\d{1,2}$/);
+      numbers.push(parseInt(text.slice(1), 10));
+    }
+
+    // Real-week-of-year values are in [1, 53] and should not all be a 1..N sequence
+    // (a plan starting in May should show ~W18, not W1).
+    expect(numbers.every(n => n >= 1 && n <= 53)).toBe(true);
+
+    // Detect "old sequential counter" pattern: 1, 2, 3, ... starting at 1
+    const isOldSequential = numbers[0] === 1
+      && numbers.every((n, i) => i === 0 || n === numbers[i - 1] + 1);
+    expect(isOldSequential, 'Week numbers should be real calendar weeks, not 1,2,3,...').toBe(false);
+
+    // Tooltip on the first week cell should include the year for disambiguation.
+    const firstCell = chart.locator('.gantt-week').first();
+    const tooltip = await firstCell.getAttribute('title');
+    expect(tooltip).toMatch(/Week \d{1,2}, \d{4}/);
+  });
+
   test('all task bars contain at least 2 role segments (DEV + QA domain invariant)', async ({ page }) => {
     const chart = await ensureChartOrSkip(page);
 

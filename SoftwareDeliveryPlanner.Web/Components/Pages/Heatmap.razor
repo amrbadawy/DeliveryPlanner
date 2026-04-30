@@ -1,6 +1,9 @@
 @page "/heatmap"
 @using MediatR
 @using SoftwareDeliveryPlanner.Application.Planning.Queries
+@using SoftwareDeliveryPlanner.Application.Settings.Queries
+@using SoftwareDeliveryPlanner.Domain
+@using SoftwareDeliveryPlanner.Domain.Services
 @inject IMediator Mediator
 
 <PageTitle>Workload Heatmap</PageTitle>
@@ -49,7 +52,12 @@ else
                         <th class="heatmap-resource-header">Resource</th>
                         @foreach (var week in heatmap.WeekStarts)
                         {
-                            <th class="heatmap-week-header">@week.ToString("MMM dd")</th>
+                            var weekEnd = week.AddDays(6);
+                            var wn = WeekNumberCalculator.GetWeekOfYear(week, weekNumberingCode, workingWeekCode);
+                            <th class="heatmap-week-header">
+                                <div class="hw-num">W@wn</div>
+                                <div class="hw-range">@week.ToString("dd MMM") - @weekEnd.ToString("dd MMM")</div>
+                            </th>
                         }
                     </tr>
                 </thead>
@@ -62,7 +70,7 @@ else
                             {
                                 var cell = heatmap.Cells.FirstOrDefault(c => c.ResourceName == resourceName && c.WeekStart == week);
                                 var pct = cell?.UtilizationPct ?? 0;
-                                <td class="heatmap-cell" style="background-color: @GetCellColor(pct);" title="@resourceName — Week of @week.ToString("MMM dd") — @pct.ToString("F1")%">
+                                <td class="heatmap-cell" style="background-color: @GetCellColor(pct);" title="@resourceName — W@(WeekNumberCalculator.GetWeekOfYear(week, weekNumberingCode, workingWeekCode)) (@week.ToString("dd MMM") - @week.AddDays(6).ToString("dd MMM")) — @pct.ToString("F1")%">
                                     @pct.ToString("F0")%
                                 </td>
                             }
@@ -88,9 +96,19 @@ else
     private bool isLoaded;
     private bool isRefreshing;
     private ToastNotification toast = default!;
+    private string workingWeekCode = DomainConstants.WorkingWeek.SunThu;
+    private string weekNumberingCode = DomainConstants.WeekNumbering.Default;
 
     protected override async Task OnInitializedAsync()
     {
+        var settingsResult = await Mediator.Send(new GetSettingsQuery());
+        if (settingsResult.IsSuccess)
+        {
+            if (!string.IsNullOrEmpty(settingsResult.Value.GlobalWorkingWeek))
+                workingWeekCode = settingsResult.Value.GlobalWorkingWeek;
+            if (!string.IsNullOrEmpty(settingsResult.Value.WeekNumbering))
+                weekNumberingCode = settingsResult.Value.WeekNumbering;
+        }
         await LoadData();
         isLoaded = true;
     }
