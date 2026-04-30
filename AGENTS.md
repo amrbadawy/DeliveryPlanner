@@ -125,6 +125,8 @@ SoftwareDeliveryPlanner.Web/tests/e2e/
 | `drag-drop-priority.spec.ts` | Drag-and-drop task priority reordering |
 | `task-filter-sidebar.spec.ts` | Persistent left filter sidebar — chips, search, URL sync, per-page scope |
 | `task-filter-saved-views.spec.ts` | Saved views CRUD, pin/hide row actions, ghost-dependency stub indicator on Gantt |
+| `task-filter-bulk-pin-hide.spec.ts` | Bulk select-all + bulk pin/hide actions from Tasks table toolbar |
+| `heatmap-filter.spec.ts` | Heatmap resource sidebar filters (search + role + seniority chips) |
 
 ### Shared test utilities
 
