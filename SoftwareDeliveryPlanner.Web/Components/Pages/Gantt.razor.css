@@ -355,6 +355,14 @@
     position: relative;
 }
 
+/* Override: segments must remain position: absolute (defined in app.css)
+   even though they also carry the .gantt-tooltip class. Tooltip pseudo-
+   element still anchors correctly to the segment because absolute
+   positioning establishes its own containing-block. */
+.gantt-tooltip.gantt-segment {
+    position: absolute;
+}
+
 .gantt-tooltip::after {
     content: attr(data-tooltip);
     position: absolute;
