@@ -742,11 +742,12 @@ public class TeamMemberDomainAdditionalTests
     }
 
     [Fact]
-    public void Create_ArbitraryRole_Accepted()
+    public void Create_ArbitraryRole_Rejected()
     {
-        // Role parameter has no validation — accepts any string
-        var member = TeamMember.Create("DEV-001", "Alice", "Arbitrary Role", "Delivery", 100, 1, DateTime.Today);
-        Assert.Equal("Arbitrary Role", member.Role);
+        // Role is validated against DomainConstants.ResourceRole.AllRoles.
+        var ex = Assert.Throws<SoftwareDeliveryPlanner.SharedKernel.DomainException>(() =>
+            TeamMember.Create("DEV-001", "Alice", "Arbitrary Role", "Delivery", 100, 1, DateTime.Today));
+        Assert.Contains("Invalid role", ex.Message);
     }
 
     [Fact]
@@ -757,11 +758,12 @@ public class TeamMemberDomainAdditionalTests
     }
 
     [Fact]
-    public void Create_ArbitraryActive_Accepted()
+    public void Create_ArbitraryActive_Rejected()
     {
-        // Active parameter has no validation — accepts any string
-        var member = TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 100, 1, DateTime.Today, active: "Maybe");
-        Assert.Equal("Maybe", member.Active);
+        // Active is validated against DomainConstants.ActiveStatus.{Yes,No}.
+        var ex = Assert.Throws<SoftwareDeliveryPlanner.SharedKernel.DomainException>(() =>
+            TeamMember.Create("DEV-001", "Alice", "DEV", "Delivery", 100, 1, DateTime.Today, active: "Maybe"));
+        Assert.Contains("Invalid active status", ex.Message);
     }
 
     [Fact]

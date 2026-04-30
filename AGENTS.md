@@ -123,6 +123,8 @@ SoftwareDeliveryPlanner.Web/tests/e2e/
 | `audit-log.spec.ts` | Activity/audit log page loads and refresh |
 | `bulk-import.spec.ts` | Bulk CSV import modal open/close |
 | `drag-drop-priority.spec.ts` | Drag-and-drop task priority reordering |
+| `task-filter-sidebar.spec.ts` | Persistent left filter sidebar — chips, search, URL sync, per-page scope |
+| `task-filter-saved-views.spec.ts` | Saved views CRUD, pin/hide row actions, ghost-dependency stub indicator on Gantt |
 
 ### Shared test utilities
 
