@@ -292,6 +292,7 @@ else
     private HashSet<string> criticalPathTaskIds = new();
     private HashSet<string> visibleRoles = new(DomainConstants.ResourceRole.PipelineOrder, StringComparer.OrdinalIgnoreCase);
     private string workingWeekCode = DomainConstants.WorkingWeek.SunThu;
+    private string weekNumberingCode = DomainConstants.WeekNumbering.Default;
     private ToastNotification toast = default!;
     private List<MonthMarker> _cachedMonthMarkers = new();
     private List<WeekMarker> _cachedWeekMarkers = new();
@@ -302,6 +303,8 @@ else
         var settingsResult = await Mediator.Send(new GetSettingsQuery());
         if (settingsResult.IsSuccess && !string.IsNullOrEmpty(settingsResult.Value.GlobalWorkingWeek))
             workingWeekCode = settingsResult.Value.GlobalWorkingWeek;
+        if (settingsResult.IsSuccess && !string.IsNullOrEmpty(settingsResult.Value.WeekNumbering))
+            weekNumberingCode = settingsResult.Value.WeekNumbering;
 
         try
         {
@@ -628,7 +631,6 @@ else
         while (current.DayOfWeek != weekStartDay)
             current = current.AddDays(1);
 
-        int weekNumber = 1;
         while (current <= planEnd)
         {
             var weekEnd = current.AddDays(6);
@@ -639,16 +641,19 @@ else
 
             var dateRange = $"{current:dd MMM} - {weekEnd:dd MMM}";
 
+            // Real calendar week-of-year, driven by centralized week-numbering setting.
+            var weekNumber = SoftwareDeliveryPlanner.Domain.Services.WeekNumberCalculator
+                .GetWeekOfYear(current, weekNumberingCode, workingWeekCode);
+
             markers.Add(new WeekMarker
             {
                 Label = $"W{weekNumber}",
                 DateRange = dateRange,
-                FullLabel = $"Week {weekNumber} ({dateRange})",
+                FullLabel = $"Week {weekNumber}, {current:yyyy} ({dateRange})",
                 LeftPct = Math.Round(leftPct, 2),
                 WidthPct = Math.Round(Math.Max(rightPct - leftPct, 0.5), 2)
             });
 
-            weekNumber++;
             current = current.AddDays(7);
         }
 

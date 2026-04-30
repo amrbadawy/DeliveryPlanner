@@ -37,7 +37,20 @@
 .heatmap-week-header {
     font-weight: 600;
     background-color: var(--color-bg-tertiary);
-    min-width: 72px;
+    min-width: 96px;
+    line-height: 1.15;
+}
+
+.heatmap-week-header .hw-num {
+    font-weight: 700;
+    font-size: var(--font-size-sm);
+}
+
+.heatmap-week-header .hw-range {
+    font-size: 0.7rem;
+    font-weight: 500;
+    opacity: 0.75;
+    margin-top: 2px;
 }
 
 .heatmap-cell {
