@@ -54,6 +54,14 @@ export async function runSchedulerFromDashboard(page: Page): Promise<void> {
     message: 'Wait tasks table after scheduler run',
     timeout: 20_000,
   }).toBeGreaterThan(0);
+
+  // Some scenarios set a default saved view that auto-applies on load.
+  // Test setup should start from an unfiltered baseline unless a test explicitly
+  // opts into a saved/default view flow.
+  const clearAll = page.getByTestId('task-filter-clear-all');
+  if (await clearAll.count()) {
+    await clearAll.click();
+  }
 }
 
 export async function countRowsByText(table: Locator, text: string): Promise<number> {

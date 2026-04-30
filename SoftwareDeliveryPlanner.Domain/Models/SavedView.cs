@@ -30,6 +30,9 @@ public class SavedView
     /// <summary>Serialized SavedViewPayload (JSON). Stored as-is for forward compatibility.</summary>
     public string PayloadJson { get; private set; } = string.Empty;
 
+    /// <summary>Whether this saved view auto-applies by default for its (OwnerKey, PageKey) scope.</summary>
+    public bool IsDefault { get; private set; }
+
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -53,6 +56,7 @@ public class SavedView
             PageKey = pageKey.Trim().ToLowerInvariant(),
             OwnerKey = string.IsNullOrWhiteSpace(ownerKey) ? null : ownerKey.Trim(),
             PayloadJson = payloadJson,
+            IsDefault = false,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -74,6 +78,24 @@ public class SavedView
             throw new DomainException("Saved view name must be 100 characters or fewer.");
 
         Name = name.Trim();
+        UpdatedAt = TimeProvider.System.GetUtcNow().DateTime;
+    }
+
+    public void MarkAsDefault()
+    {
+        if (IsDefault)
+            return;
+
+        IsDefault = true;
+        UpdatedAt = TimeProvider.System.GetUtcNow().DateTime;
+    }
+
+    public void ClearDefault()
+    {
+        if (!IsDefault)
+            return;
+
+        IsDefault = false;
         UpdatedAt = TimeProvider.System.GetUtcNow().DateTime;
     }
 }
