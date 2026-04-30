@@ -16,6 +16,7 @@ public class PlanScenario
     public DateTime? LatestFinish { get; private set; }
     public double TotalEstimation { get; private set; }
     public string? Notes { get; private set; }
+    public string? GanttZoomLevel { get; private set; }
 
     // ── Task snapshots (historical Gantt data) ──────────────
     private readonly List<ScenarioTaskSnapshot> _taskSnapshots = new();
@@ -72,5 +73,20 @@ public class PlanScenario
             throw new DomainException("Task snapshot must not be null.");
 
         _taskSnapshots.Add(snapshot);
+    }
+
+    public void SetGanttZoomLevel(string? zoomLevel)
+    {
+        if (string.IsNullOrWhiteSpace(zoomLevel))
+        {
+            GanttZoomLevel = null;
+            return;
+        }
+
+        var canonical = zoomLevel.Trim().ToUpperInvariant();
+        if (!DomainConstants.GanttZoomLevel.IsValid(canonical))
+            throw new DomainException("Invalid scenario zoom level.");
+
+        GanttZoomLevel = canonical;
     }
 }

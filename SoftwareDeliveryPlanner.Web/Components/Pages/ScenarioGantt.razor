@@ -2,6 +2,7 @@
 @using MediatR
 @using Microsoft.JSInterop
 @using SoftwareDeliveryPlanner.Application.Scenarios.Queries
+@using SoftwareDeliveryPlanner.Application.Scenarios.Commands
 @using SoftwareDeliveryPlanner.Application.Settings.Queries
 @using SoftwareDeliveryPlanner.Application.Settings.Commands
 @using SoftwareDeliveryPlanner.Domain.Models
@@ -189,6 +190,11 @@ else
                     title="Scroll to today (T)" data-testid="scenario-gantt-today-btn">
                 <i class="bi bi-calendar-event"></i> Today
             </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ResetZoomToDefaultAsync"
+                    title="Reset to default scenario zoom" data-testid="scenario-gantt-zoom-reset"
+                    disabled="@(!hasScenarioZoomOverride)">
+                <i class="bi bi-arrow-counterclockwise"></i> Reset
+            </button>
             <span class="gantt-zoom-hint">Shortcuts: 1/2/3/4 zoom · F fit · T today</span>
         </div>
 
@@ -360,6 +366,8 @@ else
     private DotNetObjectReference<ScenarioGantt>? selfRef;
     private bool keyboardBound = false;
     private CancellationTokenSource? _persistCts;
+    private string scenarioZoomFallback = DomainConstants.GanttZoomLevel.Default;
+    private bool hasScenarioZoomOverride;
 
     private double PixelsPerDay => DomainConstants.GanttZoomLevel.PixelsPerDay(zoomLevel);
     private int TimelineWidthPx => Math.Max(MinTimelineWidthPx, (int)Math.Ceiling(totalDays * PixelsPerDay));
@@ -375,10 +383,15 @@ else
             workingWeekCode = settingsResult.Value.GlobalWorkingWeek;
         if (settingsResult.IsSuccess && !string.IsNullOrEmpty(settingsResult.Value.WeekNumbering))
             weekNumberingCode = settingsResult.Value.WeekNumbering;
-        if (settingsResult.IsSuccess && !string.IsNullOrEmpty(settingsResult.Value.GanttZoomLevel)
+        if (settingsResult.IsSuccess && !string.IsNullOrEmpty(settingsResult.Value.ScenarioGanttZoomLevel)
+            && DomainConstants.GanttZoomLevel.IsValid(settingsResult.Value.ScenarioGanttZoomLevel))
+        {
+            scenarioZoomFallback = settingsResult.Value.ScenarioGanttZoomLevel!.ToUpperInvariant();
+        }
+        else if (settingsResult.IsSuccess && !string.IsNullOrEmpty(settingsResult.Value.GanttZoomLevel)
             && DomainConstants.GanttZoomLevel.IsValid(settingsResult.Value.GanttZoomLevel))
         {
-            zoomLevel = settingsResult.Value.GanttZoomLevel!.ToUpperInvariant();
+            scenarioZoomFallback = settingsResult.Value.GanttZoomLevel!.ToUpperInvariant();
         }
 
         try
@@ -388,6 +401,10 @@ else
             if (result.IsSuccess)
             {
                 scenario = result.Value;
+                hasScenarioZoomOverride = !string.IsNullOrWhiteSpace(scenario.GanttZoomLevel);
+                zoomLevel = hasScenarioZoomOverride
+                    ? scenario.GanttZoomLevel!.ToUpperInvariant()
+                    : scenarioZoomFallback;
 
             scheduledTasks = scenario.TaskSnapshots
                 .Where(t => t.PlannedStart.HasValue && t.PlannedFinish.HasValue)
@@ -758,6 +775,7 @@ else
 
         var beforeWidth = TimelineWidthPx;
         zoomLevel = canonical;
+        hasScenarioZoomOverride = !string.Equals(zoomLevel, scenarioZoomFallback, StringComparison.OrdinalIgnoreCase);
         var afterWidth = TimelineWidthPx;
 
         StateHasChanged();
@@ -780,10 +798,25 @@ else
             var token = _persistCts.Token;
             await Task.Delay(300, token);
             if (token.IsCancellationRequested) return;
-            await Mediator.Send(new UpsertSettingCommand(DomainConstants.SettingKeys.GanttZoomLevel, level), token);
+            var result = await Mediator.Send(new SetScenarioZoomLevelCommand(ScenarioId, level), token);
+            if (result.IsSuccess)
+                hasScenarioZoomOverride = true;
         }
         catch (OperationCanceledException) { }
         catch { }
+    }
+
+    private async Task ResetZoomToDefaultAsync()
+    {
+        _persistCts?.Cancel();
+
+        var result = await Mediator.Send(new SetScenarioZoomLevelCommand(ScenarioId, null));
+        if (!result.IsSuccess)
+            return;
+
+        hasScenarioZoomOverride = false;
+        zoomLevel = scenarioZoomFallback;
+        StateHasChanged();
     }
 
     private async Task FitToScreenAsync()

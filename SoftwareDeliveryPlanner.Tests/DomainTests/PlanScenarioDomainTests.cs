@@ -1,4 +1,5 @@
 using SoftwareDeliveryPlanner.Domain.Models;
+using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.SharedKernel;
 
 namespace SoftwareDeliveryPlanner.Tests;
@@ -204,5 +205,34 @@ public class PlanScenarioDomainTests
             0, "TSK-002", "Service B", 5, null, null, null, null, null, null, null, "NOT_STARTED", "ON_TRACK", null, null));
 
         Assert.Equal(2, scenario.TaskSnapshots.Count);
+    }
+
+    [Fact]
+    public void SetGanttZoomLevel_ValidValue_IsStoredUppercase()
+    {
+        var scenario = PlanScenario.Create("Zoom", 0, 0, 0, 0, 0, null, null, 0, null, TestTimestamp);
+
+        scenario.SetGanttZoomLevel("month");
+
+        Assert.Equal(DomainConstants.GanttZoomLevel.Month, scenario.GanttZoomLevel);
+    }
+
+    [Fact]
+    public void SetGanttZoomLevel_Null_ClearsOverride()
+    {
+        var scenario = PlanScenario.Create("Zoom", 0, 0, 0, 0, 0, null, null, 0, null, TestTimestamp);
+        scenario.SetGanttZoomLevel(DomainConstants.GanttZoomLevel.Week);
+
+        scenario.SetGanttZoomLevel(null);
+
+        Assert.Null(scenario.GanttZoomLevel);
+    }
+
+    [Fact]
+    public void SetGanttZoomLevel_Invalid_ThrowsDomainException()
+    {
+        var scenario = PlanScenario.Create("Zoom", 0, 0, 0, 0, 0, null, null, 0, null, TestTimestamp);
+
+        Assert.Throws<DomainException>(() => scenario.SetGanttZoomLevel("INVALID"));
     }
 }

@@ -27,9 +27,10 @@ internal sealed class SettingsService : ISettingsService
         settings.TryGetValue(DomainConstants.SettingKeys.AtRiskThreshold, out var atRiskThresholdStr);
         settings.TryGetValue(DomainConstants.SettingKeys.WeekNumbering, out var weekNumbering);
         settings.TryGetValue(DomainConstants.SettingKeys.GanttZoomLevel, out var ganttZoomLevel);
+        settings.TryGetValue(DomainConstants.SettingKeys.ScenarioGanttZoomLevel, out var scenarioGanttZoomLevel);
         var atRiskThreshold = int.TryParse(atRiskThresholdStr, out var threshold) ? threshold : 5;
 
-        return new SettingsDto(strategy, baselineDate, workingWeek, planStartDate, atRiskThreshold, weekNumbering, ganttZoomLevel);
+        return new SettingsDto(strategy, baselineDate, workingWeek, planStartDate, atRiskThreshold, weekNumbering, ganttZoomLevel, scenarioGanttZoomLevel);
     }
 
     public async Task UpsertSettingAsync(string key, string? value, CancellationToken cancellationToken = default)

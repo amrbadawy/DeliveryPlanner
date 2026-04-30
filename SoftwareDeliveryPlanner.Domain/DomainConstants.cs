@@ -43,6 +43,7 @@ public static class DomainConstants
         public const string SchedulingStrategy = "scheduling_strategy";
         public const string WeekNumbering = "week_numbering";
         public const string GanttZoomLevel = "gantt_zoom_level";
+        public const string ScenarioGanttZoomLevel = "scenario_gantt_zoom_level";
     }
 
     /// <summary>Holiday classification types.</summary>

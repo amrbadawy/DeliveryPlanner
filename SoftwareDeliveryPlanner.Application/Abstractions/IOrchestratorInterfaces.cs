@@ -124,6 +124,7 @@ public interface IScenarioOrchestrator
 {
     Task<List<PlanScenario>> GetScenariosAsync();
     Task<PlanScenario?> GetScenarioWithSnapshotsAsync(int id);
+    Task<PlanScenario?> SetScenarioZoomLevelAsync(int id, string? zoomLevel, CancellationToken cancellationToken = default);
     Task SaveScenarioAsync(PlanScenario scenario);
     Task SaveScenarioWithSnapshotsAsync(PlanScenario scenario, List<TaskItem> tasks);
     Task DeleteScenarioAsync(int id);

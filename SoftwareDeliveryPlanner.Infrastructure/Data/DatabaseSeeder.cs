@@ -44,7 +44,8 @@ internal sealed class DatabaseSeeder : IDatabaseSeeder
             new Setting { Key = DomainConstants.SettingKeys.WorkingWeek, Value = DomainConstants.WorkingWeek.SunThu },
             new Setting { Key = DomainConstants.SettingKeys.SchedulingStrategy, Value = DomainConstants.SchedulingStrategy.PriorityFirst },
             new Setting { Key = DomainConstants.SettingKeys.WeekNumbering, Value = DomainConstants.WeekNumbering.Default },
-            new Setting { Key = DomainConstants.SettingKeys.GanttZoomLevel, Value = DomainConstants.GanttZoomLevel.Default }
+            new Setting { Key = DomainConstants.SettingKeys.GanttZoomLevel, Value = DomainConstants.GanttZoomLevel.Default },
+            new Setting { Key = DomainConstants.SettingKeys.ScenarioGanttZoomLevel, Value = DomainConstants.GanttZoomLevel.Default }
         );
     }
 

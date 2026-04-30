@@ -33,6 +33,18 @@ internal sealed class ScenarioOrchestrator : ServiceBase, IScenarioOrchestrator
             .FirstOrDefaultAsync(s => s.Id == id);
     }
 
+    public async Task<PlanScenario?> SetScenarioZoomLevelAsync(int id, string? zoomLevel, CancellationToken cancellationToken = default)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync(cancellationToken);
+        var scenario = await db.PlanScenarios.FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
+        if (scenario is null)
+            return null;
+
+        scenario.SetGanttZoomLevel(zoomLevel);
+        await db.SaveChangesAsync(cancellationToken);
+        return scenario;
+    }
+
     public async Task SaveScenarioAsync(PlanScenario scenario)
     {
         await using var db = await DbFactory.CreateDbContextAsync();
