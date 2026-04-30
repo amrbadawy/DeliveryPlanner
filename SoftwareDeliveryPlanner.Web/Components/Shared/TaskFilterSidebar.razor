@@ -11,6 +11,7 @@
 @inject TaskFilterState Filter
 @inject IMediator Mediator
 @inject IJSRuntime JS
+@inject NavigationManager Navigation
 @implements IAsyncDisposable
 
 @*
@@ -238,6 +239,13 @@
                                     </button>
                                 }
                                 <button type="button"
+                                        class="task-filter-saved-edit"
+                                        title="Copy share link for this saved view"
+                                        @onclick="() => CopyShareLinkAsync(view)"
+                                        data-testid="@($"task-filter-saved-view-copy-{view.Id}")">
+                                    <i class="bi bi-link-45deg"></i>
+                                </button>
+                                <button type="button"
                                         class="task-filter-saved-delete"
                                         title="Delete this saved view"
                                         @onclick="() => DeleteView(view)"
@@ -325,6 +333,7 @@
     private string editingViewName = string.Empty;
     private string? renameError;
     private DotNetObjectReference<TaskFilterSidebar>? selfRef;
+    private bool appliedViewFromUrl;
 
     /// <summary>Hard cap on a single imported file (1 MiB) — guards against accidentally selecting a huge non-JSON file.</summary>
     private const long MaxImportBytes = 1 * 1024 * 1024;
@@ -387,6 +396,7 @@
     {
         ownerKey = await Filter.GetOwnerKeyAsync();
         await ReloadSavedViewsAsync();
+        TryApplyViewFromUrl();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -402,12 +412,17 @@
     {
         var result = await Mediator.Send(new ListSavedViewsQuery(PageKey, ownerKey));
         savedViews = result.IsSuccess ? result.Value : new List<SavedView>();
+
+        if (!appliedViewFromUrl)
+            TryApplyViewFromUrl();
     }
 
     private async Task SaveCurrentView()
     {
         saveError = null;
         renameError = null;
+        ioMessage = null;
+        ioError = null;
         if (!CanSave) return;
 
         var payload = Filter.SerializeCurrentAsPayload();
@@ -451,6 +466,8 @@
     private async Task SaveRenameAsync()
     {
         renameError = null;
+        ioMessage = null;
+        ioError = null;
         if (!CanRename || editingViewId is null)
             return;
 
@@ -475,9 +492,69 @@
 
     private async Task DeleteView(SavedView view)
     {
+        ioMessage = null;
+        ioError = null;
         var result = await Mediator.Send(new DeleteSavedViewCommand(view.Id));
         if (result.IsSuccess)
             await ReloadSavedViewsAsync();
+    }
+
+    private void TryApplyViewFromUrl()
+    {
+        if (appliedViewFromUrl || savedViews.Count == 0)
+            return;
+
+        var uri = new Uri(Navigation.Uri);
+        var q = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var viewParam = q["view"];
+        if (string.IsNullOrWhiteSpace(viewParam))
+        {
+            appliedViewFromUrl = true;
+            return;
+        }
+
+        var matchByName = savedViews.FirstOrDefault(v => string.Equals(v.Name, viewParam, StringComparison.OrdinalIgnoreCase));
+        if (matchByName is not null)
+        {
+            ApplyView(matchByName);
+            ioMessage = $"Applied saved view '{matchByName.Name}' from URL.";
+            appliedViewFromUrl = true;
+            return;
+        }
+
+        if (int.TryParse(viewParam, out var id))
+        {
+            var matchById = savedViews.FirstOrDefault(v => v.Id == id);
+            if (matchById is not null)
+            {
+                ApplyView(matchById);
+                ioMessage = $"Applied saved view '{matchById.Name}' from URL.";
+            }
+        }
+
+        appliedViewFromUrl = true;
+    }
+
+    private async Task CopyShareLinkAsync(SavedView view)
+    {
+        ioError = null;
+        ioMessage = null;
+        var uri = new Uri(Navigation.Uri);
+        var path = uri.GetLeftPart(UriPartial.Path);
+        var final = new UriBuilder(path)
+        {
+            Query = $"view={Uri.EscapeDataString(view.Name)}"
+        }.Uri.ToString();
+
+        try
+        {
+            await JS.InvokeVoidAsync("TaskFilterSidebarClipboard.copyText", final);
+            ioMessage = "Share link copied to clipboard.";
+        }
+        catch
+        {
+            ioError = "Unable to copy link automatically. You can copy it from the browser address bar after applying the view.";
+        }
     }
 
     private void OnFilterChanged() => InvokeAsync(StateHasChanged);

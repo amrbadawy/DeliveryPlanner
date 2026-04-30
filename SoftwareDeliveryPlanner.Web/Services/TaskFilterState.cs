@@ -272,6 +272,7 @@ public sealed class TaskFilterState : IDisposable
             ["phase"] = SerializeSet(page.Phases),
             ["role"] = SerializeSet(page.Roles),
             ["dep"] = SerializeSet(page.DependencyStates),
+            ["view"] = null,
         };
 
         var newUri = _nav.GetUriWithQueryParameters(dict);

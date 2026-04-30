@@ -114,6 +114,43 @@ test.describe('Saved views', () => {
     await gotoPage(page, '/gantt');
     await expect(page.getByTestId('task-filter-saved-views')).not.toContainText(tasksViewName);
   });
+
+  test('direct navigation with ?view=name applies the saved view', async ({ page }) => {
+    await gotoPage(page, '/tasks');
+    await page.getByTestId('task-filter-chip-priority-high').click();
+
+    const viewName = `Shareable ${uniqueSuffix('sv')}`;
+    await page.getByTestId('task-filter-saved-view-name').fill(viewName);
+    await page.getByTestId('task-filter-saved-view-save').click();
+
+    await gotoPage(page, `/tasks?view=${encodeURIComponent(viewName)}`);
+    await expect(page.getByTestId('task-filter-chip-priority-high')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('direct navigation with ?view=id falls back to saved view id lookup', async ({ page }) => {
+    await gotoPage(page, '/tasks');
+    await page.getByTestId('task-filter-chip-risk-late').click();
+
+    const viewName = `Id fallback ${uniqueSuffix('id')}`;
+    await page.getByTestId('task-filter-saved-view-name').fill(viewName);
+    await page.getByTestId('task-filter-saved-view-save').click();
+
+    const savedItem = page.getByTestId('task-filter-saved-views')
+      .locator('[data-testid^="task-filter-saved-view-"]', { hasText: viewName })
+      .first();
+    const itemTestId = await savedItem.getAttribute('data-testid');
+    expect(itemTestId).toBeTruthy();
+    const id = itemTestId!.replace('task-filter-saved-view-', '');
+
+    await gotoPage(page, `/tasks?view=${id}`);
+    await expect(page.getByTestId('task-filter-chip-risk-late')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('missing ?view value leaves filters unchanged', async ({ page }) => {
+    await gotoPage(page, '/tasks?view=definitely-missing-view');
+    await expect(page.getByTestId('task-filter-chip-status-not_started')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByTestId('task-filter-chip-priority-high')).toHaveAttribute('aria-pressed', 'false');
+  });
 });
 
 test.describe('Pin / hide row actions', () => {
