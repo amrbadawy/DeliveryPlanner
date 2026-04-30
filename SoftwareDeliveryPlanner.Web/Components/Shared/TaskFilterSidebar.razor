@@ -239,6 +239,13 @@
                                     </button>
                                 }
                                 <button type="button"
+                                        class="task-filter-saved-default @(view.IsDefault ? "active" : string.Empty)"
+                                        title="@(view.IsDefault ? "Unset default view" : "Set as default view")"
+                                        @onclick="() => ToggleDefaultAsync(view)"
+                                        data-testid="@($"task-filter-saved-view-default-{view.Id}")">
+                                    <i class="bi @(view.IsDefault ? "bi-star-fill" : "bi-star")"></i>
+                                </button>
+                                <button type="button"
                                         class="task-filter-saved-edit"
                                         title="Copy share link for this saved view"
                                         @onclick="() => CopyShareLinkAsync(view)"
@@ -334,6 +341,7 @@
     private string? renameError;
     private DotNetObjectReference<TaskFilterSidebar>? selfRef;
     private bool appliedViewFromUrl;
+    private bool appliedDefaultFromSavedView;
 
     /// <summary>Hard cap on a single imported file (1 MiB) — guards against accidentally selecting a huge non-JSON file.</summary>
     private const long MaxImportBytes = 1 * 1024 * 1024;
@@ -396,7 +404,10 @@
     {
         ownerKey = await Filter.GetOwnerKeyAsync();
         await ReloadSavedViewsAsync();
-        TryApplyViewFromUrl();
+
+        var appliedFromUrl = TryApplyViewFromUrl();
+        if (!appliedFromUrl)
+            await TryApplyDefaultViewAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -496,13 +507,17 @@
         ioError = null;
         var result = await Mediator.Send(new DeleteSavedViewCommand(view.Id));
         if (result.IsSuccess)
+        {
+            if (view.IsDefault)
+                appliedDefaultFromSavedView = false;
             await ReloadSavedViewsAsync();
+        }
     }
 
-    private void TryApplyViewFromUrl()
+    private bool TryApplyViewFromUrl()
     {
         if (appliedViewFromUrl || savedViews.Count == 0)
-            return;
+            return false;
 
         var uri = new Uri(Navigation.Uri);
         var q = System.Web.HttpUtility.ParseQueryString(uri.Query);
@@ -510,7 +525,7 @@
         if (string.IsNullOrWhiteSpace(viewParam))
         {
             appliedViewFromUrl = true;
-            return;
+            return false;
         }
 
         var matchByName = savedViews.FirstOrDefault(v => string.Equals(v.Name, viewParam, StringComparison.OrdinalIgnoreCase));
@@ -519,7 +534,7 @@
             ApplyView(matchByName);
             ioMessage = $"Applied saved view '{matchByName.Name}' from URL.";
             appliedViewFromUrl = true;
-            return;
+            return true;
         }
 
         if (int.TryParse(viewParam, out var id))
@@ -529,10 +544,58 @@
             {
                 ApplyView(matchById);
                 ioMessage = $"Applied saved view '{matchById.Name}' from URL.";
+                appliedViewFromUrl = true;
+                return true;
             }
         }
 
         appliedViewFromUrl = true;
+        return false;
+    }
+
+    private async Task TryApplyDefaultViewAsync()
+    {
+        if (appliedDefaultFromSavedView || savedViews.Count == 0)
+            return;
+
+        var uri = new Uri(Navigation.Uri);
+        var q = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        if (!string.IsNullOrWhiteSpace(q["view"]))
+            return;
+
+        // Respect explicit URL filters/search and user interactions.
+        if (Filter.IsAnyActive)
+            return;
+
+        var defaultView = savedViews.FirstOrDefault(v => v.IsDefault);
+        if (defaultView is null)
+            return;
+
+        ApplyView(defaultView);
+        ioMessage = $"Applied default saved view '{defaultView.Name}'.";
+        appliedDefaultFromSavedView = true;
+    }
+
+    private async Task ToggleDefaultAsync(SavedView view)
+    {
+        ioMessage = null;
+        ioError = null;
+        saveError = null;
+        renameError = null;
+
+        var result = await Mediator.Send(new SetDefaultSavedViewCommand(view.Id, !view.IsDefault));
+        if (!result.IsSuccess)
+        {
+            ioError = result.Error.Message;
+            return;
+        }
+
+        appliedDefaultFromSavedView = false;
+        await ReloadSavedViewsAsync();
+
+        ioMessage = result.Value.IsDefault
+            ? $"'{result.Value.Name}' set as default view."
+            : $"'{result.Value.Name}' is no longer the default view.";
     }
 
     private async Task CopyShareLinkAsync(SavedView view)

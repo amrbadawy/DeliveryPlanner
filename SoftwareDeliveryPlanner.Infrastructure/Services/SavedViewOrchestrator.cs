@@ -31,6 +31,15 @@ internal sealed class SavedViewOrchestrator : ServiceBase, ISavedViewOrchestrato
         return await db.SavedViews.FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
     }
 
+    public async Task<SavedView?> GetDefaultAsync(string pageKey, string? ownerKey, CancellationToken cancellationToken = default)
+    {
+        var key = pageKey.Trim().ToLowerInvariant();
+        await using var db = await ReadOnlyDbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.SavedViews
+            .Where(v => v.PageKey == key && v.OwnerKey == ownerKey && v.IsDefault)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<SavedView> UpsertAsync(string name, string pageKey, string payloadJson, string? ownerKey, CancellationToken cancellationToken = default)
     {
         var key = pageKey.Trim().ToLowerInvariant();
@@ -71,6 +80,33 @@ internal sealed class SavedViewOrchestrator : ServiceBase, ISavedViewOrchestrato
             return null;
 
         view.Rename(trimmedName);
+        await db.SaveChangesAsync(cancellationToken);
+        return view;
+    }
+
+    public async Task<SavedView?> SetDefaultAsync(int id, bool isDefault, CancellationToken cancellationToken = default)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync(cancellationToken);
+        var view = await db.SavedViews.FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
+        if (view is null)
+            return null;
+
+        if (isDefault)
+        {
+            var existingDefault = await db.SavedViews
+                .Where(v => v.Id != id && v.PageKey == view.PageKey && v.OwnerKey == view.OwnerKey && v.IsDefault)
+                .ToListAsync(cancellationToken);
+
+            foreach (var item in existingDefault)
+                item.ClearDefault();
+
+            view.MarkAsDefault();
+        }
+        else
+        {
+            view.ClearDefault();
+        }
+
         await db.SaveChangesAsync(cancellationToken);
         return view;
     }
