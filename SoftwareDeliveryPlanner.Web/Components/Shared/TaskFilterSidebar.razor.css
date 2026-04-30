@@ -257,3 +257,39 @@
     font-size: var(--font-size-xs);
     color: var(--color-danger);
 }
+
+.task-filter-info {
+    margin-top: 0.4rem;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+}
+
+.task-filter-saved-io {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+}
+
+.task-filter-saved-io .btn {
+    flex: 1 1 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+}
+
+/* Hide the native file input inside the import label, but keep it focusable. */
+.task-filter-saved-import-label {
+    position: relative;
+    cursor: pointer;
+    margin: 0;
+}
+
+.task-filter-saved-import-label > input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+}
