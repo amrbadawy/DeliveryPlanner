@@ -25,7 +25,7 @@
 <aside class="task-filter-sidebar @(isCollapsed ? "collapsed" : "")" data-testid="task-filter-sidebar" aria-label="Filter tasks">
     <div class="task-filter-sidebar-header">
         <button type="button" class="task-filter-toggle"
-                @onclick="ToggleCollapsed"
+                @onclick="ToggleCollapsedAsync"
                 aria-expanded="@((!isCollapsed).ToString().ToLowerInvariant())"
                 title="@(isCollapsed ? "Expand filters" : "Collapse filters")"
                 data-testid="task-filter-toggle">
@@ -255,7 +255,7 @@
                                 <button type="button"
                                         class="task-filter-saved-delete"
                                         title="Delete this saved view"
-                                        @onclick="() => DeleteView(view)"
+                                        @onclick="() => RequestDeleteView(view)"
                                         data-testid="@($"task-filter-saved-view-delete-{view.Id}")">
                                     <i class="bi bi-x"></i>
                                 </button>
@@ -322,6 +322,17 @@
     }
 </aside>
 
+@if (_pendingDeleteView is not null)
+{
+    <ConfirmDialog Visible="true"
+                   TestId="task-filter-saved-view-delete-modal"
+                   Title="Delete saved view"
+                   Message="@($"Delete '{_pendingDeleteView.Name}'? This cannot be undone.")"
+                   IsProcessing="_deleteProcessing"
+                   OnConfirm="OnDeleteConfirmedAsync"
+                   OnCancel="OnDeleteCancelled" />
+}
+
 @code {
     /// <summary>Page key — TaskFilterState.PageKeyTasks or TaskFilterState.PageKeyGantt.</summary>
     [Parameter, EditorRequired] public string PageKey { get; set; } = TaskFilterState.PageKeyTasks;
@@ -342,6 +353,15 @@
     private DotNetObjectReference<TaskFilterSidebar>? selfRef;
     private bool appliedViewFromUrl;
     private bool appliedDefaultFromSavedView;
+
+    // Confirm-delete state
+    private SavedView? _pendingDeleteView;
+    private bool _deleteProcessing;
+
+    // Auto-dismiss timer for ioMessage
+    private Timer? _ioDismissTimer;
+
+    private string CollapseKey => $"sdp-task-filter-collapsed-{PageKey}";
 
     /// <summary>Hard cap on a single imported file (1 MiB) — guards against accidentally selecting a huge non-JSON file.</summary>
     private const long MaxImportBytes = 1 * 1024 * 1024;
@@ -417,6 +437,15 @@
 
         selfRef = DotNetObjectReference.Create(this);
         await JS.InvokeVoidAsync("TaskFilterSidebarKeyboard.bind", selfRef);
+
+        // Restore persisted collapsed state. Done here (not OnInitializedAsync)
+        // because JS localStorage is not available during server-side prerender.
+        var wasCollapsed = await JS.InvokeAsync<bool>("TaskFilterSidebarStorage.getCollapsed", CollapseKey);
+        if (wasCollapsed != isCollapsed)
+        {
+            isCollapsed = wasCollapsed;
+            StateHasChanged();
+        }
     }
 
     private async Task ReloadSavedViewsAsync()
@@ -432,7 +461,7 @@
     {
         saveError = null;
         renameError = null;
-        ioMessage = null;
+        SetIoMessage(null);
         ioError = null;
         if (!CanSave) return;
 
@@ -477,7 +506,7 @@
     private async Task SaveRenameAsync()
     {
         renameError = null;
-        ioMessage = null;
+        SetIoMessage(null);
         ioError = null;
         if (!CanRename || editingViewId is null)
             return;
@@ -501,11 +530,30 @@
             CancelRename();
     }
 
-    private async Task DeleteView(SavedView view)
+    private void RequestDeleteView(SavedView view)
     {
-        ioMessage = null;
+        _pendingDeleteView = view;
+        _deleteProcessing = false;
+    }
+
+    private void OnDeleteCancelled()
+    {
+        _pendingDeleteView = null;
+        _deleteProcessing = false;
+    }
+
+    private async Task OnDeleteConfirmedAsync()
+    {
+        if (_pendingDeleteView is null) return;
+        _deleteProcessing = true;
+        SetIoMessage(null);
         ioError = null;
+
+        var view = _pendingDeleteView;
         var result = await Mediator.Send(new DeleteSavedViewCommand(view.Id));
+        _deleteProcessing = false;
+        _pendingDeleteView = null;
+
         if (result.IsSuccess)
         {
             if (view.IsDefault)
@@ -532,7 +580,7 @@
         if (matchByName is not null)
         {
             ApplyView(matchByName);
-            ioMessage = $"Applied saved view '{matchByName.Name}' from URL.";
+            SetIoMessage($"Applied saved view '{matchByName.Name}' from URL.");
             appliedViewFromUrl = true;
             return true;
         }
@@ -543,7 +591,7 @@
             if (matchById is not null)
             {
                 ApplyView(matchById);
-                ioMessage = $"Applied saved view '{matchById.Name}' from URL.";
+                SetIoMessage($"Applied saved view '{matchById.Name}' from URL.");
                 appliedViewFromUrl = true;
                 return true;
             }
@@ -572,13 +620,13 @@
             return;
 
         ApplyView(defaultView);
-        ioMessage = $"Applied default saved view '{defaultView.Name}'.";
+        SetIoMessage($"Applied default saved view '{defaultView.Name}'.");
         appliedDefaultFromSavedView = true;
     }
 
     private async Task ToggleDefaultAsync(SavedView view)
     {
-        ioMessage = null;
+        SetIoMessage(null);
         ioError = null;
         saveError = null;
         renameError = null;
@@ -593,15 +641,15 @@
         appliedDefaultFromSavedView = false;
         await ReloadSavedViewsAsync();
 
-        ioMessage = result.Value.IsDefault
+        SetIoMessage(result.Value.IsDefault
             ? $"'{result.Value.Name}' set as default view."
-            : $"'{result.Value.Name}' is no longer the default view.";
+            : $"'{result.Value.Name}' is no longer the default view.");
     }
 
     private async Task CopyShareLinkAsync(SavedView view)
     {
         ioError = null;
-        ioMessage = null;
+        SetIoMessage(null);
         var uri = new Uri(Navigation.Uri);
         var path = uri.GetLeftPart(UriPartial.Path);
         var final = new UriBuilder(path)
@@ -612,7 +660,7 @@
         try
         {
             await JS.InvokeVoidAsync("TaskFilterSidebarClipboard.copyText", final);
-            ioMessage = "Share link copied to clipboard.";
+            SetIoMessage("Share link copied to clipboard.");
         }
         catch
         {
@@ -624,14 +672,25 @@
 
     private void OnSearchInput(ChangeEventArgs e) => Filter.SearchTerm = e.Value?.ToString() ?? string.Empty;
 
-    private void ToggleCollapsed() => isCollapsed = !isCollapsed;
+    private async Task ToggleCollapsedAsync()
+    {
+        isCollapsed = !isCollapsed;
+        try
+        {
+            await JS.InvokeVoidAsync("TaskFilterSidebarStorage.setCollapsed", CollapseKey, isCollapsed);
+        }
+        catch
+        {
+            // JS may not be available during prerender; best-effort only.
+        }
+    }
 
     [JSInvokable]
     public async Task OnSidebarShortcut(string action)
     {
         if (string.Equals(action, "TOGGLE", StringComparison.Ordinal))
         {
-            ToggleCollapsed();
+            await ToggleCollapsedAsync();
             await InvokeAsync(StateHasChanged);
             return;
         }
@@ -654,9 +713,31 @@
         string.IsNullOrWhiteSpace(value) ? "none"
         : new string(value.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
 
+    /// <summary>
+    /// Sets ioMessage and (re)starts the 5 s auto-dismiss timer.
+    /// Passing null cancels any pending timer and clears the message.
+    /// </summary>
+    private void SetIoMessage(string? msg)
+    {
+        _ioDismissTimer?.Dispose();
+        _ioDismissTimer = null;
+        ioMessage = msg;
+        if (msg is not null)
+        {
+            _ioDismissTimer = new Timer(_ =>
+            {
+                ioMessage = null;
+                _ioDismissTimer?.Dispose();
+                _ioDismissTimer = null;
+                InvokeAsync(StateHasChanged);
+            }, null, 5_000, Timeout.Infinite);
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         Filter.OnChange -= OnFilterChanged;
+        _ioDismissTimer?.Dispose();
         try
         {
             await JS.InvokeVoidAsync("TaskFilterSidebarKeyboard.unbind");
@@ -671,7 +752,7 @@
     private async Task ExportViewsAsync()
     {
         ioError = null;
-        ioMessage = null;
+        SetIoMessage(null);
         if (savedViews.Count == 0)
             return;
 
@@ -688,7 +769,7 @@
         try
         {
             await JS.InvokeVoidAsync("BlazorDownloadFile", fileName, json, "application/json");
-            ioMessage = $"Exported {savedViews.Count} view(s).";
+            SetIoMessage($"Exported {savedViews.Count} view(s).");
         }
         catch (Exception ex)
         {
@@ -699,7 +780,7 @@
     private async Task OnImportFileSelected(InputFileChangeEventArgs e)
     {
         ioError = null;
-        ioMessage = null;
+        SetIoMessage(null);
 
         var file = e.File;
         if (file is null) return;
@@ -786,7 +867,7 @@
         var parts = new List<string> { $"Imported {importedCount} view(s)" };
         if (skippedCount > 0) parts.Add($"skipped {skippedCount} invalid");
         if (errorCount > 0) parts.Add($"{errorCount} failed");
-        ioMessage = string.Join(", ", parts) + ".";
+        SetIoMessage(string.Join(", ", parts) + ".");
     }
 
     /// <summary>Top-level shape of the export file. Camel-cased on the wire.</summary>
