@@ -75,8 +75,8 @@ test.describe('Tasks CRUD + edge cases', () => {
     await waitForTableRows(table);
 
     const firstRow = table.locator('tbody tr').first();
-    const taskId = (await firstRow.locator('td').nth(0).innerText()).trim();
-    const serviceName = (await firstRow.locator('td').nth(1).innerText()).trim();
+    const taskId = (await firstRow.locator('td').nth(1).innerText()).trim();
+    const serviceName = (await firstRow.locator('td').nth(2).innerText()).trim();
 
     await page.getByTestId(`tasks-delete-${taskId}`).click();
     await expectModalVisible(page, 'tasks-delete-modal');

@@ -64,7 +64,7 @@ else
                             var weekEnd = week.AddDays(6);
                             var wn = WeekNumberCalculator.GetWeekOfYear(week, weekNumberingCode, workingWeekCode);
                             <th class="heatmap-week-header">
-                                <div class="hw-num">W@wn</div>
+                                <div class="hw-num">W@(wn)</div>
                                 <div class="hw-range">@week.ToString("dd MMM") - @weekEnd.ToString("dd MMM")</div>
                             </th>
                         }

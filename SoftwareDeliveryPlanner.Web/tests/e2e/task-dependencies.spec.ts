@@ -32,7 +32,7 @@ test.describe('Task dependencies', () => {
 
     // Get the first task's ID to use as a dependency
     const firstRow = table.locator('tbody tr').first();
-    const depTaskId = (await firstRow.locator('td').nth(0).innerText()).trim();
+    const depTaskId = (await firstRow.locator('td').nth(1).innerText()).trim();
 
     // Add a new task with a dependency
     const serviceName = uniqueSuffix('E2E DepTask');
@@ -77,10 +77,10 @@ test.describe('Task dependencies', () => {
 
     for (let i = 0; i < rowCount; i++) {
       const row = rows.nth(i);
-      const depsCell = row.locator('td').nth(10);
+      const depsCell = row.locator('td').nth(11);
       const badges = await depsCell.locator('.badge').count();
       if (badges === 0) {
-        targetTaskId = (await row.locator('td').nth(0).innerText()).trim();
+        targetTaskId = (await row.locator('td').nth(1).innerText()).trim();
         break;
       }
     }
@@ -94,7 +94,7 @@ test.describe('Task dependencies', () => {
     // Get another task ID to add as dependency
     const allTaskIds: string[] = [];
     for (let i = 0; i < rowCount; i++) {
-      const id = (await rows.nth(i).locator('td').nth(0).innerText()).trim();
+      const id = (await rows.nth(i).locator('td').nth(1).innerText()).trim();
       if (id !== targetTaskId) {
         allTaskIds.push(id);
       }
@@ -137,7 +137,7 @@ test.describe('Task dependencies', () => {
     // Get two task IDs to use as dependencies
     const taskIds: string[] = [];
     for (let i = 0; i < Math.min(3, rowCount); i++) {
-      taskIds.push((await rows.nth(i).locator('td').nth(0).innerText()).trim());
+      taskIds.push((await rows.nth(i).locator('td').nth(1).innerText()).trim());
     }
 
     // Add a new task depending on the first two

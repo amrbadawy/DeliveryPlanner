@@ -13,8 +13,8 @@ test.describe('Drag-and-Drop Task Priority', () => {
     const secondRow = rows.nth(1);
 
     // Capture initial task IDs
-    const firstTaskId = (await firstRow.locator('td').nth(0).innerText()).trim();
-    const secondTaskId = (await secondRow.locator('td').nth(0).innerText()).trim();
+    const firstTaskId = (await firstRow.locator('td').nth(1).innerText()).trim();
+    const secondTaskId = (await secondRow.locator('td').nth(1).innerText()).trim();
 
     // Drag first row to second row position
     await firstRow.dragTo(secondRow);
@@ -24,8 +24,8 @@ test.describe('Drag-and-Drop Task Priority', () => {
     await waitForTableRows(table, 2);
 
     // The rows should have swapped (or at least the order should be different)
-    const newFirstTaskId = (await rows.nth(0).locator('td').nth(0).innerText()).trim();
-    const newSecondTaskId = (await rows.nth(1).locator('td').nth(0).innerText()).trim();
+    const newFirstTaskId = (await rows.nth(0).locator('td').nth(1).innerText()).trim();
+    const newSecondTaskId = (await rows.nth(1).locator('td').nth(1).innerText()).trim();
 
     // Either the swap happened or both tasks still exist
     // (priority swap is the expected behavior)
