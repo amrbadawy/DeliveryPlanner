@@ -179,7 +179,19 @@
 
             <!-- Saved views -->
             <section class="task-filter-section task-filter-saved-views" data-testid="task-filter-saved-views">
-                <div class="task-filter-section-label">Saved views</div>
+                <div class="task-filter-section-header">
+                    <div class="task-filter-section-label">Saved views</div>
+                    @if (IsDriftedFromDefault)
+                    {
+                        <button type="button"
+                                class="task-filter-reset-default"
+                                title="Reset to default view"
+                                @onclick="ResetToDefaultView"
+                                data-testid="task-filter-reset-default">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                    }
+                </div>
                 @if (savedViews.Count == 0)
                 {
                     <div class="task-filter-empty" data-testid="task-filter-saved-views-empty">No saved views.</div>
@@ -203,11 +215,11 @@
                                 else
                                 {
                                     <button type="button"
-                                            class="task-filter-saved-apply"
+                                            class="task-filter-saved-apply @(_activeAppliedViewId == view.Id ? "active" : "")"
                                             title="Apply this saved view"
                                             @onclick="() => ApplyView(view)"
                                             data-testid="@($"task-filter-saved-view-apply-{view.Id}")">
-                                        <i class="bi bi-bookmark-check"></i> @view.Name
+                                        <i class="bi @(_activeAppliedViewId == view.Id ? "bi-bookmark-check-fill" : "bi-bookmark-check")"></i> @view.Name
                                     </button>
                                 }
                                 @if (editingViewId == view.Id)
@@ -361,6 +373,9 @@
     // Auto-dismiss timer for ioMessage
     private Timer? _ioDismissTimer;
 
+    // Active applied view tracking
+    private int? _activeAppliedViewId;
+
     private string CollapseKey => $"sdp-task-filter-collapsed-{PageKey}";
 
     /// <summary>Hard cap on a single imported file (1 MiB) — guards against accidentally selecting a huge non-JSON file.</summary>
@@ -386,6 +401,22 @@
         editingViewId.HasValue
         && !string.IsNullOrWhiteSpace(editingViewName)
         && editingViewName.Trim().Length <= 100;
+
+    /// <summary>
+    /// True when a default view exists AND the current filter selection differs
+    /// from its payload. Drives the "Reset to default" button visibility.
+    /// Computed on each render — fast because payloads are small JSON objects.
+    /// </summary>
+    private bool IsDriftedFromDefault
+    {
+        get
+        {
+            var defaultView = savedViews.FirstOrDefault(v => v.IsDefault);
+            if (defaultView is null) return false;
+            return !SavedViewPayloadComparer.AreEqual(
+                Filter.SerializeCurrentAsPayload(), defaultView.PayloadJson);
+        }
+    }
 
     private static readonly (string Code, string Display)[] StatusChips =
     {
@@ -486,6 +517,7 @@
     private void ApplyView(SavedView view)
     {
         renameError = null;
+        _activeAppliedViewId = view.Id;
         Filter.ApplyPayload(view.PayloadJson);
     }
 
@@ -668,7 +700,21 @@
         }
     }
 
-    private void OnFilterChanged() => InvokeAsync(StateHasChanged);
+    private void OnFilterChanged()
+    {
+        // Clear the active view indicator when the user's filter drifts
+        // away from the payload of the view that was last applied.
+        if (_activeAppliedViewId.HasValue)
+        {
+            var applied = savedViews.FirstOrDefault(v => v.Id == _activeAppliedViewId.Value);
+            if (applied is null || !SavedViewPayloadComparer.AreEqual(
+                    Filter.SerializeCurrentAsPayload(), applied.PayloadJson))
+            {
+                _activeAppliedViewId = null;
+            }
+        }
+        InvokeAsync(StateHasChanged);
+    }
 
     private void OnSearchInput(ChangeEventArgs e) => Filter.SearchTerm = e.Value?.ToString() ?? string.Empty;
 
@@ -708,6 +754,13 @@
     }
 
     private void ClearAll() => Filter.Clear();
+
+    private void ResetToDefaultView()
+    {
+        var defaultView = savedViews.FirstOrDefault(v => v.IsDefault);
+        if (defaultView is null) return;
+        ApplyView(defaultView);
+    }
 
     private static string SanitizeId(string value) =>
         string.IsNullOrWhiteSpace(value) ? "none"

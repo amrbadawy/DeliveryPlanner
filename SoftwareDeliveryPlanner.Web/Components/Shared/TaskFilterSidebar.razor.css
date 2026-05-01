@@ -180,6 +180,30 @@
     padding-top: 0.75rem;
 }
 
+/* Header row — label + optional reset button */
+.task-filter-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+}
+
+.task-filter-reset-default {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 0 0.4rem;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.task-filter-reset-default:hover {
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+}
+
 .task-filter-empty {
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
@@ -229,6 +253,13 @@
 .task-filter-saved-apply:hover {
     background: var(--color-bg-secondary);
     border-color: var(--color-accent);
+}
+
+.task-filter-saved-apply.active {
+    background: var(--color-accent-light);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+    font-weight: 600;
 }
 
 .task-filter-saved-delete {
