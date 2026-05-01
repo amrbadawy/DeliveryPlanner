@@ -59,3 +59,12 @@ window.TaskFilterSidebarClipboard = {
         document.body.removeChild(ta);
     }
 };
+
+window.TaskFilterSidebarStorage = {
+    getCollapsed: function (key) {
+        try { return localStorage.getItem(key) === 'true'; } catch { return false; }
+    },
+    setCollapsed: function (key, value) {
+        try { localStorage.setItem(key, value ? 'true' : 'false'); } catch { }
+    }
+};
