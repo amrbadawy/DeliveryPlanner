@@ -119,7 +119,7 @@ test.describe('Task Details + Notes', () => {
   });
 
   test('task detail warnings card shows for task with resource gap', async ({ page }) => {
-    // Create a task with UX role to guarantee a resource gap (no UX resources in seed data)
+    // Create a task requiring Principal-seniority DEV — no such resource in seed data → guaranteed gap
     await gotoPage(page, '/tasks');
     const table = page.getByTestId('tasks-table');
     await waitForTableRows(table);
@@ -129,16 +129,13 @@ test.describe('Task Details + Notes', () => {
     await expectModalVisible(page, 'tasks-modal');
     await fillInputByTestId(page, 'tasks-service-name', serviceName);
     await fillInputByTestId(page, 'effort-days-DEV', '3');
-    await fillInputByTestId(page, 'effort-days-QA', '1');
-    await page.getByTestId('effort-add-role-select').selectOption('UX');
-    await page.getByTestId('effort-add-btn').click();
-    await fillInputByTestId(page, 'effort-days-UX', '2');
+    await fillInputByTestId(page, 'effort-seniority-DEV', 'Principal');
     await page.getByTestId('tasks-save').click();
     await expect(page.getByTestId('tasks-modal')).toBeHidden();
 
     const newRow = table.locator('tbody tr', { hasText: serviceName });
     await expect(newRow).toBeVisible();
-    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
+    const taskId = (await newRow.locator('td').nth(1).innerText()).trim();
 
     // Navigate to the detail page
     const taskLink = newRow.locator('a').first();
@@ -150,7 +147,7 @@ test.describe('Task Details + Notes', () => {
     await expect(warnings).toBeVisible();
     await expect(page.getByTestId('task-detail-resource-gap-warning')).toBeVisible();
     await expect(page.getByTestId('task-detail-resource-gap-warning')).toContainText('Resource gap');
-    await expect(page.getByTestId('task-detail-resource-gap-warning')).toContainText('UX');
+    await expect(page.getByTestId('task-detail-resource-gap-warning')).toContainText('DEV');
 
     // Clean up — go back and delete
     await page.getByTestId('task-details-back-bottom').click();
@@ -185,7 +182,7 @@ test.describe('Task Details + Notes', () => {
 
     const newRow = table.locator('tbody tr', { hasText: serviceName });
     await expect(newRow).toBeVisible();
-    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
+    const taskId = (await newRow.locator('td').nth(1).innerText()).trim();
 
     // Run scheduler — task should remain unscheduled
     await page.getByTestId('tasks-refresh').click();
@@ -238,7 +235,7 @@ test.describe('Task Details + Notes', () => {
 
     const newRow = table.locator('tbody tr', { hasText: serviceName });
     await expect(newRow).toBeVisible();
-    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
+    const taskId = (await newRow.locator('td').nth(1).innerText()).trim();
 
     // Run scheduler
     await page.getByTestId('tasks-refresh').click();
@@ -282,7 +279,7 @@ test.describe('Task Details + Notes', () => {
 
     const newRow = table.locator('tbody tr', { hasText: serviceName });
     await expect(newRow).toBeVisible();
-    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
+    const taskId = (await newRow.locator('td').nth(1).innerText()).trim();
 
     // Run scheduler so the task gets scheduled
     await page.getByTestId('tasks-refresh').click();
@@ -312,7 +309,7 @@ test.describe('Task Details + Notes', () => {
     await waitForTableRows(table);
 
     const firstRow = table.locator('tbody tr').first();
-    const taskId = (await firstRow.locator('td').nth(0).innerText()).trim();
+    const taskId = (await firstRow.locator('td').nth(1).innerText()).trim();
     await firstRow.locator('a').first().click();
 
     await expect(page.getByTestId('task-details-card')).toBeVisible();

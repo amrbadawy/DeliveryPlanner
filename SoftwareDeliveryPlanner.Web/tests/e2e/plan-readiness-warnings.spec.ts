@@ -60,7 +60,7 @@ test.describe('Plan readiness warnings', () => {
     // Find the new task row
     const newRow = table.locator('tbody tr', { hasText: serviceName });
     await expect(newRow).toBeVisible();
-    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
+    const taskId = (await newRow.locator('td').nth(1).innerText()).trim();
 
     // Resource gap warning should appear immediately (even before scheduler)
     const resourceGapWarning = page.getByTestId(`resource-gap-warning-${taskId}`);
@@ -109,7 +109,7 @@ test.describe('Plan readiness warnings', () => {
 
     const newRow = table.locator('tbody tr', { hasText: serviceName });
     await expect(newRow).toBeVisible();
-    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
+    const taskId = (await newRow.locator('td').nth(1).innerText()).trim();
 
     // Run the scheduler
     await page.getByTestId('tasks-refresh').click();
@@ -202,7 +202,7 @@ test.describe('Plan readiness warnings', () => {
 
     const newRow = table.locator('tbody tr', { hasText: serviceName });
     await expect(newRow).toBeVisible();
-    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
+    const taskId = (await newRow.locator('td').nth(1).innerText()).trim();
 
     // Resource gap warning should appear because no Principal DEV exists
     const resourceGapWarning = page.getByTestId(`resource-gap-warning-${taskId}`);
@@ -220,7 +220,7 @@ test.describe('Plan readiness warnings', () => {
   });
 
   test('resource gap warning clears after adding a matching resource', async ({ page }) => {
-    // Step 1: Create a task requiring UX role (no UX resource exists)
+    // Use DEV + MinSeniority=Principal — no Principal DEV in seed data → guaranteed gap
     await gotoPage(page, '/tasks');
     const table = page.getByTestId('tasks-table');
     await waitForTableRows(table);
@@ -231,24 +231,21 @@ test.describe('Plan readiness warnings', () => {
     await expectModalVisible(page, 'tasks-modal');
     await fillInputByTestId(page, 'tasks-service-name', serviceName);
     await fillInputByTestId(page, 'effort-days-DEV', '3');
+    await fillInputByTestId(page, 'effort-seniority-DEV', 'Principal');
     await fillInputByTestId(page, 'effort-days-QA', '1');
-
-    await page.getByTestId('effort-add-role-select').selectOption('UX');
-    await page.getByTestId('effort-add-btn').click();
-    await fillInputByTestId(page, 'effort-days-UX', '2');
 
     await page.getByTestId('tasks-save').click();
     await expect(page.getByTestId('tasks-modal')).toBeHidden();
 
     const newRow = table.locator('tbody tr', { hasText: serviceName });
     await expect(newRow).toBeVisible();
-    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
+    const taskId = (await newRow.locator('td').nth(1).innerText()).trim();
 
-    // Verify gap warning is visible
+    // Verify gap warning is visible (no Principal DEV exists)
     const gapWarning = page.getByTestId(`resource-gap-warning-${taskId}`);
     await expect(gapWarning).toBeVisible({ timeout: 5_000 });
 
-    // Step 2: Add a UX resource
+    // Step 2: Add a Principal DEV resource
     await gotoPage(page, '/resources');
     const resTable = page.getByTestId('resources-table');
     await waitForTableRows(resTable);
@@ -256,9 +253,10 @@ test.describe('Plan readiness warnings', () => {
     await page.getByTestId('resources-add').click();
     await expectModalVisible(page, 'resources-modal');
     const resourceId = (await page.getByTestId('resources-id').inputValue()).trim();
-    await fillInputByTestId(page, 'resources-name', uniqueSuffix('UX Resource'));
-    await fillInputByTestId(page, 'resources-role', 'UX Designer');
+    await fillInputByTestId(page, 'resources-name', uniqueSuffix('Principal Dev'));
+    await fillInputByTestId(page, 'resources-role', 'Developer');
     await fillInputByTestId(page, 'resources-team', 'E2E Team');
+    await page.getByTestId('resources-seniority').selectOption('Principal');
     await page.getByTestId('resources-save').click();
     await expect(page.getByTestId('resources-modal')).toBeHidden();
 
@@ -291,27 +289,21 @@ test.describe('Plan readiness warnings', () => {
 
     const serviceName = uniqueSuffix('TooltipTest');
 
-    // Create a task with both UX and BA roles — neither has a matching resource in seed data
+    // Create a task with DEV+Principal AND QA+Principal — neither has a Principal resource in seed
     await page.getByTestId('tasks-add').click();
     await expectModalVisible(page, 'tasks-modal');
     await fillInputByTestId(page, 'tasks-service-name', serviceName);
     await fillInputByTestId(page, 'effort-days-DEV', '2');
+    await fillInputByTestId(page, 'effort-seniority-DEV', 'Principal');
     await fillInputByTestId(page, 'effort-days-QA', '1');
-
-    await page.getByTestId('effort-add-role-select').selectOption('UX');
-    await page.getByTestId('effort-add-btn').click();
-    await fillInputByTestId(page, 'effort-days-UX', '3');
-
-    await page.getByTestId('effort-add-role-select').selectOption('BA');
-    await page.getByTestId('effort-add-btn').click();
-    await fillInputByTestId(page, 'effort-days-BA', '2');
+    await fillInputByTestId(page, 'effort-seniority-QA', 'Principal');
 
     await page.getByTestId('tasks-save').click();
     await expect(page.getByTestId('tasks-modal')).toBeHidden();
 
     const newRow = table.locator('tbody tr', { hasText: serviceName });
     await expect(newRow).toBeVisible();
-    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
+    const taskId = (await newRow.locator('td').nth(1).innerText()).trim();
 
     // Resource gap warning should be visible with multiple uncovered roles
     const gapWarning = page.getByTestId(`resource-gap-warning-${taskId}`);
@@ -319,9 +311,9 @@ test.describe('Plan readiness warnings', () => {
 
     const title = await gapWarning.getAttribute('title');
     expect(title).toMatch(/No active resource for role\(s\):/);
-    // Tooltip should list both uncovered role names
-    expect(title).toContain('UX');
-    expect(title).toContain('BA');
+    // Tooltip should list both uncovered role names (DEV and QA both require Principal seniority)
+    expect(title).toContain('DEV');
+    expect(title).toContain('QA');
 
     // Clean up
     await page.getByTestId(`tasks-delete-${taskId}`).click();
@@ -352,7 +344,7 @@ test.describe('Plan readiness warnings', () => {
 
     const newRow = table.locator('tbody tr', { hasText: serviceName });
     await expect(newRow).toBeVisible();
-    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
+    const taskId = (await newRow.locator('td').nth(1).innerText()).trim();
 
     // Run the scheduler
     await page.getByTestId('tasks-refresh').click();
@@ -365,7 +357,7 @@ test.describe('Plan readiness warnings', () => {
 
     // Finish and Days columns should show scheduled values (not dash)
     const cells = updatedRow.locator('td');
-    const finishCell = cells.nth(6);
+    const finishCell = cells.nth(7);
     await expect(finishCell).not.toContainText('—');
 
     // Clean up
@@ -405,7 +397,8 @@ test.describe('Plan readiness warnings', () => {
   });
 
   test('inactive resource causes resource gap', async ({ page }) => {
-    // Step 1: Create a UX resource (active)
+    // Use DEV + MinSeniority=Principal: create a Principal DEV resource first,
+    // then a task that requires it. Deactivating it must trigger the gap warning.
     await gotoPage(page, '/resources');
     const resTable = page.getByTestId('resources-table');
     await waitForTableRows(resTable);
@@ -413,14 +406,15 @@ test.describe('Plan readiness warnings', () => {
     await page.getByTestId('resources-add').click();
     await expectModalVisible(page, 'resources-modal');
     const resourceId = (await page.getByTestId('resources-id').inputValue()).trim();
-    const resName = uniqueSuffix('InactiveRes');
+    const resName = uniqueSuffix('InactivePrincipalDev');
     await fillInputByTestId(page, 'resources-name', resName);
-    await fillInputByTestId(page, 'resources-role', 'UX Designer');
+    await fillInputByTestId(page, 'resources-role', 'Developer');
     await fillInputByTestId(page, 'resources-team', 'E2E Team');
+    await page.getByTestId('resources-seniority').selectOption('Principal');
     await page.getByTestId('resources-save').click();
     await expect(page.getByTestId('resources-modal')).toBeHidden();
 
-    // Step 2: Create a task with UX role — should have NO gap since UX resource exists
+    // Step 2: Create a task requiring Principal DEV — no gap since resource just created
     await gotoPage(page, '/tasks');
     const table = page.getByTestId('tasks-table');
     await waitForTableRows(table);
@@ -430,22 +424,20 @@ test.describe('Plan readiness warnings', () => {
     await expectModalVisible(page, 'tasks-modal');
     await fillInputByTestId(page, 'tasks-service-name', serviceName);
     await fillInputByTestId(page, 'effort-days-DEV', '3');
+    await fillInputByTestId(page, 'effort-seniority-DEV', 'Principal');
     await fillInputByTestId(page, 'effort-days-QA', '1');
-    await page.getByTestId('effort-add-role-select').selectOption('UX');
-    await page.getByTestId('effort-add-btn').click();
-    await fillInputByTestId(page, 'effort-days-UX', '2');
     await page.getByTestId('tasks-save').click();
     await expect(page.getByTestId('tasks-modal')).toBeHidden();
 
     const newRow = table.locator('tbody tr', { hasText: serviceName });
     await expect(newRow).toBeVisible();
-    const taskId = (await newRow.locator('td').nth(0).innerText()).trim();
+    const taskId = (await newRow.locator('td').nth(1).innerText()).trim();
 
-    // No resource gap — UX resource is active
+    // No resource gap — Principal DEV resource is active
     const gapWarning = page.getByTestId(`resource-gap-warning-${taskId}`);
     await expect(gapWarning).not.toBeVisible();
 
-    // Step 3: Deactivate the UX resource
+    // Step 3: Deactivate the Principal DEV resource
     await gotoPage(page, '/resources');
     await waitForTableRows(page.getByTestId('resources-table'));
     await page.getByTestId(`resources-edit-${resourceId}`).click();

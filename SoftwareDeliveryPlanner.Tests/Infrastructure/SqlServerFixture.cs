@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
+using SoftwareDeliveryPlanner.Infrastructure.Data;
 
 namespace SoftwareDeliveryPlanner.Tests.Infrastructure;
 
@@ -21,11 +23,19 @@ namespace SoftwareDeliveryPlanner.Tests.Infrastructure;
 public class SqlServerFixture : IAsyncLifetime
 {
     private const string EnvVarName = "TEST_SQL_CONNECTION";
-    private const string DefaultConnectionString = "Server=.;Trusted_Connection=True;TrustServerCertificate=True;";
+    private const string DefaultConnectionString = "Server=.;Trusted_Connection=True;TrustServerCertificate=True;Connect Timeout=10;";
     private const string SharedDatabaseName = "SoftwareDeliveryPlannerTest";
 
     private string _baseConnectionString = string.Empty;
     private readonly ConcurrentBag<string> _createdDatabases = new();
+
+    /// <summary>
+    /// Cached DbContext options and connection string after the first database
+    /// creation. Subsequent test classes reuse the same schema and only reset
+    /// the data, which is ~20× faster than drop-and-recreate.
+    /// Set by <see cref="TestDatabaseHelper.CreateOptions"/>.
+    /// </summary>
+    internal (DbContextOptions<PlannerDbContext> Options, string ConnectionString)? CachedOptions { get; set; }
 
     /// <summary>
     /// Base connection string (master / default catalog) for the SQL Server instance.
