@@ -89,6 +89,27 @@ builder.Services.AddScoped<SoftwareDeliveryPlanner.Web.Services.TaskFilterState>
 builder.Services.AddScoped<SoftwareDeliveryPlanner.Web.Services.ResourceFilterState>();
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// ---------------------------------------------------------------------------
+// Test-fault seam — registered with a no-op default in production. When the
+// SDP_TEST_FAULTS=1 environment variable is set, an in-memory armable
+// implementation is registered instead and a pair of minimal-API endpoints
+// (POST /test-faults/arm, POST /test-faults/clear) become available so e2e
+// tests can deterministically exercise failure-handling UI paths.
+// ---------------------------------------------------------------------------
+var testFaultsEnabled = string.Equals(
+    Environment.GetEnvironmentVariable("SDP_TEST_FAULTS"), "1", StringComparison.Ordinal);
+
+if (testFaultsEnabled)
+{
+    var policy = new SoftwareDeliveryPlanner.Web.Services.Testing.InMemoryTestFaultPolicy(enabled: true);
+    builder.Services.AddSingleton<ITestFaultPolicy>(policy);
+    builder.Services.AddSingleton(policy); // also expose concrete type for the endpoint handlers
+}
+else
+{
+    builder.Services.AddSingleton<ITestFaultPolicy, NoOpTestFaultPolicy>();
+}
+
 var app = builder.Build();
 
 // Apply pending migrations and seed data
@@ -147,5 +168,29 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+// ---------------------------------------------------------------------------
+// Test-fault endpoints — only registered when SDP_TEST_FAULTS=1.
+// They mutate the in-memory armed-set used by InMemoryTestFaultPolicy.
+// Both endpoints are restricted to localhost so they can never be reached
+// from outside the test runner host even if the env var is accidentally set.
+// ---------------------------------------------------------------------------
+if (testFaultsEnabled)
+{
+    app.MapPost("/test-faults/arm", (string operation,
+        SoftwareDeliveryPlanner.Web.Services.Testing.InMemoryTestFaultPolicy policy) =>
+    {
+        policy.Arm(operation);
+        return Results.NoContent();
+    }).RequireHost("localhost", "localhost:*", "127.0.0.1", "127.0.0.1:*");
+
+    app.MapPost("/test-faults/clear", (string? operation,
+        SoftwareDeliveryPlanner.Web.Services.Testing.InMemoryTestFaultPolicy policy) =>
+    {
+        if (string.IsNullOrWhiteSpace(operation)) policy.ClearAll();
+        else policy.Clear(operation);
+        return Results.NoContent();
+    }).RequireHost("localhost", "localhost:*", "127.0.0.1", "127.0.0.1:*");
+}
 
 app.Run();

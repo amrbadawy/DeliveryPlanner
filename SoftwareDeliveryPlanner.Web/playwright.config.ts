@@ -32,6 +32,11 @@ export default defineConfig({
     env: {
       ASPNETCORE_ENVIRONMENT: 'Development',
       PLANNER_DB_PATH: testDbPath,
+      // Enables the env-gated test-fault seam (ITestFaultPolicy →
+      // InMemoryTestFaultPolicy + POST /test-faults/{arm,clear}). Always 0
+      // in production; only set here so e2e specs can deterministically
+      // exercise failure-handling UI paths.
+      SDP_TEST_FAULTS: '1',
     },
   },
   projects: [
