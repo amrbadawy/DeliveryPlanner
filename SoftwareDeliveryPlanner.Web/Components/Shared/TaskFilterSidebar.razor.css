@@ -188,6 +188,77 @@
     gap: 0.25rem;
 }
 
+/* Per-section bulk-action overflow menu */
+.task-filter-bulk-menu-container {
+    position: relative;
+}
+
+.task-filter-bulk-trigger {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    padding: 0 0.35rem;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.task-filter-bulk-trigger:hover {
+    background: var(--color-bg-secondary);
+    border-color: var(--color-border);
+    color: var(--color-text-primary);
+}
+
+.task-filter-bulk-dropdown {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    z-index: 20;
+    min-width: 100px;
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    padding: 0.25rem 0;
+}
+
+.task-filter-bulk-action {
+    background: transparent;
+    border: 0;
+    text-align: left;
+    padding: 0.3rem 0.7rem;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-primary);
+    cursor: pointer;
+}
+
+.task-filter-bulk-action:hover {
+    background: var(--color-bg-secondary);
+}
+
+/* Chip count badge */
+.task-filter-chip-count {
+    background: var(--color-bg-primary);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    font-size: 0.65rem;
+    padding: 0 0.4rem;
+    line-height: 1.2;
+    margin-left: 0.25rem;
+    min-width: 1.1rem;
+    text-align: center;
+}
+
+.task-filter-chip.active .task-filter-chip-count {
+    background: var(--color-bg-primary);
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+}
+
 .task-filter-reset-default {
     background: transparent;
     border: 1px solid var(--color-border);

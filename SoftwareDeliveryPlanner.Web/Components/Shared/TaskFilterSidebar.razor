@@ -67,17 +67,37 @@
 
             <!-- Status -->
             <section class="task-filter-section">
-                <div class="task-filter-section-label">Status</div>
+                <div class="task-filter-section-header">
+                    <div class="task-filter-section-label">Status</div>
+                    <div class="task-filter-bulk-menu-container">
+                        <button type="button" class="task-filter-bulk-trigger"
+                                title="Bulk actions for Status"
+                                @onclick='() => ToggleBulkMenu("status")'
+                                data-testid="task-filter-bulk-trigger-status">
+                            <i class="bi bi-three-dots"></i>
+                        </button>
+                        @if (_openBulkSection == "status")
+                        {
+                            <div class="task-filter-bulk-dropdown" data-testid="task-filter-bulk-menu-status">
+                                <button type="button" class="task-filter-bulk-action" @onclick='() => BulkAll("status", StatusChips.Select(x => x.Code))' data-testid="task-filter-bulk-all-status">All</button>
+                                <button type="button" class="task-filter-bulk-action" @onclick='() => BulkClear("status")' data-testid="task-filter-bulk-clear-status">Clear</button>
+                                <button type="button" class="task-filter-bulk-action" @onclick='() => BulkInvert("status", StatusChips.Select(x => x.Code))' data-testid="task-filter-bulk-invert-status">Invert</button>
+                            </div>
+                        }
+                    </div>
+                </div>
                 <div class="task-filter-chip-group" role="group" aria-label="Filter by status">
                     @foreach (var (code, display) in StatusChips)
                     {
                         var active = Filter.SelectedStatuses.Contains(code);
+                        var count = GetChipCount("status", code);
                         <button type="button"
                                 class="task-filter-chip @(active ? "active" : "")"
                                 aria-pressed="@active.ToString().ToLowerInvariant()"
                                 @onclick="() => Filter.ToggleStatus(code)"
                                 data-testid="@($"task-filter-chip-status-{code.ToLowerInvariant()}")">
                             @display
+                            @if (count.HasValue) { <span class="task-filter-chip-count">@count</span> }
                         </button>
                     }
                 </div>
@@ -85,17 +105,37 @@
 
             <!-- Risk -->
             <section class="task-filter-section">
-                <div class="task-filter-section-label">Delivery risk</div>
+                <div class="task-filter-section-header">
+                    <div class="task-filter-section-label">Delivery risk</div>
+                    <div class="task-filter-bulk-menu-container">
+                        <button type="button" class="task-filter-bulk-trigger"
+                                title="Bulk actions for Delivery risk"
+                                @onclick='() => ToggleBulkMenu("risk")'
+                                data-testid="task-filter-bulk-trigger-risk">
+                            <i class="bi bi-three-dots"></i>
+                        </button>
+                        @if (_openBulkSection == "risk")
+                        {
+                            <div class="task-filter-bulk-dropdown" data-testid="task-filter-bulk-menu-risk">
+                                <button type="button" class="task-filter-bulk-action" @onclick='() => BulkAll("risk", RiskChips.Select(x => x.Code))' data-testid="task-filter-bulk-all-risk">All</button>
+                                <button type="button" class="task-filter-bulk-action" @onclick='() => BulkClear("risk")' data-testid="task-filter-bulk-clear-risk">Clear</button>
+                                <button type="button" class="task-filter-bulk-action" @onclick='() => BulkInvert("risk", RiskChips.Select(x => x.Code))' data-testid="task-filter-bulk-invert-risk">Invert</button>
+                            </div>
+                        }
+                    </div>
+                </div>
                 <div class="task-filter-chip-group" role="group" aria-label="Filter by risk">
                     @foreach (var (code, display, swatch) in RiskChips)
                     {
                         var active = Filter.SelectedRisks.Contains(code);
+                        var count = GetChipCount("risk", code);
                         <button type="button"
                                 class="task-filter-chip task-filter-chip-risk task-filter-chip-risk-@swatch @(active ? "active" : "")"
                                 aria-pressed="@active.ToString().ToLowerInvariant()"
                                 @onclick="() => Filter.ToggleRisk(code)"
                                 data-testid="@($"task-filter-chip-risk-{code.ToLowerInvariant()}")">
                             @display
+                            @if (count.HasValue) { <span class="task-filter-chip-count">@count</span> }
                         </button>
                     }
                 </div>
@@ -103,17 +143,37 @@
 
             <!-- Priority -->
             <section class="task-filter-section">
-                <div class="task-filter-section-label">Priority</div>
+                <div class="task-filter-section-header">
+                    <div class="task-filter-section-label">Priority</div>
+                    <div class="task-filter-bulk-menu-container">
+                        <button type="button" class="task-filter-bulk-trigger"
+                                title="Bulk actions for Priority"
+                                @onclick='() => ToggleBulkMenu("priority")'
+                                data-testid="task-filter-bulk-trigger-priority">
+                            <i class="bi bi-three-dots"></i>
+                        </button>
+                        @if (_openBulkSection == "priority")
+                        {
+                            <div class="task-filter-bulk-dropdown" data-testid="task-filter-bulk-menu-priority">
+                                <button type="button" class="task-filter-bulk-action" @onclick='() => BulkAll("priority", PriorityChips.Select(x => x.Code))' data-testid="task-filter-bulk-all-priority">All</button>
+                                <button type="button" class="task-filter-bulk-action" @onclick='() => BulkClear("priority")' data-testid="task-filter-bulk-clear-priority">Clear</button>
+                                <button type="button" class="task-filter-bulk-action" @onclick='() => BulkInvert("priority", PriorityChips.Select(x => x.Code))' data-testid="task-filter-bulk-invert-priority">Invert</button>
+                            </div>
+                        }
+                    </div>
+                </div>
                 <div class="task-filter-chip-group" role="group" aria-label="Filter by priority">
                     @foreach (var (code, display) in PriorityChips)
                     {
                         var active = Filter.SelectedPriorityBuckets.Contains(code);
+                        var count = GetChipCount("priority", code);
                         <button type="button"
                                 class="task-filter-chip @(active ? "active" : "")"
                                 aria-pressed="@active.ToString().ToLowerInvariant()"
                                 @onclick="() => Filter.TogglePriorityBucket(code)"
                                 data-testid="@($"task-filter-chip-priority-{code.ToLowerInvariant()}")">
                             @display
+                            @if (count.HasValue) { <span class="task-filter-chip-count">@count</span> }
                         </button>
                     }
                 </div>
@@ -121,11 +181,30 @@
 
             <!-- Role (effort breakdown) -->
             <section class="task-filter-section">
-                <div class="task-filter-section-label">Role</div>
+                <div class="task-filter-section-header">
+                    <div class="task-filter-section-label">Role</div>
+                    <div class="task-filter-bulk-menu-container">
+                        <button type="button" class="task-filter-bulk-trigger"
+                                title="Bulk actions for Role"
+                                @onclick='() => ToggleBulkMenu("role")'
+                                data-testid="task-filter-bulk-trigger-role">
+                            <i class="bi bi-three-dots"></i>
+                        </button>
+                        @if (_openBulkSection == "role")
+                        {
+                            <div class="task-filter-bulk-dropdown" data-testid="task-filter-bulk-menu-role">
+                                <button type="button" class="task-filter-bulk-action" @onclick='() => BulkAll("role", DomainConstants.ResourceRole.PipelineOrder)' data-testid="task-filter-bulk-all-role">All</button>
+                                <button type="button" class="task-filter-bulk-action" @onclick='() => BulkClear("role")' data-testid="task-filter-bulk-clear-role">Clear</button>
+                                <button type="button" class="task-filter-bulk-action" @onclick='() => BulkInvert("role", DomainConstants.ResourceRole.PipelineOrder)' data-testid="task-filter-bulk-invert-role">Invert</button>
+                            </div>
+                        }
+                    </div>
+                </div>
                 <div class="task-filter-chip-group" role="group" aria-label="Filter by role">
                     @foreach (var role in DomainConstants.ResourceRole.PipelineOrder)
                     {
                         var active = Filter.SelectedRoles.Contains(role);
+                        var count = GetChipCount("role", role);
                         <button type="button"
                                 class="task-filter-chip task-filter-chip-role @(active ? "active" : "")"
                                 aria-pressed="@active.ToString().ToLowerInvariant()"
@@ -133,6 +212,7 @@
                                 data-testid="@($"task-filter-chip-role-{role.ToLowerInvariant()}")">
                             <span class="task-filter-chip-swatch gantt-role-@role.ToLowerInvariant()"></span>
                             @DomainConstants.ResourceRole.GetDisplayName(role)
+                            @if (count.HasValue) { <span class="task-filter-chip-count">@count</span> }
                         </button>
                     }
                 </div>
@@ -142,17 +222,37 @@
             @if (AvailablePhases is { Count: > 0 })
             {
                 <section class="task-filter-section">
-                    <div class="task-filter-section-label">Phase</div>
+                    <div class="task-filter-section-header">
+                        <div class="task-filter-section-label">Phase</div>
+                        <div class="task-filter-bulk-menu-container">
+                            <button type="button" class="task-filter-bulk-trigger"
+                                    title="Bulk actions for Phase"
+                                    @onclick='() => ToggleBulkMenu("phase")'
+                                    data-testid="task-filter-bulk-trigger-phase">
+                                <i class="bi bi-three-dots"></i>
+                            </button>
+                            @if (_openBulkSection == "phase")
+                            {
+                                <div class="task-filter-bulk-dropdown" data-testid="task-filter-bulk-menu-phase">
+                                    <button type="button" class="task-filter-bulk-action" @onclick='() => BulkAll("phase", AvailablePhases)' data-testid="task-filter-bulk-all-phase">All</button>
+                                    <button type="button" class="task-filter-bulk-action" @onclick='() => BulkClear("phase")' data-testid="task-filter-bulk-clear-phase">Clear</button>
+                                    <button type="button" class="task-filter-bulk-action" @onclick='() => BulkInvert("phase", AvailablePhases)' data-testid="task-filter-bulk-invert-phase">Invert</button>
+                                </div>
+                            }
+                        </div>
+                    </div>
                     <div class="task-filter-chip-group" role="group" aria-label="Filter by phase">
                         @foreach (var phase in AvailablePhases)
                         {
                             var active = Filter.SelectedPhases.Contains(phase);
+                            var count = GetChipCount("phase", phase);
                             <button type="button"
                                     class="task-filter-chip @(active ? "active" : "")"
                                     aria-pressed="@active.ToString().ToLowerInvariant()"
                                     @onclick="() => Filter.TogglePhase(phase)"
                                     data-testid="@($"task-filter-chip-phase-{SanitizeId(phase)}")">
                                 @(string.IsNullOrEmpty(phase) ? "(no phase)" : phase)
+                                @if (count.HasValue) { <span class="task-filter-chip-count">@count</span> }
                             </button>
                         }
                     </div>
@@ -161,17 +261,37 @@
 
             <!-- Dependency state -->
             <section class="task-filter-section">
-                <div class="task-filter-section-label">Dependencies</div>
+                <div class="task-filter-section-header">
+                    <div class="task-filter-section-label">Dependencies</div>
+                    <div class="task-filter-bulk-menu-container">
+                        <button type="button" class="task-filter-bulk-trigger"
+                                title="Bulk actions for Dependencies"
+                                @onclick='() => ToggleBulkMenu("dep")'
+                                data-testid="task-filter-bulk-trigger-dep">
+                            <i class="bi bi-three-dots"></i>
+                        </button>
+                        @if (_openBulkSection == "dep")
+                        {
+                            <div class="task-filter-bulk-dropdown" data-testid="task-filter-bulk-menu-dep">
+                                <button type="button" class="task-filter-bulk-action" @onclick='() => BulkAll("dep", DepStateChips.Select(x => x.Code))' data-testid="task-filter-bulk-all-dep">All</button>
+                                <button type="button" class="task-filter-bulk-action" @onclick='() => BulkClear("dep")' data-testid="task-filter-bulk-clear-dep">Clear</button>
+                                <button type="button" class="task-filter-bulk-action" @onclick='() => BulkInvert("dep", DepStateChips.Select(x => x.Code))' data-testid="task-filter-bulk-invert-dep">Invert</button>
+                            </div>
+                        }
+                    </div>
+                </div>
                 <div class="task-filter-chip-group" role="group" aria-label="Filter by dependency state">
                     @foreach (var (code, display) in DepStateChips)
                     {
                         var active = Filter.SelectedDependencyStates.Contains(code);
+                        var count = GetChipCount("dep", code);
                         <button type="button"
                                 class="task-filter-chip @(active ? "active" : "")"
                                 aria-pressed="@active.ToString().ToLowerInvariant()"
                                 @onclick="() => Filter.ToggleDependencyState(code)"
                                 data-testid="@($"task-filter-chip-dep-{code.ToLowerInvariant()}")">
                             @display
+                            @if (count.HasValue) { <span class="task-filter-chip-count">@count</span> }
                         </button>
                     }
                 </div>
@@ -352,6 +472,12 @@
     /// <summary>Distinct phases discovered in the page's data set.</summary>
     [Parameter] public IReadOnlyList<string>? AvailablePhases { get; set; }
 
+    /// <summary>
+    /// Optional per-chip task counts for display badges.
+    /// Keys are <c>"dimension:CODE"</c> e.g. <c>"status:IN_PROGRESS"</c>.
+    /// </summary>
+    [Parameter] public IReadOnlyDictionary<string, int>? ChipCounts { get; set; }
+
     private bool isCollapsed;
     private List<SavedView> savedViews = new();
     private string newViewName = string.Empty;
@@ -375,6 +501,9 @@
 
     // Active applied view tracking
     private int? _activeAppliedViewId;
+
+    // Bulk-action section menu state ("status" | "risk" | "priority" | "role" | "dep" | "phase" | null)
+    private string? _openBulkSection;
 
     private string CollapseKey => $"sdp-task-filter-collapsed-{PageKey}";
 
@@ -468,6 +597,7 @@
 
         selfRef = DotNetObjectReference.Create(this);
         await JS.InvokeVoidAsync("TaskFilterSidebarKeyboard.bind", selfRef);
+        await JS.InvokeVoidAsync("TaskFilterSidebarRoving.bind");
 
         // Restore persisted collapsed state. Done here (not OnInitializedAsync)
         // because JS localStorage is not available during server-side prerender.
@@ -762,6 +892,32 @@
         ApplyView(defaultView);
     }
 
+    // ── Chip counts ──────────────────────────────────────────────────────────
+    private int? GetChipCount(string dimension, string code) =>
+        ChipCounts is not null && ChipCounts.TryGetValue($"{dimension}:{code}", out var n) ? n : null;
+
+    // ── Per-section bulk actions ─────────────────────────────────────────────
+    private void ToggleBulkMenu(string section) =>
+        _openBulkSection = _openBulkSection == section ? null : section;
+
+    private void BulkAll(string dim, IEnumerable<string> universe)
+    {
+        Filter.SelectAllDimension(dim, universe);
+        _openBulkSection = null;
+    }
+
+    private void BulkClear(string dim)
+    {
+        Filter.ClearDimension(dim);
+        _openBulkSection = null;
+    }
+
+    private void BulkInvert(string dim, IEnumerable<string> universe)
+    {
+        Filter.InvertDimension(dim, universe);
+        _openBulkSection = null;
+    }
+
     private static string SanitizeId(string value) =>
         string.IsNullOrWhiteSpace(value) ? "none"
         : new string(value.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
@@ -794,6 +950,7 @@
         try
         {
             await JS.InvokeVoidAsync("TaskFilterSidebarKeyboard.unbind");
+            await JS.InvokeVoidAsync("TaskFilterSidebarRoving.unbind");
         }
         catch
         {

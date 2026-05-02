@@ -93,6 +93,49 @@ public sealed class TaskFilterState : IDisposable
     public void ToggleRole(string role) => ToggleSet(Current.Roles, role);
     public void ToggleDependencyState(string state) => ToggleSet(Current.DependencyStates, state);
 
+    /// <summary>Selects all values in a chip-based dimension from the given universe.</summary>
+    public void SelectAllDimension(string dimension, IEnumerable<string> universe)
+    {
+        var set = GetDimensionSet(dimension);
+        if (set == null) return;
+        foreach (var item in universe)
+            if (!string.IsNullOrWhiteSpace(item)) set.Add(item);
+        Notify();
+    }
+
+    /// <summary>Clears all selections in a chip-based dimension.</summary>
+    public void ClearDimension(string dimension)
+    {
+        var set = GetDimensionSet(dimension);
+        if (set == null || set.Count == 0) return;
+        set.Clear();
+        Notify();
+    }
+
+    /// <summary>Inverts the selection in a chip-based dimension relative to the given universe.</summary>
+    public void InvertDimension(string dimension, IEnumerable<string> universe)
+    {
+        var set = GetDimensionSet(dimension);
+        if (set == null) return;
+        foreach (var item in universe)
+        {
+            if (string.IsNullOrWhiteSpace(item)) continue;
+            if (!set.Remove(item)) set.Add(item);
+        }
+        Notify();
+    }
+
+    private HashSet<string>? GetDimensionSet(string dimension) => dimension switch
+    {
+        "status"   => Current.Statuses,
+        "risk"     => Current.Risks,
+        "priority" => Current.PriorityBuckets,
+        "phase"    => Current.Phases,
+        "role"     => Current.Roles,
+        "dep"      => Current.DependencyStates,
+        _          => null
+    };
+
     /// <summary>Pin a task to the top of the rendered list. Pinning auto-unhides.</summary>
     public void TogglePin(string taskId)
     {
