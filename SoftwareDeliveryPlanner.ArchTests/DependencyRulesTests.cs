@@ -2006,6 +2006,67 @@ public class DependencyRulesTests
     }
 
     /// <summary>
+    /// Pure helpers under <c>SoftwareDeliveryPlanner.Web.Services.Heatmap</c> must not
+    /// take dependencies on EF Core, MediatR, or other infrastructure — they are
+    /// the testable core of the Heatmap view (colour palette, future bucket math)
+    /// and must remain side-effect free.
+    /// </summary>
+    [Fact]
+    public void Web_Services_Heatmap_Must_Not_Reference_Infrastructure_Or_MediatR()
+    {
+        var webAssembly = LoadWebAssembly();
+        Assert.NotNull(webAssembly);
+
+        var helperTypes = SafeGetTypes(webAssembly!)
+            .Where(t =>
+            {
+                try { return t.Namespace?.StartsWith("SoftwareDeliveryPlanner.Web.Services.Heatmap", StringComparison.Ordinal) == true; }
+                catch { return false; }
+            })
+            .ToList();
+
+        Assert.NotEmpty(helperTypes);
+
+        var forbiddenAssemblyPrefixes = new[]
+        {
+            "Microsoft.EntityFrameworkCore",
+            "MediatR",
+            "SoftwareDeliveryPlanner.Infrastructure"
+        };
+
+        var violations = new List<string>();
+        foreach (var t in helperTypes)
+        {
+            var referenced = new HashSet<Type>();
+            try
+            {
+                foreach (var m in t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance))
+                {
+                    referenced.Add(m.ReturnType);
+                    foreach (var p in m.GetParameters()) referenced.Add(p.ParameterType);
+                }
+                foreach (var f in t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance))
+                    referenced.Add(f.FieldType);
+            }
+            catch (TypeLoadException) { /* skip helpers whose signatures touch unloaded types */ }
+            catch (FileNotFoundException) { /* same */ }
+
+            foreach (var r in referenced)
+            {
+                string asmName;
+                try { asmName = r.Assembly.GetName().Name ?? ""; }
+                catch { continue; }
+                if (forbiddenAssemblyPrefixes.Any(p => asmName.StartsWith(p, StringComparison.Ordinal)))
+                    violations.Add($"{t.FullName} references {r.FullName} (from {asmName})");
+            }
+        }
+
+        Assert.True(violations.Count == 0,
+            $"Web.Services.Heatmap helpers must remain pure. Violations:{Environment.NewLine}" +
+            string.Join(Environment.NewLine, violations.Distinct()));
+    }
+
+    /// <summary>
     /// Loads the Web assembly via the file system since Web has no public AssemblyMarker
     /// and ArchTests deliberately avoids a project reference to the Web SDK.
     /// </summary>
