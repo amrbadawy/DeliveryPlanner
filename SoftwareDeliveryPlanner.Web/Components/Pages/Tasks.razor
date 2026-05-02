@@ -46,7 +46,8 @@
 
 <div class="tasks-layout">
 <TaskFilterSidebar PageKey="@SoftwareDeliveryPlanner.Web.Services.TaskFilterState.PageKeyTasks"
-                   AvailablePhases="availablePhases" />
+                   AvailablePhases="availablePhases"
+                   ChipCounts="ComputeChipCounts()" />
 <div class="tasks-layout-main">
 
 <!-- Search / Filter bar -->
@@ -924,6 +925,37 @@ else
         resources = resourceResult.Value;
 
         ComputeWarnings();
+    }
+
+    /// <summary>
+    /// Computes per-chip task counts for the sidebar. v1: counts are based on the
+    /// unfiltered task list, so each chip shows the total tasks that would match
+    /// just that one chip selection (ignoring other active chips).
+    /// Keys use the form "dimension:CODE" e.g. "status:IN_PROGRESS".
+    /// </summary>
+    private IReadOnlyDictionary<string, int> ComputeChipCounts()
+    {
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var t in tasks)
+        {
+            counts[$"status:{t.Status}"] = counts.GetValueOrDefault($"status:{t.Status}") + 1;
+            counts[$"risk:{t.DeliveryRisk}"] = counts.GetValueOrDefault($"risk:{t.DeliveryRisk}") + 1;
+            var bucket = SoftwareDeliveryPlanner.Web.Services.TaskFilterState.PriorityBuckets.FromPriority(t.Priority);
+            counts[$"priority:{bucket}"] = counts.GetValueOrDefault($"priority:{bucket}") + 1;
+
+            var phase = t.Phase ?? string.Empty;
+            counts[$"phase:{phase}"] = counts.GetValueOrDefault($"phase:{phase}") + 1;
+
+            var roles = t.EffortBreakdown.Select(e => e.Role).Distinct(StringComparer.OrdinalIgnoreCase);
+            foreach (var role in roles)
+                counts[$"role:{role}"] = counts.GetValueOrDefault($"role:{role}") + 1;
+
+            var depKey = t.Dependencies.Count > 0
+                ? SoftwareDeliveryPlanner.Web.Services.TaskFilterState.DependencyStates.HasDependencies
+                : SoftwareDeliveryPlanner.Web.Services.TaskFilterState.DependencyStates.NoDependencies;
+            counts[$"dep:{depKey}"] = counts.GetValueOrDefault($"dep:{depKey}") + 1;
+        }
+        return counts;
     }
 
     private async Task ShowAddModal()

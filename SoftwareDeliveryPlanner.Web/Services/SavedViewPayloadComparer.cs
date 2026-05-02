@@ -30,8 +30,10 @@ public static class SavedViewPayloadComparer
     /// </summary>
     public static bool AreEqual(string? payloadA, string? payloadB)
     {
-        if (ReferenceEquals(payloadA, payloadB)) return true;
+        // Null payloads are never considered equal — defensive: a missing default
+        // payload should always count as drift, never silently match.
         if (payloadA is null || payloadB is null) return false;
+        if (ReferenceEquals(payloadA, payloadB)) return true;
         if (payloadA == payloadB) return true;
 
         try

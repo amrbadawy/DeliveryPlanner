@@ -62,6 +62,9 @@ test.describe('Saved views', () => {
     const deleteBtn = savedList.locator('[data-testid^="task-filter-saved-view-delete-"]').last();
     await deleteBtn.click();
 
+    // Phase 2 wired the delete flow through a ConfirmDialog — confirm it.
+    await page.getByTestId('task-filter-saved-view-delete-modal-confirm').click();
+
     await expect(savedList).not.toContainText(viewName);
   });
 
