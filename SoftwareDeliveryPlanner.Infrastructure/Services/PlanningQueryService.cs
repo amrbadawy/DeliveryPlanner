@@ -27,7 +27,7 @@ internal sealed class PlanningQueryService : ServiceBase, IPlanningQueryService
     public async Task<List<OutputPlanRowDto>> GetOutputPlanAsync(CancellationToken cancellationToken = default)
     {
         using var engine = await EngineFactory.CreateAsync(cancellationToken);
-        return engine.GetOutputPlan();
+        return await engine.GetOutputPlanAsync(cancellationToken);
     }
 
     public async Task<TaskTimelineDto> GetTaskTimelineAsync(string taskId, CancellationToken cancellationToken = default)

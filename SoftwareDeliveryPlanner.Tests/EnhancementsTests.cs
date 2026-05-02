@@ -369,73 +369,73 @@ public class Enhancement11_12_13_5_SchedulingServicesTests : IDisposable
     // ── #11 Overallocation count in KPIs ────────────────────────────
 
     [Fact]
-    public void GetDashboardKPIs_ContainsOverallocationCount_Key()
+    public async Task GetDashboardKPIs_ContainsOverallocationCount_Key()
     {
-        var kpis = _engine.GetDashboardKPIs();
+        var kpis = await _engine.GetDashboardKPIsAsync();
         Assert.True(kpis.ContainsKey("overallocation_count"),
             "KPI dictionary must include 'overallocation_count'");
     }
 
     [Fact]
-    public void GetDashboardKPIs_OverallocationCount_IsNonNegativeInt()
+    public async Task GetDashboardKPIs_OverallocationCount_IsNonNegativeInt()
     {
-        var kpis = _engine.GetDashboardKPIs();
+        var kpis = await _engine.GetDashboardKPIsAsync();
         var count = (int)kpis["overallocation_count"];
         Assert.True(count >= 0);
     }
 
     [Fact]
-    public void GetDashboardKPIs_AfterSchedulerRun_OverallocationCountIsInteger()
+    public async Task GetDashboardKPIs_AfterSchedulerRun_OverallocationCountIsInteger()
     {
-        _engine.RunScheduler();
-        var kpis = _engine.GetDashboardKPIs();
+        await _engine.RunSchedulerAsync();
+        var kpis = await _engine.GetDashboardKPIsAsync();
         Assert.IsType<int>(kpis["overallocation_count"]);
     }
 
     // ── #12 PreviewSchedule diff ─────────────────────────────────────
 
     [Fact]
-    public void PreviewSchedule_ReturnsScheduleDiffDto()
+    public async Task PreviewSchedule_ReturnsScheduleDiffDto()
     {
-        var diff = _engine.PreviewSchedule();
+        var diff = await _engine.PreviewScheduleAsync();
         Assert.NotNull(diff);
     }
 
     [Fact]
-    public void PreviewSchedule_DoesNotPersistAllocations()
+    public async Task PreviewSchedule_DoesNotPersistAllocations()
     {
         var allocsBefore = _db.Allocations.Count();
-        _engine.PreviewSchedule();
+        await _engine.PreviewScheduleAsync();
         var allocsAfter = _db.Allocations.Count();
         Assert.Equal(allocsBefore, allocsAfter);
     }
 
     [Fact]
-    public void PreviewSchedule_ReturnsNewAllocationsCount_NonNegative()
+    public async Task PreviewSchedule_ReturnsNewAllocationsCount_NonNegative()
     {
-        var diff = _engine.PreviewSchedule();
+        var diff = await _engine.PreviewScheduleAsync();
         Assert.True(diff.NewAllocations >= 0);
     }
 
     [Fact]
-    public void PreviewSchedule_TaskChanges_IsNotNull()
+    public async Task PreviewSchedule_TaskChanges_IsNotNull()
     {
-        var diff = _engine.PreviewSchedule();
+        var diff = await _engine.PreviewScheduleAsync();
         Assert.NotNull(diff.TaskChanges);
     }
 
     [Fact]
-    public void PreviewSchedule_TasksAffectedPlusUnchanged_EqualsTotalTasks()
+    public async Task PreviewSchedule_TasksAffectedPlusUnchanged_EqualsTotalTasks()
     {
         var totalTasks = _db.Tasks.Count();
-        var diff = _engine.PreviewSchedule();
+        var diff = await _engine.PreviewScheduleAsync();
         Assert.Equal(totalTasks, diff.TasksAffected + diff.TasksUnchanged);
     }
 
     // ── #10 Parallel Phase Execution ─────────────────────────────────
 
     [Fact]
-    public void RunScheduler_MultiPhaseTask_DEV_and_QA_BothScheduled()
+    public async Task RunScheduler_MultiPhaseTask_DEV_and_QA_BothScheduled()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -445,7 +445,7 @@ public class Enhancement11_12_13_5_SchedulingServicesTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("PP-001", "Parallel Phase Task", 1, B(10)));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var devAllocs = _db.Allocations.Where(a => a.TaskId == "PP-001" && a.Role == "DEV").Count();
         var qaAllocs = _db.Allocations.Where(a => a.TaskId == "PP-001" && a.Role == "QA").Count();
@@ -455,7 +455,7 @@ public class Enhancement11_12_13_5_SchedulingServicesTests : IDisposable
     }
 
     [Fact]
-    public void RunScheduler_TaskCompletes_HasBothPhaseAllocations()
+    public async Task RunScheduler_TaskCompletes_HasBothPhaseAllocations()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -464,7 +464,7 @@ public class Enhancement11_12_13_5_SchedulingServicesTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("PP-002", "Two Phase Task", 1, B(5)));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var task = _db.Tasks.First(t => t.TaskId == "PP-002");
         Assert.Equal(DomainConstants.TaskStatus.Completed, task.Status);
@@ -496,7 +496,7 @@ public class Enhancement9_PerResourceWorkingWeek_EngineTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public void RunScheduler_ResourceWithMonFriWorkingWeek_DoesNotAllocateOnWeekend()
+    public async Task RunScheduler_ResourceWithMonFriWorkingWeek_DoesNotAllocateOnWeekend()
     {
         // Set global working week to Sun-Thu
         _db.Settings.Add(new Setting { Key = DomainConstants.SettingKeys.PlanStartDate, Value = "2026-05-04" }); // Monday
@@ -512,7 +512,7 @@ public class Enhancement9_PerResourceWorkingWeek_EngineTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("WW-001", "Working Week Task", 1, B(10)));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         // For Mon-Fri resource, Saturday (DayOfWeek=6) and Sunday (DayOfWeek=0) should have no allocations
         var saturdayAllocs = _db.Allocations
@@ -551,7 +551,7 @@ public class Enhancement1_Seniority_EngineTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public void RunScheduler_PhaseWithMinSeniority_OnlyAssignsSeniorOrAbove()
+    public async Task RunScheduler_PhaseWithMinSeniority_OnlyAssignsSeniorOrAbove()
     {
         _db.Settings.Add(new Setting { Key = DomainConstants.SettingKeys.PlanStartDate, Value = "2026-05-04" });
         _db.Settings.Add(new Setting { Key = DomainConstants.SettingKeys.AtRiskThreshold, Value = "5" });
@@ -577,7 +577,7 @@ public class Enhancement1_Seniority_EngineTests : IDisposable
         _db.Tasks.Add(task);
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         // The Junior DEV should have no allocations for this task
         var juniorAllocs = _db.Allocations
@@ -619,7 +619,7 @@ public class Enhancement15_Strategy_EngineTests : IDisposable
     [InlineData("deadline_first")]
     [InlineData("balanced_workload")]
     [InlineData("critical_path")]
-    public void RunScheduler_WithEachStrategy_CompletesWithoutException(string strategy)
+    public async Task RunScheduler_WithEachStrategy_CompletesWithoutException(string strategy)
     {
         // Set the strategy
         var existing = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.SchedulingStrategy);
@@ -629,7 +629,7 @@ public class Enhancement15_Strategy_EngineTests : IDisposable
             _db.Settings.Add(new Setting { Key = DomainConstants.SettingKeys.SchedulingStrategy, Value = strategy });
         _db.SaveChanges();
 
-        var ex = Record.Exception(() => _engine.RunScheduler());
+        var ex = await Record.ExceptionAsync(async () => await _engine.RunSchedulerAsync());
         Assert.Null(ex);
 
         // All tasks should be scheduled
@@ -639,7 +639,7 @@ public class Enhancement15_Strategy_EngineTests : IDisposable
     }
 
     [Fact]
-    public void RunScheduler_DeadlineFirst_StrictDateTaskScheduledFirst()
+    public async Task RunScheduler_DeadlineFirst_StrictDateTaskScheduledFirst()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -659,7 +659,7 @@ public class Enhancement15_Strategy_EngineTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("DF-002", "Non-Urgent Task", 5, B(3)));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var urgent = _db.Tasks.First(t => t.TaskId == "DF-001");
         var nonUrgent = _db.Tasks.First(t => t.TaskId == "DF-002");
@@ -695,10 +695,10 @@ public class Enhancement3_BaselineFreeze_EngineTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public void RunScheduler_LockedAllocation_IsPreserved()
+    public async Task RunScheduler_LockedAllocation_IsPreserved()
     {
         // Run the scheduler first to generate allocations
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         // Lock one allocation
         var alloc = _db.Allocations.First();
@@ -707,19 +707,19 @@ public class Enhancement3_BaselineFreeze_EngineTests : IDisposable
         var lockedId = alloc.AllocationId;
 
         // Run scheduler again — locked allocation should survive
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var stillExists = _db.Allocations.Any(a => a.AllocationId == lockedId);
         Assert.True(stillExists, "Locked allocation must not be removed by the scheduler");
     }
 
     [Fact]
-    public void RunScheduler_UnlockedAllocations_AreReplacedOnReschedule()
+    public async Task RunScheduler_UnlockedAllocations_AreReplacedOnReschedule()
     {
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
         var unlockedCount1 = _db.Allocations.Count(a => !a.IsLocked);
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
         var unlockedCount2 = _db.Allocations.Count(a => !a.IsLocked);
 
         // Unlocked allocations are cleared and regenerated — count may vary slightly but should be > 0

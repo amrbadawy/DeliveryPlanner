@@ -33,7 +33,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_OverrideStart_TaskDoesNotStartBeforeOverrideDate()
+    public async Task RunScheduler_OverrideStart_TaskDoesNotStartBeforeOverrideDate()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -45,7 +45,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("SV-100", "Override Start Test", 5, B(5), overrideStart: overrideDate));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-100");
         // PlannedStart must be >= overrideDate (or null if no capacity in window)
@@ -61,7 +61,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_MaxFteConstraint_AllocationsRespectMaxFte()
+    public async Task RunScheduler_MaxFteConstraint_AllocationsRespectMaxFte()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -71,7 +71,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
             new List<EffortBreakdownSpec> { new("DEV", 3, 0, MaxFte: 0.5), new("QA", 1, 0) }));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var allocations = _db.Allocations
             .Where(a => a.TaskId == "SV-101")
@@ -88,14 +88,14 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void GetDashboardKPIs_ResourceWithEndDateInPast_NotCountedAsActive()
+    public async Task GetDashboardKPIs_ResourceWithEndDateInPast_NotCountedAsActive()
     {
         // Add a resource whose EndDate has already passed
         _db.Resources.Add(TeamMember.Create("RES-99", "Past Resource", "DEV", "Default", 100, 1, new DateTime(2020, 1, 1)));
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
-        var kpis = engine.GetDashboardKPIs();
+        var kpis = await engine.GetDashboardKPIsAsync();
 
         // active_resources counts resources where Active == "YES" (no date filter in GetDashboardKPIs)
         // The scheduling engine itself filters by EndDate during RunScheduler, not GetDashboardKPIs.
@@ -105,7 +105,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     }
 
     [Fact]
-    public void RunScheduler_ResourceWithEndDateBeforePlanStart_NoCapacityContributed()
+    public async Task RunScheduler_ResourceWithEndDateBeforePlanStart_NoCapacityContributed()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -119,7 +119,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
-        var result = engine.RunScheduler();
+        var result = await engine.RunSchedulerAsync();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-102");
         // No capacity available → task should remain Not Started / unallocated
@@ -131,7 +131,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_AdjustmentZeroCapacity_TaskNotScheduledDuringAdjustmentPeriod()
+    public async Task RunScheduler_AdjustmentZeroCapacity_TaskNotScheduledDuringAdjustmentPeriod()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -148,7 +148,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
-        engine.RunScheduler();
+        await engine.RunSchedulerAsync();
 
         var allocations = _db.Allocations
             .Where(a => a.TaskId == "SV-103"
@@ -165,7 +165,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_ZeroEstimationTask_HandledWithoutError()
+    public async Task RunScheduler_ZeroEstimationTask_HandledWithoutError()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -177,7 +177,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         var engine = new SchedulingEngine(_db, TimeProvider.System);
 
         // Should not throw; zero-estimation tasks just get "NOT_STARTED" (no effort remaining)
-        var exception = Record.Exception(() => engine.RunScheduler());
+        var exception = await Record.ExceptionAsync(async () => await engine.RunSchedulerAsync());
         Assert.Null(exception);
     }
 
@@ -186,14 +186,14 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void GetDashboardKPIs_NoScheduledTasks_OverallFinishIsMinValue()
+    public async Task GetDashboardKPIs_NoScheduledTasks_OverallFinishIsMinValue()
     {
         // Remove all tasks so there are no PlannedFinish dates
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
-        var kpis = engine.GetDashboardKPIs();
+        var kpis = await engine.GetDashboardKPIsAsync();
 
         // With no finish dates, overallFinish falls back to DateTime.MinValue
         Assert.True(kpis.ContainsKey("overall_finish"));
@@ -203,7 +203,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     }
 
     [Fact]
-    public void GetDashboardKPIs_TasksWithNoPlannedFinish_AvgAssignedIsZero()
+    public async Task GetDashboardKPIs_TasksWithNoPlannedFinish_AvgAssignedIsZero()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.SaveChanges();
@@ -212,7 +212,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
-        var kpis = engine.GetDashboardKPIs();
+        var kpis = await engine.GetDashboardKPIsAsync();
 
         Assert.Equal(0.0, (double)kpis["avg_assigned"]);
     }
@@ -222,7 +222,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_TaskFinishesAfterStrictDate_MarkedLate()
+    public async Task RunScheduler_TaskFinishesAfterStrictDate_MarkedLate()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -235,7 +235,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
-        engine.RunScheduler();
+        await engine.RunSchedulerAsync();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-106");
         Assert.Equal("LATE", task.DeliveryRisk);
@@ -246,7 +246,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_HigherPriorityTask_StartsEarlierOrSameDay()
+    public async Task RunScheduler_HigherPriorityTask_StartsEarlierOrSameDay()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -256,7 +256,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("SV-108", "Priority 9", 9, B(10)));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var p1 = _db.Tasks.First(t => t.TaskId == "SV-107");
         var p9 = _db.Tasks.First(t => t.TaskId == "SV-108");
@@ -272,7 +272,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_MultipleTasksSamePriority_BothGetScheduled()
+    public async Task RunScheduler_MultipleTasksSamePriority_BothGetScheduled()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -282,7 +282,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("SV-110", "Same Priority B", 5, B(3)));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var t1 = _db.Tasks.First(t => t.TaskId == "SV-109");
         var t2 = _db.Tasks.First(t => t.TaskId == "SV-110");
@@ -296,7 +296,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_TaskWithMaxResourceGreaterThanCapacity_CapsAtCapacity()
+    public async Task RunScheduler_TaskWithMaxResourceGreaterThanCapacity_CapsAtCapacity()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -305,7 +305,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("SV-111", "Max Dev Overflow", 5, B(10)));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var allocations = _db.Allocations.Where(a => a.TaskId == "SV-111").ToList();
         // Each allocation's HoursAllocated should be positive
@@ -319,7 +319,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_AllResourcesInactive_TaskNotScheduled()
+    public async Task RunScheduler_AllResourcesInactive_TaskNotScheduled()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -333,7 +333,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
-        engine.RunScheduler();
+        await engine.RunSchedulerAsync();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-112");
         Assert.Equal("NOT_STARTED", task.Status);
@@ -344,7 +344,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void CalculateRisk_NoStrictDate_ReturnsOnTrack()
+    public async Task CalculateRisk_NoStrictDate_ReturnsOnTrack()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -353,7 +353,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("SV-113", "No Strict Date", 5, B(3)));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-113");
         Assert.Equal("ON_TRACK", task.DeliveryRisk);
@@ -364,7 +364,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_MultipleStrictDateTasks_EarlierDeadlineFirst()
+    public async Task RunScheduler_MultipleStrictDateTasks_EarlierDeadlineFirst()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -374,7 +374,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("SV-115", "Earlier Deadline", 5, B(5), strictDate: new DateTime(2026, 8, 1)));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var later = _db.Tasks.First(t => t.TaskId == "SV-114");
         var earlier = _db.Tasks.First(t => t.TaskId == "SV-115");
@@ -392,12 +392,12 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void GetDashboardKPIs_WithScheduledTasks_OverallFinishIsMax()
+    public async Task GetDashboardKPIs_WithScheduledTasks_OverallFinishIsMax()
     {
         // Run scheduler with default seeded data
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
-        var kpis = _engine.GetDashboardKPIs();
+        var kpis = await _engine.GetDashboardKPIsAsync();
         Assert.True(kpis.ContainsKey("overall_finish"));
 
         var overallFinish = (DateTime)kpis["overall_finish"];
@@ -410,7 +410,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_TaskWithDependency_StartsAfterDependencyCompletes()
+    public async Task RunScheduler_TaskWithDependency_StartsAfterDependencyCompletes()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -425,7 +425,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Tasks.Add(dep002);
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var prerequisite = _db.Tasks.First(t => t.TaskId == "DEP-001");
         var dependent = _db.Tasks.First(t => t.TaskId == "DEP-002");
@@ -440,7 +440,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     }
 
     [Fact]
-    public void RunScheduler_TaskWithMultipleDependencies_StartsAfterAllComplete()
+    public async Task RunScheduler_TaskWithMultipleDependencies_StartsAfterAllComplete()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -459,7 +459,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Tasks.Add(dep012);
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var prereqA = _db.Tasks.First(t => t.TaskId == "DEP-010");
         var prereqB = _db.Tasks.First(t => t.TaskId == "DEP-011");
@@ -479,7 +479,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     }
 
     [Fact]
-    public void RunScheduler_TaskWithNoDependency_SchedulesNormally()
+    public async Task RunScheduler_TaskWithNoDependency_SchedulesNormally()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -488,7 +488,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("DEP-020", "Independent Task", 1, B(3)));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var task = _db.Tasks.First(t => t.TaskId == "DEP-020");
         Assert.NotNull(task.PlannedStart);
@@ -496,7 +496,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     }
 
     [Fact]
-    public void RunScheduler_ChainedDependencies_SchedulesInCorrectOrder()
+    public async Task RunScheduler_ChainedDependencies_SchedulesInCorrectOrder()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -512,7 +512,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Tasks.Add(chn003);
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var first = _db.Tasks.First(t => t.TaskId == "CHN-001");
         var second = _db.Tasks.First(t => t.TaskId == "CHN-002");
@@ -528,7 +528,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     }
 
     [Fact]
-    public void RunScheduler_DependencyOnNonExistentTask_TaskNeverScheduled()
+    public async Task RunScheduler_DependencyOnNonExistentTask_TaskNeverScheduled()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -540,7 +540,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Tasks.Add(dep030);
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var task = _db.Tasks.First(t => t.TaskId == "DEP-030");
         // Task should never start because its dependency can't be completed
@@ -553,7 +553,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_CircularDependency_NeitherTaskStarts()
+    public async Task RunScheduler_CircularDependency_NeitherTaskStarts()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -568,7 +568,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         // Should not throw — circular deps just mean tasks never get scheduled
-        var exception = Record.Exception(() => _engine.RunScheduler());
+        var exception = await Record.ExceptionAsync(async () => await _engine.RunSchedulerAsync());
         Assert.Null(exception);
 
         var taskA = _db.Tasks.First(t => t.TaskId == "CIR-001");
@@ -584,7 +584,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_SelfReferencingDependency_TaskNeverStarts()
+    public async Task RunScheduler_SelfReferencingDependency_TaskNeverStarts()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -600,7 +600,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.Database.ExecuteSqlRaw(
             "INSERT INTO [task].[TaskDependencies] (TaskId, PredecessorTaskId, Type, LagDays, OverlapPct) VALUES ('SELF-001', 'SELF-001', 'FS', 0, 0)");
 
-        var exception = Record.Exception(() => _engine.RunScheduler());
+        var exception = await Record.ExceptionAsync(async () => await _engine.RunSchedulerAsync());
         Assert.Null(exception);
 
         var task = _db.Tasks.First(t => t.TaskId == "SELF-001");
@@ -613,7 +613,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_TaskWithStrictDateWithinThreshold_MarkedAtRisk()
+    public async Task RunScheduler_TaskWithStrictDateWithinThreshold_MarkedAtRisk()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -628,7 +628,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
-        engine.RunScheduler();
+        await engine.RunSchedulerAsync();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-116");
         // The task should be "AT_RISK", "ON_TRACK", or "LATE" depending on exact date/scheduling
@@ -640,7 +640,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void CalculateRisk_NoPlannedFinishWithStrictDate_ReturnsAtRisk()
+    public async Task CalculateRisk_NoPlannedFinishWithStrictDate_ReturnsAtRisk()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -652,7 +652,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
-        engine.RunScheduler();
+        await engine.RunSchedulerAsync();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-117");
         // No planned finish + has strict date → At Risk
@@ -664,9 +664,9 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_WeekendDays_HaveZeroEffectiveCapacity()
+    public async Task RunScheduler_WeekendDays_HaveZeroEffectiveCapacity()
     {
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         // DayOfWeek cannot be translated to SQL Server — evaluate client-side
         var weekendCalDays = _db.Calendar
@@ -689,9 +689,9 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_HolidayDays_HaveZeroEffectiveCapacity()
+    public async Task RunScheduler_HolidayDays_HaveZeroEffectiveCapacity()
     {
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         // DayOfWeek cannot be translated to SQL Server — evaluate client-side
         var holidayCalDays = _db.Calendar
@@ -715,9 +715,9 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_HolidayDays_HaveHolidayNameSet()
+    public async Task RunScheduler_HolidayDays_HaveHolidayNameSet()
     {
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var holidayCalDays = _db.Calendar.Where(c => c.IsHoliday).Take(5).ToList();
         Assert.NotEmpty(holidayCalDays);
@@ -729,7 +729,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_MultipleAdjustments_StackMultiplicatively()
+    public async Task RunScheduler_MultipleAdjustments_StackMultiplicatively()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -749,7 +749,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
-        engine.RunScheduler();
+        await engine.RunSchedulerAsync();
 
         // Each DEV allocation in May should have HoursAllocated <= 4.5 (1 * 8 * 0.75 * 0.75)
         // With MinAllocationHours=4 floor: floor(4.5/4)*4 = 4 hours per allocation
@@ -769,7 +769,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void RunScheduler_ResourceStartDateInFuture_NoCapacityBeforeStart()
+    public async Task RunScheduler_ResourceStartDateInFuture_NoCapacityBeforeStart()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -782,7 +782,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
-        engine.RunScheduler();
+        await engine.RunSchedulerAsync();
 
         var task = _db.Tasks.First(t => t.TaskId == "SV-119");
         // Task should not start before August 1
@@ -798,12 +798,12 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void GetOutputPlan_NoTasks_ReturnsEmptyList()
+    public async Task GetOutputPlan_NoTasks_ReturnsEmptyList()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.SaveChanges();
 
-        var output = _engine.GetOutputPlan();
+        var output = await _engine.GetOutputPlanAsync();
         Assert.NotNull(output);
         Assert.Empty(output);
     }
@@ -813,7 +813,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void GetDashboardKPIs_ManyStrictDates_UpcomingStrictCappedAtFive()
+    public async Task GetDashboardKPIs_ManyStrictDates_UpcomingStrictCappedAtFive()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.SaveChanges();
@@ -825,7 +825,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
-        var kpis = engine.GetDashboardKPIs();
+        var kpis = await engine.GetDashboardKPIsAsync();
 
         var upcoming = kpis["upcoming_strict"] as List<TaskItem>;
         Assert.NotNull(upcoming);
@@ -837,7 +837,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void GetDashboardKPIs_UpcomingStrict_OrderedByEarliestFirst()
+    public async Task GetDashboardKPIs_UpcomingStrict_OrderedByEarliestFirst()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.SaveChanges();
@@ -847,7 +847,7 @@ public class SchedulingEngineEdgeCaseTests : IDisposable
         _db.SaveChanges();
 
         var engine = new SchedulingEngine(_db, TimeProvider.System);
-        var kpis = engine.GetDashboardKPIs();
+        var kpis = await engine.GetDashboardKPIsAsync();
 
         var upcoming = kpis["upcoming_strict"] as List<TaskItem>;
         Assert.NotNull(upcoming);

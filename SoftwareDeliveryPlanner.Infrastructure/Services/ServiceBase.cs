@@ -42,7 +42,7 @@ internal abstract class ServiceBase
         await db.DispatchDomainEventsAsync(Publisher, cancellationToken);
 
         using var engine = await EngineFactory.CreateAsync(cancellationToken);
-        engine.RunScheduler();
+        await engine.RunSchedulerAsync(cancellationToken);
     }
 
     protected async Task SaveAndDispatchAsync(

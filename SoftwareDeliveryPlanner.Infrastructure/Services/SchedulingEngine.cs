@@ -24,6 +24,28 @@ internal class SchedulingEngine : ISchedulingEngine
     private const int PlanHorizonDays = 730;
     private List<Holiday>? _holidayCache;
 
+    /// <summary>
+    /// Primary constructor used by <see cref="SchedulingEngineFactory"/> which pre-loads
+    /// the settings asynchronously before construction.
+    /// </summary>
+    public SchedulingEngine(
+        PlannerDbContext db,
+        TimeProvider timeProvider,
+        int atRiskThreshold,
+        HashSet<DayOfWeek> weekendDays,
+        bool ownsContext = false)
+    {
+        _db = db;
+        _timeProvider = timeProvider;
+        _ownsContext = ownsContext;
+        _atRiskThreshold = atRiskThreshold;
+        _weekendDays = weekendDays;
+    }
+
+    /// <summary>
+    /// Convenience constructor for tests: loads settings synchronously from the provided
+    /// DbContext. Safe in test contexts where there is no SynchronizationContext.
+    /// </summary>
     public SchedulingEngine(PlannerDbContext db, TimeProvider timeProvider, bool ownsContext = false)
     {
         _db = db;
@@ -31,15 +53,14 @@ internal class SchedulingEngine : ISchedulingEngine
         _ownsContext = ownsContext;
         var setting = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.AtRiskThreshold);
         _atRiskThreshold = int.TryParse(setting?.Value, out var t) ? t : 5;
-
         var weekSetting = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.WorkingWeek);
         _weekendDays = DomainConstants.WorkingWeek.GetWeekendDays(weekSetting?.Value ?? DomainConstants.WorkingWeek.SunThu);
     }
 
     /// <summary>Loads holidays into an in-memory cache if not already loaded.</summary>
-    private List<Holiday> GetHolidayCache()
+    private async Task<List<Holiday>> GetHolidayCacheAsync(CancellationToken cancellationToken = default)
     {
-        _holidayCache ??= _db.Holidays.ToList();
+        _holidayCache ??= await _db.Holidays.ToListAsync(cancellationToken);
         return _holidayCache;
     }
 
@@ -49,8 +70,11 @@ internal class SchedulingEngine : ISchedulingEngine
         if (_weekendDays.Contains(date.DayOfWeek))
             return false;
 
-        // Check holidays — date falls within any holiday range
-        var holidays = GetHolidayCache();
+        // Check holidays — date falls within any holiday range.
+        // _holidayCache is guaranteed to be populated by the async RunSchedulerAsync/PreviewScheduleAsync
+        // paths before this method is called. In the sync test path the convenience constructor
+        // populates it via the sync overload below.
+        var holidays = EnsureHolidayCache();
         var isHoliday = holidays.Any(h => h.StartDate.Date <= date.Date && h.EndDate.Date >= date.Date);
         return !isHoliday;
     }
@@ -69,7 +93,7 @@ internal class SchedulingEngine : ISchedulingEngine
                 return false;
 
             // Still check holidays
-            var holidays = GetHolidayCache();
+            var holidays = EnsureHolidayCache();
             return !holidays.Any(h => h.StartDate.Date <= date.Date && h.EndDate.Date >= date.Date);
         }
 
@@ -79,8 +103,19 @@ internal class SchedulingEngine : ISchedulingEngine
     /// <summary>Finds the first holiday whose range covers the given date, or null.</summary>
     public Holiday? GetHolidayForDate(DateTime date)
     {
-        var holidays = GetHolidayCache();
+        var holidays = EnsureHolidayCache();
         return holidays.FirstOrDefault(h => h.StartDate.Date <= date.Date && h.EndDate.Date >= date.Date);
+    }
+
+    /// <summary>
+    /// Returns the in-memory holiday cache. If it has not yet been populated by the async
+    /// path, falls back to a synchronous DB load. This fallback is only reached in the
+    /// test convenience-constructor path where there is no SynchronizationContext.
+    /// </summary>
+    private List<Holiday> EnsureHolidayCache()
+    {
+        _holidayCache ??= _db.Holidays.ToList();
+        return _holidayCache;
     }
 
     public int GetWorkingDaysBetween(DateTime start, DateTime end)
@@ -425,34 +460,34 @@ internal class SchedulingEngine : ISchedulingEngine
         return true;
     }
 
-    public string RunScheduler()
+    public async Task<string> RunSchedulerAsync(CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("RunScheduler", ActivityKind.Internal);
 
         // Prime the holiday cache once at the start (eliminates 1460+ individual DB queries)
-        _holidayCache = _db.Holidays.ToList();
+        _holidayCache = await _db.Holidays.ToListAsync(cancellationToken);
 
-        var planStartSetting = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.PlanStartDate);
+        var planStartSetting = await _db.Settings.FirstOrDefaultAsync(s => s.Key == DomainConstants.SettingKeys.PlanStartDate, cancellationToken);
         var planStart = DateTime.TryParse(planStartSetting?.Value, out var ps) ? ps : new DateTime(2026, 5, 1);
         var endDate = planStart.AddDays(PlanHorizonDays);
 
         // Read scheduling strategy
-        var strategySetting = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.SchedulingStrategy);
+        var strategySetting = await _db.Settings.FirstOrDefaultAsync(s => s.Key == DomainConstants.SettingKeys.SchedulingStrategy, cancellationToken);
         var strategy = strategySetting?.Value ?? DomainConstants.SchedulingStrategy.PriorityFirst;
         if (!DomainConstants.SchedulingStrategy.All.Contains(strategy))
             strategy = DomainConstants.SchedulingStrategy.PriorityFirst;
 
         // Read baseline date
-        var baselineSetting = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.BaselineDate);
+        var baselineSetting = await _db.Settings.FirstOrDefaultAsync(s => s.Key == DomainConstants.SettingKeys.BaselineDate, cancellationToken);
         DateTime? baselineDate = DateTime.TryParse(baselineSetting?.Value, out var bd) ? bd : null;
 
-        var tasks = _db.Tasks
+        var tasks = await _db.Tasks
             .Include(t => t.EffortBreakdown)
             .Include(t => t.Dependencies)
             .AsSplitQuery()
-            .ToList();
-        var resources = _db.Resources.ToList();
-        var adjustments = _db.Adjustments.ToList();
+            .ToListAsync(cancellationToken);
+        var resources = await _db.Resources.ToListAsync(cancellationToken);
+        var adjustments = await _db.Adjustments.ToListAsync(cancellationToken);
 
         if (!tasks.Any()) return "No tasks to schedule";
 
@@ -464,7 +499,7 @@ internal class SchedulingEngine : ISchedulingEngine
         tasks = rankedTasks.ToList();
 
         // Clear and generate calendar
-        _db.Calendar.RemoveRange(_db.Calendar);
+        _db.Calendar.RemoveRange(await _db.Calendar.ToListAsync(cancellationToken));
 
         var calendar = new List<CalendarDay>();
         var current = planStart;
@@ -496,13 +531,13 @@ internal class SchedulingEngine : ISchedulingEngine
             dateKey++;
         }
         _db.Calendar.AddRange(calendar);
-        _db.SaveChanges();
+        await _db.SaveChangesAsync(cancellationToken);
 
         // Baseline freeze: only remove unlocked allocations
         _db.Allocations.RemoveRange(_db.Allocations.Where(a => !a.IsLocked));
 
         // Load locked allocations to pre-compute cumulative state
-        var lockedAllocations = _db.Allocations.Where(a => a.IsLocked).ToList();
+        var lockedAllocations = await _db.Allocations.Where(a => a.IsLocked).ToListAsync(cancellationToken);
 
         var allocations = new List<Allocation>();
         var allocCounter = 1;
@@ -872,12 +907,12 @@ internal class SchedulingEngine : ISchedulingEngine
             calRow.ReservedCapacity = reservedHours / DomainConstants.HoursPerDay;
             calRow.RemainingCapacity = calRow.EffectiveCapacity - calRow.ReservedCapacity;
 
-            var existing = _db.Calendar.First(c => c.DateKey == calRow.DateKey);
+            var existing = await _db.Calendar.FirstAsync(c => c.DateKey == calRow.DateKey, cancellationToken);
             existing.ReservedCapacity = calRow.ReservedCapacity;
             existing.RemainingCapacity = calRow.RemainingCapacity;
         }
 
-        _db.SaveChanges();
+        await _db.SaveChangesAsync(cancellationToken);
 
         var resultMessage = $"Successfully scheduled {tasks.Count} tasks with {allocations.Count} allocations";
 
@@ -899,12 +934,12 @@ internal class SchedulingEngine : ISchedulingEngine
         return resultMessage;
     }
 
-    public ScheduleDiffDto PreviewSchedule()
+    public async Task<ScheduleDiffDto> PreviewScheduleAsync(CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("PreviewSchedule", ActivityKind.Internal);
 
         // 1. Snapshot current task state before any changes (AsNoTracking so EF stays clean)
-        var tasks = _db.Tasks.Include(t => t.EffortBreakdown).Include(t => t.Dependencies).AsSplitQuery().AsNoTracking().ToList();
+        var tasks = await _db.Tasks.Include(t => t.EffortBreakdown).Include(t => t.Dependencies).AsSplitQuery().AsNoTracking().ToListAsync(cancellationToken);
         var snapshots = tasks.Select(t => new
         {
             t.TaskId,
@@ -917,17 +952,17 @@ internal class SchedulingEngine : ISchedulingEngine
 
         // 2. Run the full scheduler inside a transaction that we will roll back,
         //    so the DB is left exactly as it was — true dry-run.
-        using var transaction = _db.Database.BeginTransaction();
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         try
         {
-            RunScheduler();
+            await RunSchedulerAsync(cancellationToken);
 
             // 3. Detach tracked entities so the next reads go to the DB (still in transaction)
             foreach (var entry in _db.ChangeTracker.Entries().ToList())
                 entry.State = EntityState.Detached;
 
-            var updatedTasks = _db.Tasks.Include(t => t.EffortBreakdown).Include(t => t.Dependencies).AsSplitQuery().AsNoTracking().ToList();
-            var newAllocCount = _db.Allocations.AsNoTracking().Count(a => !a.IsLocked);
+            var updatedTasks = await _db.Tasks.Include(t => t.EffortBreakdown).Include(t => t.Dependencies).AsSplitQuery().AsNoTracking().ToListAsync(cancellationToken);
+            var newAllocCount = await _db.Allocations.AsNoTracking().CountAsync(a => !a.IsLocked, cancellationToken);
 
             // 4. Compute diffs
             var changes = new List<TaskDiffEntry>();
@@ -979,8 +1014,8 @@ internal class SchedulingEngine : ISchedulingEngine
 
             var result = new ScheduleDiffDto(changes, affected, unchanged, newAllocCount);
 
-            // 5. Roll back — undoes all RunScheduler() DB writes (true dry-run)
-            transaction.Rollback();
+            // 5. Roll back — undoes all RunSchedulerAsync() DB writes (true dry-run)
+            await transaction.RollbackAsync(cancellationToken);
 
             // 6. Detach all tracked entities so the DbContext is clean for future use
             foreach (var entry in _db.ChangeTracker.Entries().ToList())
@@ -990,17 +1025,17 @@ internal class SchedulingEngine : ISchedulingEngine
         }
         catch
         {
-            transaction.Rollback();
+            await transaction.RollbackAsync(cancellationToken);
             foreach (var entry in _db.ChangeTracker.Entries().ToList())
                 entry.State = EntityState.Detached;
             throw;
         }
     }
 
-    public Dictionary<string, object> GetDashboardKPIs()
+    public async Task<Dictionary<string, object>> GetDashboardKPIsAsync(CancellationToken cancellationToken = default)
     {
-        var tasks = _db.Tasks.Include(t => t.EffortBreakdown).AsSplitQuery().ToList();
-        var resources = _db.Resources.Where(r => r.Active == DomainConstants.ActiveStatus.Yes).ToList();
+        var tasks = await _db.Tasks.Include(t => t.EffortBreakdown).AsSplitQuery().ToListAsync(cancellationToken);
+        var resources = await _db.Resources.Where(r => r.Active == DomainConstants.ActiveStatus.Yes).ToListAsync(cancellationToken);
 
         var totalServices = tasks.Count;
         var totalEstimation = tasks.Sum(t => t.TotalEstimationDays);
@@ -1030,7 +1065,7 @@ internal class SchedulingEngine : ISchedulingEngine
             .ToList();
 
         // Count overallocations: days where a resource's total allocated hours exceed 8
-        var allocations = _db.Allocations.ToList();
+        var allocations = await _db.Allocations.ToListAsync(cancellationToken);
         var overallocationCount = allocations
             .GroupBy(a => new { a.ResourceId, a.CalendarDate })
             .Count(g => g.Sum(a => a.HoursAllocated) > 8);
@@ -1054,9 +1089,9 @@ internal class SchedulingEngine : ISchedulingEngine
         };
     }
 
-    public List<OutputPlanRowDto> GetOutputPlan()
+    public async Task<List<OutputPlanRowDto>> GetOutputPlanAsync(CancellationToken cancellationToken = default)
     {
-        var tasks = _db.Tasks.Include(t => t.EffortBreakdown).AsSplitQuery().OrderBy(t => t.SchedulingRank).ToList();
+        var tasks = await _db.Tasks.Include(t => t.EffortBreakdown).AsSplitQuery().OrderBy(t => t.SchedulingRank).ToListAsync(cancellationToken);
         var output = new List<OutputPlanRowDto>();
 
         for (int i = 0; i < tasks.Count; i++)
@@ -1086,21 +1121,21 @@ internal class SchedulingEngine : ISchedulingEngine
             _db.Dispose();
     }
 
-    public void FreezeBaseline()
+    public async Task FreezeBaselineAsync(CancellationToken cancellationToken = default)
     {
         // Lock all currently-unlocked allocations so they survive future scheduler runs
-        var unlocked = _db.Allocations.Where(a => !a.IsLocked).ToList();
+        var unlocked = await _db.Allocations.Where(a => !a.IsLocked).ToListAsync(cancellationToken);
         foreach (var a in unlocked)
             a.IsLocked = true;
 
         // Upsert baseline_date = today
         var today = _timeProvider.GetUtcNow().Date.ToString("yyyy-MM-dd");
-        var setting = _db.Settings.FirstOrDefault(s => s.Key == DomainConstants.SettingKeys.BaselineDate);
+        var setting = await _db.Settings.FirstOrDefaultAsync(s => s.Key == DomainConstants.SettingKeys.BaselineDate, cancellationToken);
         if (setting is not null)
             setting.Value = today;
         else
             _db.Settings.Add(new Setting { Key = DomainConstants.SettingKeys.BaselineDate, Value = today });
 
-        _db.SaveChanges();
+        await _db.SaveChangesAsync(cancellationToken);
     }
 }

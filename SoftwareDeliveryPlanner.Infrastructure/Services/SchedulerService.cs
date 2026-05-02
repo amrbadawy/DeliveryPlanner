@@ -43,7 +43,7 @@ internal sealed class SchedulerService : ServiceBase, ISchedulerService
             .ToListAsync(cancellationToken);
 
         using var engine = await EngineFactory.CreateAsync(cancellationToken);
-        var result = engine.RunScheduler();
+        var result = await engine.RunSchedulerAsync(cancellationToken);
 
         // Record last scheduler run timestamp
         var now = TimeProvider.System.GetUtcNow().DateTime;
@@ -55,7 +55,7 @@ internal sealed class SchedulerService : ServiceBase, ISchedulerService
             db.Settings.Add(new Setting { Key = DomainConstants.SettingKeys.LastSchedulerRun, Value = now.ToString("O") });
 
         // Record scheduler snapshot for risk trend
-        var kpis = engine.GetDashboardKPIs();
+        var kpis = await engine.GetDashboardKPIsAsync(cancellationToken);
         var onTrack = (int)kpis["on_track"];
         var atRisk = (int)kpis["at_risk"];
         var late = (int)kpis["late"];
@@ -106,7 +106,7 @@ internal sealed class SchedulerService : ServiceBase, ISchedulerService
     public async Task<DashboardKpisDto> GetDashboardKpisAsync(CancellationToken cancellationToken = default)
     {
         using var engine = await EngineFactory.CreateAsync(cancellationToken);
-        var kpis = engine.GetDashboardKPIs();
+        var kpis = await engine.GetDashboardKPIsAsync(cancellationToken);
 
         var rawFinish = kpis["overall_finish"] as DateTime?;
         var overallFinish = rawFinish.HasValue && rawFinish.Value > DateTime.MinValue ? rawFinish : null;
@@ -138,12 +138,12 @@ internal sealed class SchedulerService : ServiceBase, ISchedulerService
     public async Task<ScheduleDiffDto> PreviewScheduleAsync(CancellationToken cancellationToken = default)
     {
         using var engine = await EngineFactory.CreateAsync(cancellationToken);
-        return engine.PreviewSchedule();
+        return await engine.PreviewScheduleAsync(cancellationToken);
     }
 
     public async Task FreezeBaselineAsync(CancellationToken cancellationToken = default)
     {
         using var engine = await EngineFactory.CreateAsync(cancellationToken);
-        engine.FreezeBaseline();
+        await engine.FreezeBaselineAsync(cancellationToken);
     }
 }

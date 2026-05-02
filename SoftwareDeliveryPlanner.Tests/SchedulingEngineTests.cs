@@ -354,17 +354,17 @@ public class SchedulingEngineTests : IDisposable
     #region RunScheduler Tests
 
     [Fact]
-    public void RunScheduler_NoTasks_ReturnsNoTasksMessage()
+    public async Task RunScheduler_NoTasks_ReturnsNoTasksMessage()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.SaveChanges();
 
-        var result = _engine.RunScheduler();
+        var result = await _engine.RunSchedulerAsync();
         Assert.Equal("No tasks to schedule", result);
     }
 
     [Fact]
-    public void RunScheduler_SingleTask_CreatesAllocations()
+    public async Task RunScheduler_SingleTask_CreatesAllocations()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -373,7 +373,7 @@ public class SchedulingEngineTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("TST-001", "Test Service", 1, B(5)));
         _db.SaveChanges();
 
-        var result = _engine.RunScheduler();
+        var result = await _engine.RunSchedulerAsync();
 
         Assert.Contains("successfully scheduled", result, StringComparison.OrdinalIgnoreCase);
         var allocations = _db.Allocations.Where(a => a.TaskId == "TST-001").ToList();
@@ -381,7 +381,7 @@ public class SchedulingEngineTests : IDisposable
     }
 
     [Fact]
-    public void RunScheduler_MultipleTasks_SchedulesByPriority()
+    public async Task RunScheduler_MultipleTasks_SchedulesByPriority()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -391,7 +391,7 @@ public class SchedulingEngineTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("TH-001", "High Priority", 1, B(3)));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var lowTask = _db.Tasks.First(t => t.TaskId == "TL-001");
         var highTask = _db.Tasks.First(t => t.TaskId == "TH-001");
@@ -400,7 +400,7 @@ public class SchedulingEngineTests : IDisposable
     }
 
     [Fact]
-    public void RunScheduler_StrictDateTask_SchedulesBeforeDeadline()
+    public async Task RunScheduler_StrictDateTask_SchedulesBeforeDeadline()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -411,14 +411,14 @@ public class SchedulingEngineTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("TS-001", "Strict Deadline", 1, B(10), strictDate: futureDate));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var task = _db.Tasks.First(t => t.TaskId == "TS-001");
         Assert.NotNull(task.PlannedFinish);
     }
 
     [Fact]
-    public void RunScheduler_UpdatesTaskDates()
+    public async Task RunScheduler_UpdatesTaskDates()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -427,7 +427,7 @@ public class SchedulingEngineTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("TD-001", "Date Test", 1, B(5)));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var task = _db.Tasks.First(t => t.TaskId == "TD-001");
         Assert.NotNull(task.PlannedStart);
@@ -440,14 +440,14 @@ public class SchedulingEngineTests : IDisposable
     #region RunScheduler result format
 
     [Fact]
-    public void RunScheduler_WithDefaultData_ReturnsAllocationsCount()
+    public async Task RunScheduler_WithDefaultData_ReturnsAllocationsCount()
     {
-        var result = _engine.RunScheduler();
+        var result = await _engine.RunSchedulerAsync();
         Assert.Contains("allocations", result, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void RunScheduler_SingleTask_StatusIsCompleted()
+    public async Task RunScheduler_SingleTask_StatusIsCompleted()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.Allocations.RemoveRange(_db.Allocations);
@@ -456,7 +456,7 @@ public class SchedulingEngineTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("SM-001", "Small Task", 1, B(1)));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         var task = _db.Tasks.First(t => t.TaskId == "SM-001");
         Assert.Equal(DomainConstants.TaskStatus.Completed, task.Status);
@@ -467,33 +467,33 @@ public class SchedulingEngineTests : IDisposable
     #region GetDashboardKPIs Tests
 
     [Fact]
-    public void GetDashboardKPIs_ReturnsTotalServices()
+    public async Task GetDashboardKPIs_ReturnsTotalServices()
     {
-        var kpis = _engine.GetDashboardKPIs();
+        var kpis = await _engine.GetDashboardKPIsAsync();
         Assert.True(kpis.ContainsKey("total_services"));
         Assert.True((int)kpis["total_services"] > 0);
     }
 
     [Fact]
-    public void GetDashboardKPIs_ReturnsActiveResources()
+    public async Task GetDashboardKPIs_ReturnsActiveResources()
     {
-        var kpis = _engine.GetDashboardKPIs();
+        var kpis = await _engine.GetDashboardKPIsAsync();
         Assert.True(kpis.ContainsKey("active_resources"));
         Assert.True((int)kpis["active_resources"] > 0);
     }
 
     [Fact]
-    public void GetDashboardKPIs_ReturnsCapacity()
+    public async Task GetDashboardKPIs_ReturnsCapacity()
     {
-        var kpis = _engine.GetDashboardKPIs();
+        var kpis = await _engine.GetDashboardKPIsAsync();
         Assert.True(kpis.ContainsKey("total_capacity"));
         Assert.True((double)kpis["total_capacity"] > 0);
     }
 
     [Fact]
-    public void GetDashboardKPIs_ReturnsRiskCounts()
+    public async Task GetDashboardKPIs_ReturnsRiskCounts()
     {
-        var kpis = _engine.GetDashboardKPIs();
+        var kpis = await _engine.GetDashboardKPIsAsync();
         Assert.True(kpis.ContainsKey("on_track"));
         Assert.True(kpis.ContainsKey("at_risk"));
         Assert.True(kpis.ContainsKey("late"));
@@ -504,23 +504,23 @@ public class SchedulingEngineTests : IDisposable
     #region GetDashboardKPIs edge cases
 
     [Fact]
-    public void GetDashboardKPIs_ContainsTotalEstimation()
+    public async Task GetDashboardKPIs_ContainsTotalEstimation()
     {
-        var kpis = _engine.GetDashboardKPIs();
+        var kpis = await _engine.GetDashboardKPIsAsync();
         Assert.True(kpis.ContainsKey("total_estimation"));
     }
 
     [Fact]
-    public void GetDashboardKPIs_ContainsAvgAssigned()
+    public async Task GetDashboardKPIs_ContainsAvgAssigned()
     {
-        var kpis = _engine.GetDashboardKPIs();
+        var kpis = await _engine.GetDashboardKPIsAsync();
         Assert.True(kpis.ContainsKey("avg_assigned"));
     }
 
     [Fact]
-    public void GetDashboardKPIs_ContainsStrictCount()
+    public async Task GetDashboardKPIs_ContainsStrictCount()
     {
-        var kpis = _engine.GetDashboardKPIs();
+        var kpis = await _engine.GetDashboardKPIsAsync();
         Assert.True(kpis.ContainsKey("strict_count"));
     }
 
@@ -529,17 +529,17 @@ public class SchedulingEngineTests : IDisposable
     #region GetOutputPlan Tests
 
     [Fact]
-    public void GetOutputPlan_ReturnsTaskList()
+    public async Task GetOutputPlan_ReturnsTaskList()
     {
-        var output = _engine.GetOutputPlan();
+        var output = await _engine.GetOutputPlanAsync();
         Assert.NotNull(output);
         Assert.True(output.Count > 0);
     }
 
     [Fact]
-    public void GetOutputPlan_ContainsRequiredFields()
+    public async Task GetOutputPlan_ContainsRequiredFields()
     {
-        var output = _engine.GetOutputPlan();
+        var output = await _engine.GetOutputPlanAsync();
         if (output.Count > 0)
         {
             var first = output[0];
@@ -550,9 +550,9 @@ public class SchedulingEngineTests : IDisposable
     }
 
     [Fact]
-    public void GetOutputPlan_IsOrderedBySchedulingRank()
+    public async Task GetOutputPlan_IsOrderedBySchedulingRank()
     {
-        var output = _engine.GetOutputPlan();
+        var output = await _engine.GetOutputPlanAsync();
         for (int i = 1; i < output.Count; i++)
         {
             var prev = output[i - 1].Num;
@@ -633,7 +633,7 @@ public class SchedulingEngineMonFriTests : IDisposable
     }
 
     [Fact]
-    public void RunScheduler_MonFriConfig_WeekendDaysHaveZeroCapacity()
+    public async Task RunScheduler_MonFriConfig_WeekendDaysHaveZeroCapacity()
     {
         _db.Tasks.RemoveRange(_db.Tasks);
         _db.SaveChanges();
@@ -641,7 +641,7 @@ public class SchedulingEngineMonFriTests : IDisposable
         _db.Tasks.Add(TaskItem.Create("MF-001", "Mon-Fri Test", 1, B(3)));
         _db.SaveChanges();
 
-        _engine.RunScheduler();
+        await _engine.RunSchedulerAsync();
 
         // DayOfWeek cannot be translated to SQL Server — evaluate client-side
         var allCalDays = _db.Calendar.ToList();
