@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SoftwareDeliveryPlanner.Application.Abstractions;
+using SoftwareDeliveryPlanner.Domain;
 using SoftwareDeliveryPlanner.Infrastructure.Data;
 
 namespace SoftwareDeliveryPlanner.Infrastructure.Services;
@@ -25,6 +26,18 @@ internal sealed class SchedulingEngineFactory : ISchedulingEngineFactory
     public async Task<ISchedulingEngine> CreateAsync(CancellationToken cancellationToken = default)
     {
         var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        return new SchedulingEngine(db, _timeProvider, ownsContext: true);
+
+        // Load settings asynchronously here so the SchedulingEngine constructor
+        // stays synchronous (constructors cannot be async).
+        var atRiskSetting = await db.Settings
+            .FirstOrDefaultAsync(s => s.Key == DomainConstants.SettingKeys.AtRiskThreshold, cancellationToken);
+        var atRiskThreshold = int.TryParse(atRiskSetting?.Value, out var t) ? t : 5;
+
+        var weekSetting = await db.Settings
+            .FirstOrDefaultAsync(s => s.Key == DomainConstants.SettingKeys.WorkingWeek, cancellationToken);
+        var weekendDays = DomainConstants.WorkingWeek.GetWeekendDays(
+            weekSetting?.Value ?? DomainConstants.WorkingWeek.SunThu);
+
+        return new SchedulingEngine(db, _timeProvider, atRiskThreshold, weekendDays, ownsContext: true);
     }
 }

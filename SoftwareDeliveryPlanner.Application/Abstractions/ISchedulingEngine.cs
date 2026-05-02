@@ -11,13 +11,13 @@ namespace SoftwareDeliveryPlanner.Application.Abstractions;
 public interface ISchedulingEngine : IDisposable
 {
     /// <summary>Runs the full scheduling algorithm. Returns a summary message.</summary>
-    string RunScheduler();
+    Task<string> RunSchedulerAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Computes dashboard KPI metrics from current task/resource data.</summary>
-    Dictionary<string, object> GetDashboardKPIs();
+    Task<Dictionary<string, object>> GetDashboardKPIsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Produces the output plan rows for all tasks ordered by scheduling rank.</summary>
-    List<OutputPlanRowDto> GetOutputPlan();
+    Task<List<OutputPlanRowDto>> GetOutputPlanAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Determines whether the given date is a working day (not a weekend or holiday).</summary>
     bool IsWorkingDay(DateTime date);
@@ -29,11 +29,11 @@ public interface ISchedulingEngine : IDisposable
     Holiday? GetHolidayForDate(DateTime date);
 
     /// <summary>Runs the scheduler in dry-run mode and returns a diff of what would change.</summary>
-    ScheduleDiffDto PreviewSchedule();
+    Task<ScheduleDiffDto> PreviewScheduleAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Locks all current unlocked allocations as the frozen baseline
     /// and records today as the baseline_date setting.
     /// </summary>
-    void FreezeBaseline();
+    Task FreezeBaselineAsync(CancellationToken cancellationToken = default);
 }

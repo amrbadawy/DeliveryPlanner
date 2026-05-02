@@ -6,6 +6,7 @@
 @using SoftwareDeliveryPlanner.Domain
 @using SoftwareDeliveryPlanner.Domain.Services
 @using SoftwareDeliveryPlanner.Web.Services
+@using SoftwareDeliveryPlanner.Web.Services.Heatmap
 @inject IMediator Mediator
 @inject ResourceFilterState ResourceFilter
 @implements IDisposable
@@ -79,7 +80,7 @@ else
                             {
                                 var cell = FilteredCells.FirstOrDefault(c => c.ResourceName == resourceName && c.WeekStart == week);
                                 var pct = cell?.UtilizationPct ?? 0;
-                                <td class="heatmap-cell" style="background-color: @GetCellColor(pct);" title="@resourceName — W@(WeekNumberCalculator.GetWeekOfYear(week, weekNumberingCode, workingWeekCode)) (@week.ToString("dd MMM") - @week.AddDays(6).ToString("dd MMM")) — @pct.ToString("F1")%">
+                                <td class="heatmap-cell" style="background-color: @HeatmapColorPalette.GetCellColor(pct);" title="@resourceName — W@(WeekNumberCalculator.GetWeekOfYear(week, weekNumberingCode, workingWeekCode)) (@week.ToString("dd MMM") - @week.AddDays(6).ToString("dd MMM")) — @pct.ToString("F1")%">
                                     @pct.ToString("F0")%
                                 </td>
                             }
@@ -169,15 +170,6 @@ else
             isRefreshing = false;
         }
     }
-
-    private static string GetCellColor(double pct) => pct switch
-    {
-        0 => "var(--color-bg-secondary)",
-        <= 50 => "var(--color-info-light)",
-        <= 80 => "var(--color-success-light)",
-        <= 100 => "var(--color-warning-light)",
-        _ => "var(--color-danger-light)"
-    };
 
     private void OnFilterChanged() => InvokeAsync(StateHasChanged);
 
