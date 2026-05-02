@@ -2157,7 +2157,7 @@ public class GetWorkloadHeatmapQueryHandlerTests : OrchestratorFixture
     [Fact]
     public async Task Handle_ReturnsSuccessWithDto()
     {
-        var handler = new GetWorkloadHeatmapQueryHandler(PlanningQueryService);
+        var handler = new GetWorkloadHeatmapQueryHandler(PlanningQueryService, new NoOpTestFaultPolicy());
         var result = await handler.Handle(new GetWorkloadHeatmapQuery(), CancellationToken.None);
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value.ResourceNames);
@@ -2169,10 +2169,46 @@ public class GetWorkloadHeatmapQueryHandlerTests : OrchestratorFixture
     public async Task Handle_AfterScheduler_ReturnsPopulatedHeatmap()
     {
         await SchedulerService.RunSchedulerAsync();
-        var handler = new GetWorkloadHeatmapQueryHandler(PlanningQueryService);
+        var handler = new GetWorkloadHeatmapQueryHandler(PlanningQueryService, new NoOpTestFaultPolicy());
         var result = await handler.Handle(new GetWorkloadHeatmapQuery(), CancellationToken.None);
         Assert.True(result.IsSuccess);
         Assert.True(result.Value.ResourceNames.Count > 0);
+    }
+
+    [Fact]
+    public async Task Handle_WhenFaultPolicyArmed_PropagatesException()
+    {
+        // Verifies the fault-injection seam: when the test fault policy throws
+        // for the WorkloadHeatmap key, the handler does NOT swallow it. The
+        // Heatmap razor catches it at the call site and renders the error UI.
+        var policy = new ThrowingFaultPolicy(GetWorkloadHeatmapQueryHandler.FaultOperationKey);
+        var handler = new GetWorkloadHeatmapQueryHandler(PlanningQueryService, policy);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.Handle(new GetWorkloadHeatmapQuery(), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Handle_WhenFaultPolicyArmedForOtherKey_DoesNotThrow()
+    {
+        // Operation-key isolation: arming a different key must NOT affect this handler.
+        var policy = new ThrowingFaultPolicy("SomeOtherOperation");
+        var handler = new GetWorkloadHeatmapQueryHandler(PlanningQueryService, policy);
+
+        var result = await handler.Handle(new GetWorkloadHeatmapQuery(), CancellationToken.None);
+        Assert.True(result.IsSuccess);
+    }
+
+    /// <summary>Minimal in-test fault policy that throws for a single key.</summary>
+    private sealed class ThrowingFaultPolicy : ITestFaultPolicy
+    {
+        private readonly string _armed;
+        public ThrowingFaultPolicy(string armed) => _armed = armed;
+        public void MaybeThrow(string operationKey)
+        {
+            if (string.Equals(operationKey, _armed, StringComparison.Ordinal))
+                throw new InvalidOperationException($"Test fault for '{operationKey}'.");
+        }
     }
 }
 

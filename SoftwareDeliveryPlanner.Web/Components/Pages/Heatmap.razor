@@ -39,6 +39,17 @@
 {
     <SkeletonLoader Variant="table" Rows="6" Columns="8" TestId="heatmap-skeleton" />
 }
+else if (!string.IsNullOrEmpty(loadError))
+{
+    <div class="empty-state" data-testid="heatmap-error">
+        <div class="empty-icon"><i class="bi bi-exclamation-triangle text-danger"></i></div>
+        <h5>Unable to load workload heatmap</h5>
+        <p>@loadError</p>
+        <button class="btn btn-outline-secondary" @onclick="RefreshData" data-testid="heatmap-error-retry">
+            <i class="bi bi-arrow-clockwise"></i> Retry
+        </button>
+    </div>
+}
 else
 {
     <div class="heatmap-layout">
@@ -108,6 +119,7 @@ else
     private WorkloadHeatmapDto? heatmap;
     private bool isLoaded;
     private bool isRefreshing;
+    private string? loadError;
     private ToastNotification toast = default!;
     private string workingWeekCode = DomainConstants.WorkingWeek.SunThu;
     private string weekNumberingCode = DomainConstants.WeekNumbering.Default;
@@ -139,8 +151,18 @@ else
             if (!string.IsNullOrEmpty(settingsResult.Value.WeekNumbering))
                 weekNumberingCode = settingsResult.Value.WeekNumbering;
         }
-        await LoadData();
-        isLoaded = true;
+        try
+        {
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Unexpected error: {ex.Message}";
+        }
+        finally
+        {
+            isLoaded = true;
+        }
     }
 
     private async Task LoadData()
@@ -163,7 +185,13 @@ else
         try
         {
             await LoadData();
+            loadError = null;
             toast.Show("Heatmap refreshed.");
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Unexpected error: {ex.Message}";
+            toast.Show($"Heatmap error: {ex.Message}", "error");
         }
         finally
         {

@@ -15,11 +15,25 @@ public sealed record GetWorkloadHeatmapQuery : IRequest<Result<WorkloadHeatmapDt
 
 internal sealed class GetWorkloadHeatmapQueryHandler : IRequestHandler<GetWorkloadHeatmapQuery, Result<WorkloadHeatmapDto>>
 {
-    private readonly IPlanningQueryService _service;
+    /// <summary>Operation key used by <see cref="ITestFaultPolicy"/> for this handler.</summary>
+    public const string FaultOperationKey = "WorkloadHeatmap";
 
-    public GetWorkloadHeatmapQueryHandler(IPlanningQueryService service)
-        => _service = service;
+    private readonly IPlanningQueryService _service;
+    private readonly ITestFaultPolicy _testFaultPolicy;
+
+    public GetWorkloadHeatmapQueryHandler(IPlanningQueryService service, ITestFaultPolicy testFaultPolicy)
+    {
+        _service = service;
+        _testFaultPolicy = testFaultPolicy;
+    }
 
     public async Task<Result<WorkloadHeatmapDto>> Handle(GetWorkloadHeatmapQuery request, CancellationToken cancellationToken)
-        => await _service.GetWorkloadHeatmapAsync(cancellationToken);
+    {
+        // Test-only fault seam: in production this is always a no-op (NoOpTestFaultPolicy).
+        // In e2e runs with SDP_TEST_FAULTS=1, an armed key throws TestInjectedFaultException,
+        // which the Heatmap page catches and surfaces as the error-state UI.
+        _testFaultPolicy.MaybeThrow(FaultOperationKey);
+
+        return await _service.GetWorkloadHeatmapAsync(cancellationToken);
+    }
 }
