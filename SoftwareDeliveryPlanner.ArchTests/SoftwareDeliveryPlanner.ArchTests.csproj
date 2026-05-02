@@ -24,6 +24,15 @@
     <ProjectReference Include="..\SoftwareDeliveryPlanner.Application\SoftwareDeliveryPlanner.Application.csproj" />
     <ProjectReference Include="..\SoftwareDeliveryPlanner.Infrastructure\SoftwareDeliveryPlanner.Infrastructure.csproj" />
     <ProjectReference Include="..\SoftwareDeliveryPlanner.SharedKernel\SoftwareDeliveryPlanner.SharedKernel.csproj" />
+    <!--
+      Web is referenced with ReferenceOutputAssembly=false so the Blazor Server SDK is
+      not pulled into the test runner's compile graph. The dependency exists only to
+      ensure Web is built before architecture tests run; the Web DLL is then loaded
+      from disk by reflection in the Gantt purity tests.
+    -->
+    <ProjectReference Include="..\SoftwareDeliveryPlanner.Web\SoftwareDeliveryPlanner.Web.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
   </ItemGroup>
 
 </Project>

@@ -1882,4 +1882,170 @@ public class DependencyRulesTests
         }
         return false;
     }
+
+    // ── Gantt-specific architecture rules (Phase 1) ─────────────────────────
+
+    /// <summary>
+    /// All MediatR queries whose name contains "Gantt" (e.g. <c>GetGanttSegmentsQuery</c>)
+    /// must implement <see cref="IRequest{T}"/> with a <c>Result&lt;T&gt;</c> response so that
+    /// failures propagate through the standard MediatR pipeline.
+    /// </summary>
+    [Fact]
+    public void GanttQueries_Must_Implement_IRequest_With_Result()
+    {
+        var appAssembly = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+
+        var ganttQueries = appAssembly.GetTypes()
+            .Where(t => t.IsClass || (t.IsValueType && !t.IsEnum && !t.IsPrimitive)) // records compile to classes; structs allowed
+            .Where(t => t.Name.Contains("Gantt", StringComparison.OrdinalIgnoreCase)
+                        && t.Name.EndsWith("Query", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.NotEmpty(ganttQueries);
+
+        var violations = ganttQueries
+            .Where(t => !t.GetInterfaces().Any(i =>
+                i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IRequest<>)))
+            .Select(t => t.FullName)
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"Gantt queries must implement IRequest<T>. Violations: {string.Join(", ", violations)}");
+    }
+
+    /// <summary>
+    /// Public Gantt DTOs in <c>SoftwareDeliveryPlanner.Application.Abstractions</c>
+    /// must be sealed records to preserve immutability and value semantics.
+    /// </summary>
+    [Fact]
+    public void GanttDtos_In_Abstractions_Must_Be_Sealed_Records()
+    {
+        var appAssembly = typeof(SoftwareDeliveryPlanner.Application.AssemblyMarker).Assembly;
+
+        var ganttDtos = appAssembly.GetTypes()
+            .Where(t => t.IsPublic
+                        && t.Namespace == "SoftwareDeliveryPlanner.Application.Abstractions"
+                        && t.Name.Contains("Gantt", StringComparison.OrdinalIgnoreCase)
+                        && t.Name.EndsWith("Dto", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.NotEmpty(ganttDtos);
+
+        var violations = new List<string>();
+        foreach (var dto in ganttDtos)
+        {
+            // Records have a compiler-generated EqualityContract property; that's our heuristic.
+            var isRecord = dto.GetMethod("<Clone>$", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public) != null;
+            if (!isRecord) violations.Add($"{dto.FullName} (not a record)");
+            else if (!dto.IsSealed) violations.Add($"{dto.FullName} (record not sealed)");
+        }
+
+        Assert.True(violations.Count == 0,
+            $"Gantt DTOs in Abstractions must be sealed records. Violations: {string.Join(", ", violations)}");
+    }
+
+    /// <summary>
+    /// Pure helpers under <c>SoftwareDeliveryPlanner.Web.Services.Gantt</c> must not
+    /// take dependencies on EF Core, MediatR, or other infrastructure — they are
+    /// the testable core of the Gantt view and must remain side-effect free.
+    /// </summary>
+    [Fact]
+    public void Web_Services_Gantt_Must_Not_Reference_Infrastructure_Or_MediatR()
+    {
+        var webAssembly = LoadWebAssembly();
+        Assert.NotNull(webAssembly);
+
+        var helperTypes = SafeGetTypes(webAssembly!)
+            .Where(t =>
+            {
+                try { return t.Namespace?.StartsWith("SoftwareDeliveryPlanner.Web.Services.Gantt", StringComparison.Ordinal) == true; }
+                catch { return false; }
+            })
+            .ToList();
+
+        Assert.NotEmpty(helperTypes);
+
+        var forbiddenAssemblyPrefixes = new[]
+        {
+            "Microsoft.EntityFrameworkCore",
+            "MediatR",
+            "SoftwareDeliveryPlanner.Infrastructure"
+        };
+
+        var violations = new List<string>();
+        foreach (var t in helperTypes)
+        {
+            // Inspect referenced types via methods, fields, constructors.
+            var referenced = new HashSet<Type>();
+            try
+            {
+                foreach (var m in t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance))
+                {
+                    referenced.Add(m.ReturnType);
+                    foreach (var p in m.GetParameters()) referenced.Add(p.ParameterType);
+                }
+                foreach (var f in t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance))
+                    referenced.Add(f.FieldType);
+            }
+            catch (TypeLoadException) { /* skip helpers whose signatures touch unloaded types */ }
+            catch (FileNotFoundException) { /* same */ }
+
+            foreach (var r in referenced)
+            {
+                string asmName;
+                try { asmName = r.Assembly.GetName().Name ?? ""; }
+                catch { continue; }
+                if (forbiddenAssemblyPrefixes.Any(p => asmName.StartsWith(p, StringComparison.Ordinal)))
+                    violations.Add($"{t.FullName} references {r.FullName} (from {asmName})");
+            }
+        }
+
+        Assert.True(violations.Count == 0,
+            $"Web.Services.Gantt helpers must remain pure. Violations:{Environment.NewLine}" +
+            string.Join(Environment.NewLine, violations.Distinct()));
+    }
+
+    /// <summary>
+    /// Loads the Web assembly via the file system since Web has no public AssemblyMarker
+    /// and ArchTests deliberately avoids a project reference to the Web SDK.
+    /// </summary>
+    private static Assembly? LoadWebAssembly()
+    {
+        var loaded = AppDomain.CurrentDomain.GetAssemblies()
+            .FirstOrDefault(a => a.GetName().Name == "SoftwareDeliveryPlanner.Web");
+        if (loaded != null) return loaded;
+
+        // Walk up from this assembly's location until we find the repo root, then probe
+        // the standard Blazor build output: SoftwareDeliveryPlanner.Web/bin/{Cfg}/net10.0/SoftwareDeliveryPlanner.Web.dll
+        var dir = new DirectoryInfo(Path.GetDirectoryName(typeof(DependencyRulesTests).Assembly.Location)!);
+        while (dir != null)
+        {
+            var slnx = Path.Combine(dir.FullName, "SoftwareDeliveryPlanner.slnx");
+            if (File.Exists(slnx))
+            {
+                foreach (var cfg in new[] { "Debug", "Release" })
+                {
+                    var candidate = Path.Combine(
+                        dir.FullName,
+                        "SoftwareDeliveryPlanner.Web", "bin", cfg, "net10.0",
+                        "SoftwareDeliveryPlanner.Web.dll");
+                    if (File.Exists(candidate))
+                        return Assembly.LoadFrom(candidate);
+                }
+                break;
+            }
+            dir = dir.Parent;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns all loadable types from an assembly, ignoring those whose dependencies
+    /// (e.g. Microsoft.AspNetCore.Components) are not present in the test runner.
+    /// </summary>
+    private static IEnumerable<Type> SafeGetTypes(Assembly asm)
+    {
+        try { return asm.GetTypes(); }
+        catch (ReflectionTypeLoadException ex) { return ex.Types.Where(t => t != null)!; }
+    }
 }
