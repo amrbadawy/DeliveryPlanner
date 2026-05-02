@@ -58,7 +58,7 @@ else if (!string.IsNullOrEmpty(loadError))
         <div class="empty-icon"><i class="bi bi-exclamation-triangle text-danger"></i></div>
         <h5>Unable to load Gantt chart</h5>
         <p>@loadError</p>
-        <button class="btn btn-outline-secondary" @onclick="RefreshData">
+        <button class="btn btn-outline-secondary" @onclick="RefreshData" data-testid="gantt-error-retry">
             <i class="bi bi-arrow-clockwise"></i> Retry
         </button>
     </div>
